@@ -4,6 +4,11 @@
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[];
   let aiState={detected:false,fingers:0,side:""};
   let imageFrame=null;
+
+  const isEmbedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
+  const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
+  const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
+  let bridgeWindow=null,bridgeWaiters=new Map();
   let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056};
 
   const defaults={
@@ -162,6 +167,54 @@
     worker.onerror=e=>{running=false;log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
   }
 
+  function setupCameraBridge(){
+    if(!bridgeChannel)return;
+    bridgeChannel.onmessage=e=>{
+      const m=e.data||{};
+      if(m.type==="camera-snapshot"&&m.requestId&&bridgeWaiters.has(m.requestId)){
+        const waiter=bridgeWaiters.get(m.requestId);
+        bridgeWaiters.delete(m.requestId);
+        waiter.resolve(m);
+      }else if(m.type==="bridge-error"){
+        log("Camera Bridge error: "+(m.message||"Unknown error"));
+      }
+    };
+    if(isEmbedded&&$("embedCameraNotice"))$("embedCameraNotice").hidden=false;
+  }
+
+  function openCameraBridge(cameraIndex=0){
+    if(!bridgeChannel)throw new Error("This browser does not support BroadcastChannel.");
+    if(bridgeWindow&&!bridgeWindow.closed){
+      try{bridgeWindow.focus();}catch(e){}
+      return bridgeWindow;
+    }
+    const url=`./camera-bridge.html?channel=${encodeURIComponent(bridgeChannelName)}&camera=${encodeURIComponent(cameraIndex)}`;
+    bridgeWindow=window.open(url,"zebjusCameraBridge","width=520,height=690,resizable=yes,scrollbars=yes");
+    if(!bridgeWindow)throw new Error("Camera popup was blocked. Allow popups for this site and Run again.");
+    return bridgeWindow;
+  }
+
+  function requestBridgeSnapshot(cameraIndex=0,timeoutMs=30000){
+    return new Promise((resolve,reject)=>{
+      if(!bridgeChannel){reject(new Error("BroadcastChannel unavailable."));return;}
+      const requestId="req-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      const timer=setTimeout(()=>{
+        if(bridgeWaiters.has(requestId))bridgeWaiters.delete(requestId);
+        reject(new Error("Camera Bridge timed out. Allow camera permission in the Camera Bridge window."));
+      },timeoutMs);
+
+      bridgeWaiters.set(requestId,{
+        resolve:m=>{clearTimeout(timer);resolve(m);},
+        reject:e=>{clearTimeout(timer);reject(e);}
+      });
+
+      // Give a newly opened bridge a short moment to subscribe.
+      setTimeout(()=>{
+        bridgeChannel.postMessage({type:"request-snapshot",requestId,cameraIndex});
+      },500);
+    });
+  }
+
   async function enumerateCameras(){
     try{
       const ds=await navigator.mediaDevices?.enumerateDevices?.()||[];
@@ -205,21 +258,57 @@
 
   async function runCode(){
     if(running){log("Program already running. Press Stop first.");return;}
-    const src=getCode(),needsCamera=/\bzebjus_ai\b|\bHandDetector\b|\bCamera\s*\(/.test(src),needsAI=/\bzebjus_ai\b|\bHandDetector\b/.test(src),idx=requestedCamera(src);
-    terminal.textContent="";running=true;
 
-    if(prefs.autoCamera){
-      if(!cameraRunning || (idx!==null&&idx!==currentCameraIndex)){
-        if(cameraRunning)stopCamera();
-        const ok=await startCamera(idx);
-        if(!ok&&needsCamera){running=false;log("Program stopped because this project needs a camera.");return;}
+    const src=getCode();
+    const needsCamera=/\bzebjus_ai\b|\bHandDetector\b|\bCamera\s*\(/.test(src);
+    const needsAI=/\bzebjus_ai\b|\bHandDetector\b/.test(src);
+    const idx=requestedCamera(src);
+    const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
+    terminal.textContent="";
+    running=true;
+
+    let runFrame=null;
+
+    // Wix Online Programs / embedded mode:
+    // open a top-level Camera Bridge because the parent iframe blocks getUserMedia().
+    if(needsCamera&&isEmbedded){
+      try{
+        log("Wix embedded mode → opening Camera Bridge…");
+        openCameraBridge(requestedIdx);
+        const snap=await requestBridgeSnapshot(requestedIdx,30000);
+        aiState=snap.aiState||{detected:false,fingers:0,side:""};
+        runFrame=snap.frame||null;
+
+        $("handDetected").textContent=aiState.detected?"Yes":"No";
+        $("fingerCount").textContent=Number(aiState.fingers)||0;
+        $("handSide").textContent=aiState.side||"—";
+
+        log(`AI snapshot → detected=${!!aiState.detected}, fingers=${Number(aiState.fingers)||0}, side=${aiState.side||"-"}`);
+      }catch(e){
+        running=false;
+        log("Camera Bridge error: "+(e?.message||e));
+        log("Allow popups/camera, then press Run again.");
+        return;
       }
+    }else{
+      if(prefs.autoCamera&&needsCamera){
+        if(!cameraRunning || (idx!==null&&idx!==currentCameraIndex)){
+          if(cameraRunning)stopCamera();
+          const ok=await startCamera(idx);
+          if(!ok){running=false;log("Program stopped because this project needs a camera.");return;}
+        }
+      }
+
+      if(needsAI&&cameraRunning){
+        const stable=await ZebjusAI.waitForStable(1500);
+        aiState={detected:!!stable.detected,fingers:Number(stable.fingers)||0,side:stable.side||""};
+        log(`AI snapshot → detected=${aiState.detected}, fingers=${aiState.fingers}, side=${aiState.side||"-"}`);
+      }else{
+        aiState=ZebjusAI?.getSnapshot?.()||aiState;
+      }
+
+      runFrame=captureFrame();
     }
-    if(needsAI&&cameraRunning){
-      const stable=await ZebjusAI.waitForStable(1500);
-      aiState={detected:!!stable.detected,fingers:Number(stable.fingers)||0,side:stable.side||""};
-      log(`AI snapshot → detected=${aiState.detected}, fingers=${aiState.fingers}, side=${aiState.side||"-"}`);
-    }else aiState=ZebjusAI?.getSnapshot?.()||aiState;
 
     if(prefs.demoMode){
       sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
@@ -229,7 +318,15 @@
     }
 
     badge($("pythonStatus"),"Running…","warn");
-    worker.postMessage({type:"run",code:src,stdin:prefs.stdin||"",aiState,sensorState,frame:captureFrame(),imageFrame});
+    worker.postMessage({
+      type:"run",
+      code:src,
+      stdin:prefs.stdin||"",
+      aiState,
+      sensorState,
+      frame:runFrame,
+      imageFrame
+    });
   }
 
   function stopProgram(){running=false;createWorker();stopCamera();applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});applyDemo({command:"MOTOR_SET",id:1,speed:0});log("Stopped.");}
@@ -308,5 +405,5 @@
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
   $("kitNameText").textContent=prefs.kitId||"ZB-000123";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
-  updateRgb(0,0,0);updateSensorGraphics();initEditor();createWorker();enumerateCameras();connectRealKit();
+  updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();
 })();

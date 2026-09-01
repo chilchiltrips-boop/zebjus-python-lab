@@ -172,3 +172,25 @@ Commit:
 Hard refresh after Pages deploy:
 - Mac: Cmd + Shift + R
 - Windows: Ctrl + Shift + R
+
+
+## v5.1 — Wix Online Programs Camera Bridge
+
+Wix Online Programs can sandbox embedded content so the browser never shows a camera permission prompt inside the iframe.
+
+This build detects embedded mode. When camera-dependent code is Run:
+1. the embedded editor stays inside Wix
+2. a small `camera-bridge.html` popup/new tab opens
+3. camera permission is requested in that top-level window
+4. MediaPipe runs there
+5. the latest AI state and 320×240 camera frame are sent back to the embedded lab using `BroadcastChannel`
+6. Python runs inside the embedded lab with that camera snapshot
+
+This works for:
+- `HandDetector`
+- MediaPipe hand examples
+- `Camera(0).read()` OpenCV examples
+
+The Camera Bridge window can remain open for later Runs.
+
+If a browser blocks the popup, allow popups for the Wix/GitHub lab and press Run again.

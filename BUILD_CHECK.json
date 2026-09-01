@@ -19,19 +19,19 @@
     "py-worker.js": {
       "returncode": 0,
       "stderr": ""
+    },
+    "camera-bridge.js": {
+      "returncode": 0,
+      "stderr": ""
     }
   },
   "critical": {
     "all_js_pass": true,
-    "hand_wait_stable": true,
-    "rgb_api": true,
-    "ultrasonic_api": true,
-    "pot_api": true,
-    "image_load": true,
-    "draw_rgb": true,
-    "draw_pot": true,
-    "draw_ultra": true,
-    "module_worker": true,
-    "nojekyll": true
+    "camera_bridge_page": true,
+    "broadcast_channel": true,
+    "bridge_snapshot": true,
+    "embedded_detection": true,
+    "hand_stable": true,
+    "rgb_api": true
   }
 }
