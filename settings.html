@@ -11,7 +11,7 @@
   <header class="topbar">
     <div>
       <h1>Python Lab Settings</h1>
-      <p>Camera, kit and editor preferences</p>
+      <p>Camera, editor and kit preferences</p>
     </div>
     <a class="btn primary" href="./index.html">← Back to Lab</a>
   </header>
@@ -23,20 +23,21 @@
         <label>
           <span>Camera index / device</span>
           <select id="cameraSelect">
-            <option value="">Camera 0 (default)</option>
+            <option value="0">Camera 0 (default)</option>
           </select>
         </label>
-
+        <div class="settings-inline">
+          <button id="allowCameraBtn" class="btn primary">Allow Camera / Detect</button>
+          <button id="refreshCameraBtn" class="btn">Refresh List</button>
+        </div>
         <label class="switch-row">
           <div>
-            <strong>Auto-start camera on Run</strong>
-            <span>Useful for MediaPipe and OpenCV camera projects.</span>
+            <strong>Auto-start camera when Run is pressed</strong>
+            <span>If camera permission fails, normal Python can still run; camera projects will stop.</span>
           </div>
           <input id="autoCamera" type="checkbox">
         </label>
-
-        <button id="refreshCameraBtn" class="btn">Refresh Camera List</button>
-        <p class="muted settings-note">Student code can also use <code>Camera(0)</code>, <code>Camera(1)</code>, etc.</p>
+        <p class="muted settings-note">Student code may override this selection with <code>Camera(0)</code>, <code>Camera(1)</code>, etc.</p>
       </div>
     </section>
 
@@ -46,16 +47,14 @@
         <label class="switch-row">
           <div>
             <strong>Demo mode</strong>
-            <span>Use the on-screen LED, motor and servo graphics.</span>
+            <span>Show commands using the on-screen LED, motor and servo graphics.</span>
           </div>
           <input id="demoMode" type="checkbox">
         </label>
-
         <label>
           <span>Kit ID</span>
           <input id="kitId" value="ZB-000123">
         </label>
-
         <label>
           <span>Secure WebSocket URL</span>
           <input id="wsUrl" placeholder="wss://lab-api.zebjus.com/ws">
@@ -76,11 +75,10 @@
             <option value="17">17 px</option>
           </select>
         </label>
-
         <label class="switch-row">
           <div>
             <strong>Auto-save student code</strong>
-            <span>Keep code in this browser after refresh.</span>
+            <span>Keep code after refresh in this browser.</span>
           </div>
           <input id="autoSave" type="checkbox">
         </label>
@@ -88,13 +86,13 @@
     </section>
 
     <section class="panel settings-card">
-      <div class="panel-title"><strong>Program Input</strong></div>
+      <div class="panel-title"><strong>Python input()</strong></div>
       <div class="settings-body">
         <label>
-          <span>Values for Python input()</span>
-          <textarea id="stdinBox" rows="6" placeholder="One value per line"></textarea>
+          <span>Program Input</span>
+          <textarea id="stdinBox" rows="6" placeholder="One input value per line"></textarea>
         </label>
-        <p class="muted settings-note">Example: first line is used by the first <code>input()</code>, second line by the next.</p>
+        <p class="muted settings-note">The first line is used by the first <code>input()</code>, the second line by the next one.</p>
       </div>
     </section>
 
@@ -104,7 +102,6 @@
       <span id="settingsSaved" class="muted"></span>
     </div>
   </main>
-
-  <script type="module" src="./settings.js"></script>
+  <script src="./settings.js"></script>
 </body>
 </html>

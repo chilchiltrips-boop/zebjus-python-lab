@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ZEBJUS Lab Diagnostics</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="settings-page">
+  <header class="topbar"><div><h1>Lab Diagnostics</h1><p>Quick deployment checks</p></div><a class="btn" href="./index.html">← Lab</a></header>
+  <main class="settings-layout">
+    <section class="panel settings-card"><div class="panel-title"><strong>Checks</strong></div><div class="settings-body">
+      <div id="diagResults">Running checks…</div>
+      <button id="workerTestBtn" class="btn primary">Test Python Worker</button>
+      <pre id="diagConsole" class="diag-console"></pre>
+    </div></section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
+  <script>
+    const out=document.getElementById("diagResults");
+    const tests=[
+      ["HTTPS", location.protocol==="https:" || location.hostname==="localhost"],
+      ["CodeMirror loaded", typeof CodeMirror!=="undefined"],
+      ["Camera API", !!navigator.mediaDevices?.getUserMedia],
+      ["Worker API", typeof Worker!=="undefined"]
+    ];
+    out.innerHTML=tests.map(([n,ok])=>`<p>${ok?"✅":"❌"} ${n}</p>`).join("");
+    document.getElementById("workerTestBtn").onclick=()=>{
+      const c=document.getElementById("diagConsole");c.textContent="Starting worker…\n";
+      const w=new Worker("./py-worker.js",{type:"module"});
+      w.onmessage=e=>{c.textContent+=JSON.stringify(e.data)+"\n";if(e.data?.type==="ready"){w.postMessage({type:"run",code:'print("Python worker OK")',stdin:"",aiState:{},frame:null});}};
+      w.onerror=e=>c.textContent+="Worker error: "+e.message+"\n";
+    };
+  </script>
+</body>
+</html>

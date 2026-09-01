@@ -1,32 +1,88 @@
-# ZEBJUS Python Lab v3.1 Classic
+# ZEBJUS Python Lab — FULL v4
 
-This version returns to the clearer classic layout while keeping the newer learning features.
+This is a fresh complete project. You can delete the old GitHub repository contents and upload **all files from this ZIP**.
 
-## Main page
-- Large Python editor
-- Run / Stop / Reset
-- Small camera preview
-- Visible LED / Motor / Servo graphics
-- Compact output terminal
-- Python / OpenCV / MediaPipe / kit examples
-- Case-sensitive autocomplete
-- Mobile responsive layout
+## Why this version fixes the editor problem
 
-## Separate Settings page
-Settings are moved to `settings.html`:
-- Camera index
-- Auto-start camera
-- Demo mode
-- Kit ID
-- Secure WebSocket URL
-- Editor font size
-- Auto-save
-- Values for Python `input()`
+Previous builds used CodeMirror 6 through ES-module imports. If one module import failed, syntax colors and autocomplete could disappear.
 
-## OpenCV
-Pyodide 314.0.6 includes `opencv-python`. It loads only when an OpenCV example imports `cv2`.
+This build uses **CodeMirror 5.65.21 classic scripts** loaded in a fixed order:
+- CodeMirror core
+- Python mode
+- show-hint autocomplete
+- auto-close brackets
+- bracket matching
+- active-line highlighting
 
-Use browser camera through:
+The editor uses a custom PyCharm-inspired dark theme.
+
+## Editor features
+
+- Python syntax colors
+- keywords orange
+- strings green
+- numbers blue
+- comments gray italic
+- function definitions yellow
+- line numbers
+- active line
+- bracket matching
+- auto-close brackets
+- Tab = 4 spaces
+- autosave
+- case-sensitive autocomplete
+- autocomplete while typing
+- Ctrl+Space / Cmd+Space shows suggestions
+- Suggestions button
+
+### Autocomplete examples
+
+Type:
+- `pri` → `print()`
+- `imp` → `import`
+- `import c` → `cv2`
+- `from zebjus import ` → `LED`, `Motor`, `Servo`, `sleep`
+- `from zebjus_ai import ` → `HandDetector`
+- `from zebjus_cv import ` → `Camera`, `show`
+- `cv2.` → OpenCV functions/constants
+- `np.` → NumPy functions
+- `math.` → math functions
+- `random.` → random functions
+
+Object inference also works for common assignments:
+
+```python
+myled = LED(1)
+myled.
+```
+
+suggests LED methods.
+
+```python
+camera = Camera(0)
+camera.
+```
+
+suggests `read()`.
+
+## Python runtime
+
+Pyodide is pinned to **314.0.6** and is run in a **module-type Web Worker**, as required by current Pyodide.
+
+OpenCV is loaded only when needed.
+
+Pyodide includes:
+- NumPy
+- opencv-python
+- many standard scientific Python packages
+
+## Camera and MediaPipe
+
+MediaPipe Tasks Vision is pinned to 1.0.1.
+
+Run automatically starts the camera when Auto Camera is enabled in Settings.
+
+Camera projects can use:
 
 ```python
 from zebjus_cv import Camera, show
@@ -37,81 +93,110 @@ gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 show(gray)
 ```
 
-## MediaPipe
-MediaPipe Tasks Vision 1.0.1 runs in the browser.
+MediaPipe:
 
-## GitHub update
-Upload/replace all files in the repository root:
+```python
+from zebjus_ai import HandDetector
 
-- index.html
-- settings.html
-- styles.css
-- config.js
-- app.js
-- settings.js
-- ai.js
-- py-worker.js
-- .nojekyll
-- README.md
-
-Commit example:
-`Restore classic UI and add separate settings page`
-
-Your GitHub Pages URL stays the same.
-
-For Wix embedding, use:
-`https://chilchiltrips-boop.github.io/zebjus-python-lab/`
-
-Recommended iframe:
-- width 100%
-- height about 720px on desktop
-- on mobile, allow the iframe to use full page width
-
-
-## v3.1.1 Pyodide Worker Fix
-
-Pyodide 314 requires a module-type Web Worker.
-This build uses:
-
-```js
-new Worker("./py-worker.js", { type: "module" })
+result = HandDetector().read()
+print(result.detected)
+print(result.fingers)
+print(result.side)
 ```
 
-and loads:
+## Kit demo
+
+```python
+from zebjus import LED, Motor, Servo, sleep
+
+led = LED(1)
+led.on()
+
+motor = Motor(1)
+motor.forward(50)
+
+servo = Servo(1)
+servo.write(90)
+```
+
+Demo mode updates the visible LED, motor and servo graphics.
+
+## Separate Settings page
+
+`settings.html` contains:
+- Camera selection
+- Allow camera / detect devices
+- Auto camera
+- Demo mode
+- Kit ID
+- WSS URL
+- Editor font size
+- Autosave
+- input() values
+
+## Diagnostics
+
+Open:
+
+`diagnostics.html`
+
+It checks:
+- HTTPS
+- CodeMirror load
+- Camera API
+- Worker API
+- Pyodide worker
+
+## GitHub upload
+
+Delete the old files and upload ALL of these:
 
 ```text
-https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs
+index.html
+settings.html
+diagnostics.html
+styles.css
+config.js
+ai.js
+app.js
+settings.js
+py-worker.js
+README.md
+.nojekyll
 ```
 
-instead of using `importScripts()`.
+Commit message:
 
+`Install complete ZEBJUS Python Lab v4`
 
-## v3.2 PyCharm-style editor
+GitHub Pages URL remains:
 
-Added richer case-sensitive autocomplete and syntax colors.
+`https://chilchiltrips-boop.github.io/zebjus-python-lab/`
 
-Autocomplete includes:
-- `import ...` library suggestions
-- `from ...` library suggestions
-- `from zebjus import ...`
-- `from zebjus_ai import ...`
-- `from zebjus_cv import ...`
-- Python built-ins and snippets
-- `cv2.` OpenCV methods/constants
-- `np.` NumPy helpers
-- `math.` functions
-- `random.` functions
-- ZEBJUS LED/Motor/Servo methods
-- MediaPipe result properties
+After upload, hard refresh:
+- macOS Chrome: Cmd + Shift + R
+- Windows Chrome: Ctrl + Shift + R
 
-PyCharm-like syntax colors distinguish:
-- keywords
-- strings
-- numbers
-- comments
-- functions
-- classes
-- variables/properties
-- operators
+## First test
 
-Suggestions are intentionally case-sensitive to match Python behavior.
+1. Open the GitHub Pages URL.
+2. Confirm Python keywords/strings have different colors.
+3. Type `pri` and confirm `print()` suggestion.
+4. Type `cv2.` and confirm OpenCV suggestions.
+5. Run:
+
+```python
+print("Hello")
+```
+
+6. Run the LED example.
+7. Run the Hand Detection example.
+8. Run OpenCV Grayscale.
+
+## Wix embed
+
+Embed the GitHub Pages URL.
+
+Recommended desktop height: 700–760 px.
+
+On mobile, the layout automatically stacks the editor, small camera preview and kit output.

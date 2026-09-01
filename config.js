@@ -1,5 +1,5 @@
 window.ZEBJUS_CONFIG = {
-  pyodideVersion: "314.0.6",
+  pyodideBase: "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/",
   mediaPipe: {
     moduleUrl: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/+esm",
     wasmRoot: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm",

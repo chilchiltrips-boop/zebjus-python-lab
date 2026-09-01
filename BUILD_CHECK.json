@@ -1,0 +1,51 @@
+{
+  "project": "ZEBJUS Python Lab FULL v4",
+  "files": [
+    ".nojekyll",
+    "README.md",
+    "ai.js",
+    "app.js",
+    "config.js",
+    "diagnostics.html",
+    "index.html",
+    "py-worker.js",
+    "settings.html",
+    "settings.js",
+    "styles.css"
+  ],
+  "js_syntax_checks": {
+    "config.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "ai.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "app.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "settings.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "py-worker.js": {
+      "returncode": 0,
+      "stderr": ""
+    }
+  },
+  "critical_checks": {
+    "index_has_codemirror": true,
+    "index_has_python_mode": true,
+    "index_has_show_hint": true,
+    "app_registers_hint": true,
+    "app_autocomplete_typing": true,
+    "app_module_worker": true,
+    "worker_pyodide_314": true,
+    "worker_opencv": true,
+    "settings_page": true,
+    "diagnostics_page": true,
+    "nojekyll": true
+  }
+}

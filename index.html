@@ -5,15 +5,22 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
   <title>ZEBJUS Python Lab</title>
+
+  <!-- CodeMirror 5: classic non-module editor for reliable GitHub Pages/Wix use -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div id="editorLoadError" class="fatal-banner" hidden>
+    Code editor library failed to load. Check internet/CDN access, then hard-refresh this page.
+  </div>
+
   <header class="topbar">
     <div>
       <h1>ZEBJUS Python Lab</h1>
-      <p>Learn Python • OpenCV • MediaPipe • Control your kit</p>
+      <p>Learn Python • OpenCV • MediaPipe • Control your Wi‑Fi kit</p>
     </div>
-
     <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
       <span id="kitStatus" class="badge">Demo mode</span>
@@ -26,7 +33,7 @@
     <section class="panel project-bar">
       <div class="project-left">
         <label>
-          <span>Example</span>
+          <span>Learning example</span>
           <select id="exampleSelect">
             <optgroup label="Python Basics">
               <option value="hello">Hello World</option>
@@ -34,12 +41,14 @@
               <option value="input">Input</option>
               <option value="ifelse">If / Else</option>
               <option value="forloop">For Loop</option>
+              <option value="whileloop">While Loop</option>
               <option value="function">Function</option>
               <option value="list">List</option>
             </optgroup>
             <optgroup label="OpenCV">
               <option value="cvGray">Camera → Grayscale</option>
               <option value="cvEdges">Camera → Canny Edges</option>
+              <option value="cvBlur">Gaussian Blur</option>
               <option value="cvThreshold">Threshold</option>
             </optgroup>
             <optgroup label="MediaPipe">
@@ -48,7 +57,7 @@
             </optgroup>
             <optgroup label="ZEBJUS Kit">
               <option value="led">LED Blink</option>
-              <option value="servo">Servo</option>
+              <option value="servo">Servo Sweep</option>
               <option value="motor">Motor</option>
             </optgroup>
           </select>
@@ -57,6 +66,7 @@
       </div>
 
       <div class="project-actions">
+        <button id="autocompleteBtn" class="btn" title="Show suggestions">⌘ Suggestions</button>
         <button id="resetBtn" class="btn">Reset</button>
         <button id="runBtn" class="btn success">▶ Run</button>
         <button id="stopBtn" class="btn danger">■ Stop</button>
@@ -68,11 +78,12 @@
         <div class="panel-title editor-title">
           <div>
             <strong>main.py</strong>
-            <span class="muted">Python autocomplete enabled</span>
+            <span class="muted">Case-sensitive Python autocomplete • Ctrl/⌘ + Space</span>
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
-        <div id="editor"></div>
+
+        <textarea id="codeEditor" spellcheck="false">print("Hello, ZEBJUS!")</textarea>
       </div>
 
       <aside class="side-column">
@@ -84,13 +95,11 @@
               <button id="cameraToggleBtn" class="btn tiny">Start</button>
             </div>
           </div>
-
           <div class="camera-wrap">
             <video id="cameraVideo" playsinline muted></video>
             <canvas id="cameraOverlay"></canvas>
             <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
           </div>
-
           <div class="ai-stats">
             <div><span>Hand</span><strong id="handDetected">—</strong></div>
             <div><span>Fingers</span><strong id="fingerCount">0</strong></div>
@@ -103,7 +112,6 @@
             <strong>Kit Output</strong>
             <span id="kitNameText" class="muted">ZB-000123</span>
           </div>
-
           <div class="demo-items">
             <div class="demo-card">
               <div class="led-shell"><div id="demoLed" class="led"></div></div>
@@ -140,13 +148,13 @@
       <div class="terminal-toolbar">
         <div class="output-tabs">
           <button class="output-tab active" data-view="terminal">Output</button>
-          <button class="output-tab" data-view="imageOutput">Image</button>
+          <button class="output-tab" data-view="imageOutput">OpenCV Image</button>
         </div>
         <button id="clearBtn" class="btn tiny">Clear</button>
       </div>
       <pre id="terminal" class="output-view active">Starting Python worker…</pre>
       <div id="imageOutput" class="output-view image-output">
-        <p id="imagePlaceholder">OpenCV <code>show(image)</code> output appears here.</p>
+        <p id="imagePlaceholder">Use <code>show(image)</code> to display an OpenCV result.</p>
         <img id="resultImage" alt="OpenCV output">
       </div>
     </section>
@@ -154,26 +162,35 @@
     <section class="panel quick-help">
       <div class="panel-title compact-title">
         <strong>Quick Reference</strong>
-        <span class="muted">Type to see case-sensitive suggestions</span>
+        <span class="muted">Start typing these commands to see suggestions</span>
       </div>
       <div class="help-grid">
         <code>import cv2</code>
         <code>import numpy as np</code>
-        <code>from zebjus import LED</code>
+        <code>from zebjus import *</code>
         <code>print()</code>
         <code>if / elif / else</code>
         <code>for i in range()</code>
         <code>LED(1).on()</code>
+        <code>Motor(1).forward()</code>
         <code>Servo(1).write(90)</code>
         <code>Camera(0).read()</code>
         <code>cv2.cvtColor()</code>
-        <code>np.array()</code>
         <code>HandDetector().read()</code>
       </div>
     </section>
   </main>
 
+  <!-- Classic CodeMirror scripts: load in fixed order -->
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/mode/python/python.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/closebrackets.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
+
   <script src="./config.js"></script>
-  <script type="module" src="./app.js"></script>
+  <script src="./ai.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
