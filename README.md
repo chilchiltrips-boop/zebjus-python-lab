@@ -1,39 +1,124 @@
-# ZEBJUS Python Lab v2
+# ZEBJUS Python Lab v3 — Student IDE
 
-Browser Python lab for Wix/GitHub Pages with Wi‑Fi kit commands and a MediaPipe hand-detection experiment.
+A compact, responsive browser Python IDE intended for Wix embedding and student learning.
 
-## Features
-- Monaco editor + autocomplete
-- Pyodide in a Web Worker
-- LED / Motor / Servo demo APIs
-- secure WebSocket transport for future real kit control
-- MediaPipe Hand Landmarker camera panel
-- finger-count demo
-- `from zebjus_ai import *` and `HandDetector().read()`
-- GitHub Pages friendly relative paths and `.nojekyll`
+## Why CodeMirror instead of Monaco
 
-## AI + LED example
-```python
-from zebjus import *
-from zebjus_ai import *
+Monaco is excellent on desktop but its official documentation says mobile browsers are not supported. v3 uses CodeMirror 6, which supports mobile native selection/editing, syntax highlighting, line numbers and autocomplete.
 
-led = LED(1)
-result = HandDetector().read()
+## Main features
 
-if result.detected and result.fingers >= 4:
-    led.on()
-else:
-    led.off()
+- Compact Wix-friendly layout
+- Desktop + tablet + mobile responsive UI
+- Mobile-friendly CodeMirror 6 editor
+- Case-sensitive Python autocomplete
+- Python keyword and built-in suggestions
+- ZEBJUS kit autocomplete
+- OpenCV autocomplete
+- MediaPipe/ZEBJUS AI autocomplete
+- Local autosave of student code
+- Program input box for `input()`
+- Run / Stop / Reset
+- Camera device/index selector
+- `Camera(0)`, `Camera(1)` style camera selection
+- Camera auto-start on Run
+- MediaPipe hand detection
+- OpenCV `cv2` support through Pyodide
+- OpenCV image output with `show(image)`
+- Demo LED / motor / servo
+- Real kit WSS structure retained
+- Python Basics / OpenCV / MediaPipe / Hardware examples
+
+## Upload to GitHub
+
+Replace the old repository files with all files from this ZIP:
+
+```text
+index.html
+styles.css
+config.js
+app.js
+ai.js
+py-worker.js
+.nojekyll
+README.md
 ```
 
-The AI bridge is snapshot-based in v2: MediaPipe runs continuously in JavaScript, and the newest camera state is copied into Python when Run is pressed. Continuous real-time Python loops will need a later async bridge.
+Commit example:
 
-## GitHub Pages files
-Keep these in repository root:
-`index.html`, `styles.css`, `config.js`, `app.js`, `ai.js`, `py-worker.js`, `.nojekyll`, `README.md`.
+```text
+Upgrade ZEBJUS Python Lab to v3 responsive student IDE
+```
 
-## Wix
-Embed the GitHub Pages HTTPS URL using Wix Embed Site/iFrame. Camera permission may be blocked by an iframe/browser policy; if so, use an **Open Python Lab** button that opens the lab in a new tab.
+Your existing GitHub Pages URL remains the same.
 
-## Production
-Before real hardware control, add authenticated users, per-user Kit ID authorization, WSS/TLS, command validation/rate limits, emergency stop, and firmware command-timeout failsafe.
+## Wix embed
+
+Recommended URL:
+
+```text
+https://chilchiltrips-boop.github.io/zebjus-python-lab/?embed=1
+```
+
+Use an Embed Site / iframe element and give it as much width as practical.
+
+Recommended desktop iframe:
+- width: 100%
+- height: 650–750 px
+
+On phones, allow the embedded element to use most of the page width. The app automatically switches to its mobile layout.
+
+### Camera note for Wix
+
+Camera APIs require HTTPS, which GitHub Pages provides. Some parent iframe configurations can still block camera permission. If a browser/Wix combination blocks it, the top-right ↗ button opens the same lab directly in a new tab, where camera permission can be granted normally.
+
+## Camera index
+
+The Camera tab lists browser cameras as Camera 0, Camera 1, etc.
+
+Student OpenCV examples use:
+
+```python
+from zebjus_cv import Camera, show
+import cv2
+
+cam = Camera(0)
+frame = cam.read()
+gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+show(gray)
+```
+
+If the code contains `Camera(1)`, the web app attempts to select browser camera index 1 before running.
+
+This intentionally uses `zebjus_cv.Camera()` instead of `cv2.VideoCapture()` because normal OpenCV desktop camera capture is not available inside a browser sandbox.
+
+## OpenCV loading
+
+OpenCV is only loaded when code imports `cv2` or `zebjus_cv`, which avoids making Python basics wait for the large OpenCV package.
+
+## MediaPipe
+
+MediaPipe runs in JavaScript/WASM and its newest hand snapshot is exposed to student Python:
+
+```python
+from zebjus_ai import HandDetector
+
+result = HandDetector().read()
+print(result.detected)
+print(result.fingers)
+print(result.side)
+```
+
+## Current live-loop limitation
+
+`HandDetector().read()` returns the latest snapshot at the moment Run begins. A blocking Python `while True` loop does not continuously receive new MediaPipe states in this static/Wix-compatible version. Press Stop to terminate accidental infinite loops.
+
+## Real kit
+
+Edit `config.js` to set your future secure relay:
+
+```js
+websocketUrl: "wss://lab-api.zebjus.com/ws"
+```
+
+Before real internet-controlled hardware use, add authenticated users, per-kit authorization, TLS/WSS, command validation, rate limiting, command timeout/failsafe, emergency stop and server-side logs.

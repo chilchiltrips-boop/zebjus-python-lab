@@ -1,144 +1,178 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
   <title>ZEBJUS Python Lab</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <header class="topbar">
-    <div>
-      <h1>ZEBJUS Python Lab</h1>
-      <p>Write Python. Run it in the browser. Control your Wi‑Fi kit.</p>
+    <div class="brand">
+      <strong>ZEBJUS Python Lab</strong>
+      <span>Learn • Code • Run • Control</span>
     </div>
-    <div class="status-wrap">
+    <div class="statusbar">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
-      <span id="kitStatus" class="badge">Kit disconnected</span>
-      <span id="aiStatus" class="badge">AI camera off</span>
+      <span id="kitStatus" class="badge">Demo kit</span>
+      <span id="aiStatus" class="badge">Camera off</span>
+      <button id="fullscreenBtn" class="icon-btn" title="Open lab in a new tab">↗</button>
     </div>
   </header>
 
-  <main class="layout">
-    <section class="panel connection-panel">
-      <div class="panel-title">Kit Connection</div>
-      <div class="form-grid">
-        <label>
-          Kit ID
-          <input id="kitId" value="ZB-000123" autocomplete="off" />
+  <main class="ide">
+    <aside class="sidebar panel">
+      <div class="side-tabs">
+        <button class="side-tab active" data-panel="learnPanel">Learn</button>
+        <button class="side-tab" data-panel="cameraPanel">Camera</button>
+        <button class="side-tab" data-panel="kitPanel">Kit</button>
+      </div>
+
+      <div id="learnPanel" class="side-panel active">
+        <label class="field">
+          <span>Learning example</span>
+          <select id="exampleSelect">
+            <optgroup label="Python Basics">
+              <option value="hello">Hello World</option>
+              <option value="variables">Variables</option>
+              <option value="input">Input</option>
+              <option value="ifelse">If / Else</option>
+              <option value="forloop">For Loop</option>
+              <option value="function">Functions</option>
+              <option value="list">Lists</option>
+            </optgroup>
+            <optgroup label="OpenCV">
+              <option value="cvGray">Camera → Grayscale</option>
+              <option value="cvEdges">Camera → Canny Edges</option>
+              <option value="cvThreshold">Threshold</option>
+            </optgroup>
+            <optgroup label="MediaPipe">
+              <option value="hand">Hand Detection</option>
+              <option value="handLed">Hand → LED</option>
+            </optgroup>
+            <optgroup label="ZEBJUS Kit">
+              <option value="led">LED Blink</option>
+              <option value="servo">Servo</option>
+              <option value="motor">Motor</option>
+            </optgroup>
+          </select>
         </label>
-        <label>
-          WebSocket URL
-          <input id="wsUrl" value="" placeholder="wss://your-server.example/ws" autocomplete="off" />
+
+        <button id="loadExampleBtn" class="btn primary full">Load Example</button>
+
+        <div class="tip">
+          <strong>Autocomplete</strong>
+          <p>Suggestions are case-sensitive like Python. Type <code>pri</code> → <code>print()</code>, <code>LED</code> → <code>LED()</code>, or <code>cv2.</code> for OpenCV.</p>
+        </div>
+
+        <details>
+          <summary>Program input</summary>
+          <textarea id="stdinBox" rows="4" placeholder="One input() value per line"></textarea>
+        </details>
+      </div>
+
+      <div id="cameraPanel" class="side-panel">
+        <label class="field">
+          <span>Camera index / device</span>
+          <select id="cameraSelect">
+            <option value="">Camera 0 (default)</option>
+          </select>
         </label>
-      </div>
-      <div class="row">
-        <button id="connectBtn" class="btn primary">Connect Kit</button>
-        <button id="disconnectBtn" class="btn">Disconnect</button>
-        <label class="switch-label">
-          <input id="demoMode" type="checkbox" checked />
-          Demo mode
+        <div class="button-grid">
+          <button id="refreshCameraBtn" class="btn">Refresh</button>
+          <button id="startCameraBtn" class="btn primary">Start</button>
+          <button id="stopCameraBtn" class="btn">Stop</button>
+        </div>
+        <label class="check">
+          <input id="autoCamera" type="checkbox" checked>
+          <span>Auto-start camera on Run</span>
         </label>
+        <p class="hint">Using <code>Camera(1)</code> in student code automatically selects camera index 1 when available.</p>
       </div>
 
-      <div class="demo-board">
-        <div class="demo-title">Demo Kit</div>
-        <div class="demo-items">
-          <div class="demo-card">
-            <div id="demoLed" class="led"></div>
-            <span>LED 1</span>
-          </div>
-          <div class="demo-card">
-            <div class="meter"><div id="motorMeter" class="meter-fill"></div></div>
-            <span id="motorLabel">Motor 1: stopped</span>
-          </div>
-          <div class="demo-card">
-            <div class="servo">
-              <div id="servoNeedle" class="servo-needle"></div>
-            </div>
-            <span id="servoLabel">Servo 1: 90°</span>
-          </div>
+      <div id="kitPanel" class="side-panel">
+        <label class="check">
+          <input id="demoMode" type="checkbox" checked>
+          <span>Demo mode</span>
+        </label>
+        <label class="field">
+          <span>Kit ID</span>
+          <input id="kitId" value="ZB-000123">
+        </label>
+        <label class="field advanced">
+          <span>Secure WebSocket</span>
+          <input id="wsUrl" placeholder="wss://lab-api.example/ws">
+        </label>
+        <div class="button-grid two">
+          <button id="connectBtn" class="btn primary">Connect</button>
+          <button id="disconnectBtn" class="btn">Disconnect</button>
+        </div>
+
+        <div class="mini-kit">
+          <div><i id="demoLed" class="led"></i><span>LED 1</span></div>
+          <div><div class="meter"><b id="motorMeter"></b></div><span id="motorLabel">Motor 0%</span></div>
+          <div><div class="servo"><b id="servoNeedle"></b></div><span id="servoLabel">Servo 90°</span></div>
         </div>
       </div>
-    </section>
+    </aside>
 
-
-    <section class="panel ai-panel">
-      <div class="panel-title ai-title">
-        <span>Browser AI Lab <small>BETA</small></span>
-        <div class="row compact">
-          <button id="startCameraBtn" class="btn primary">Start Camera</button>
-          <button id="stopCameraBtn" class="btn">Stop Camera</button>
-        </div>
-      </div>
-      <div class="ai-layout">
-        <div class="camera-wrap">
-          <video id="cameraVideo" playsinline muted></video>
-          <canvas id="cameraOverlay"></canvas>
-          <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
-        </div>
-        <div class="ai-readout">
-          <div class="readout-card"><span>Hand</span><strong id="handDetected">Not detected</strong></div>
-          <div class="readout-card"><span>Finger count</span><strong id="fingerCount">0</strong></div>
-          <div class="readout-card"><span>Hand side</span><strong id="handSide">—</strong></div>
-          <p class="muted">MediaPipe runs in the browser. Python receives the latest AI snapshot when you press Run.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="workspace">
-      <div class="panel editor-panel">
-        <div class="editor-toolbar">
-          <div>
-            <strong>main.py</strong>
-            <span class="muted">Autocomplete enabled</span>
-          </div>
-          <div class="row compact">
-            <button id="exampleBtn" class="btn">LED Example</button>
-            <button id="aiExampleBtn" class="btn">AI + LED Example</button>
-            <button id="resetBtn" class="btn">Reset</button>
+    <section class="main-workspace">
+      <section class="editor-panel panel">
+        <div class="editor-head">
+          <div class="file-title"><span class="dot"></span><strong>main.py</strong><small id="saveState">Saved</small></div>
+          <div class="toolbar">
+            <button id="resetBtn" class="btn small">Reset</button>
             <button id="runBtn" class="btn success">▶ Run</button>
             <button id="stopBtn" class="btn danger">■ Stop</button>
           </div>
         </div>
-        <div id="editor"></div>
-      </div>
+        <div id="editor" aria-label="Python code editor"></div>
+      </section>
 
-      <div class="panel terminal-panel">
-        <div class="terminal-toolbar">
-          <strong>Output</strong>
-          <button id="clearBtn" class="btn small">Clear</button>
+      <section class="output-panel panel">
+        <div class="output-head">
+          <div class="output-tabs">
+            <button class="output-tab active" data-output="consoleView">Console</button>
+            <button class="output-tab" data-output="imageView">Image</button>
+          </div>
+          <button id="clearBtn" class="btn tiny">Clear</button>
         </div>
-        <pre id="terminal">Starting Python worker…</pre>
-      </div>
+        <pre id="consoleView" class="output-view active">Starting Python…</pre>
+        <div id="imageView" class="output-view image-view">
+          <div class="image-placeholder">OpenCV <code>show(image)</code> output appears here.</div>
+          <img id="resultImage" alt="OpenCV result">
+        </div>
+      </section>
     </section>
 
-    <section class="panel help-panel">
-      <div class="panel-title">Student Libraries</div>
-      <div class="help-grid">
-        <code>LED(1).on()</code>
-        <code>LED(1).off()</code>
-        <code>LED(1).blink(5, 0.5)</code>
-        <code>Motor(1).forward(60)</code>
-        <code>Motor(1).backward(40)</code>
-        <code>Motor(1).stop()</code>
-        <code>Servo(1).write(90)</code>
-        <code>sleep(1)</code>
+    <aside class="camera-dock panel">
+      <div class="camera-head">
+        <strong>Camera</strong>
+        <span id="cameraIndexLabel">Index 0</span>
       </div>
-      <div class="help-grid">
-        <code>HandDetector()</code>
-        <code>hand.read()</code>
-        <code>result.detected</code>
-        <code>result.fingers</code>
-        <code>result.side</code>
+      <div class="camera-wrap">
+        <video id="cameraVideo" playsinline muted></video>
+        <canvas id="cameraOverlay"></canvas>
+        <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
       </div>
-      <p class="muted">Real hardware mode uses secure WebSocket (WSS). Camera requires HTTPS or localhost. Python AI uses the latest snapshot captured before Run.</p>
-    </section>
+      <div class="ai-readout">
+        <div><span>Hand</span><strong id="handDetected">—</strong></div>
+        <div><span>Fingers</span><strong id="fingerCount">0</strong></div>
+        <div><span>Side</span><strong id="handSide">—</strong></div>
+      </div>
+      <p class="hint camera-note">MediaPipe runs locally in the browser. OpenCV uses a camera snapshot for each Run.</p>
+    </aside>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
-  <script type="module" src="./ai.js"></script>
+  <nav class="mobile-nav">
+    <button data-mobile="learnPanel">Learn</button>
+    <button data-mobile="cameraPanel">Camera</button>
+    <button data-mobile="kitPanel">Kit</button>
+    <button id="mobileRun" class="run-mobile">▶ Run</button>
+  </nav>
+
   <script src="./config.js"></script>
-  <script src="./app.js"></script>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>

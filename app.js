@@ -1,316 +1,288 @@
-const terminal = document.getElementById("terminal");
-const pythonStatus = document.getElementById("pythonStatus");
-const kitStatus = document.getElementById("kitStatus");
-const aiStatus = document.getElementById("aiStatus");
-const kitIdInput = document.getElementById("kitId");
-const wsUrlInput = document.getElementById("wsUrl");
-const demoModeInput = document.getElementById("demoMode");
-const cameraVideo = document.getElementById("cameraVideo");
-const cameraOverlay = document.getElementById("cameraOverlay");
-const cameraPlaceholder = document.getElementById("cameraPlaceholder");
+import {EditorState} from "https://esm.sh/@codemirror/state@6.5.2";
+import {EditorView,keymap} from "https://esm.sh/@codemirror/view@6.38.1";
+import {basicSetup} from "https://esm.sh/codemirror@6.0.2";
+import {python} from "https://esm.sh/@codemirror/lang-python@6.2.1";
+import {autocompletion,completionKeymap} from "https://esm.sh/@codemirror/autocomplete@6.18.6";
+import {indentWithTab} from "https://esm.sh/@codemirror/commands@6.8.1";
+import "./ai.js";
 
-let editor;
-let worker;
-let ws = null;
-let running = false;
-let aiSnapshot = {detected:false,fingers:0,side:""};
-const cfg = window.ZEBJUS_CONFIG || {};
-kitIdInput.value = cfg.defaultKitId || kitIdInput.value;
-wsUrlInput.value = cfg.websocketUrl || "";
+const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
+const terminal=$("consoleView"),video=$("cameraVideo"),overlay=$("cameraOverlay"),placeholder=$("cameraPlaceholder");
+let view,worker,ws=null,running=false,cameraRunning=false,cameras=[],aiState={detected:false,fingers:0,side:""};
 
-const starterCode = `from zebjus import *
+const examples={
+hello:`print("Hello, ZEBJUS!")`,
+variables:`name = "Anna"\nage = 14\nscore = 92.5\n\nprint(name)\nprint(age)\nprint(score)`,
+input:`name = input("Enter your name: ")\nage = int(input("Enter your age: "))\n\nprint("Hello", name)\nprint("Next year you will be", age + 1)`,
+ifelse:`mark = 78\n\nif mark >= 80:\n    print("Excellent")\nelif mark >= 50:\n    print("Pass")\nelse:\n    print("Try again")`,
+forloop:`for i in range(1, 6):\n    print("Count:", i)`,
+function:`def add(a, b):\n    return a + b\n\nanswer = add(10, 20)\nprint("Answer =", answer)`,
+list:`fruits = ["apple", "orange", "mango"]\n\nfor fruit in fruits:\n    print(fruit)`,
+cvGray:`from zebjus_cv import Camera, show\nimport cv2\n\ncam = Camera(0)\nframe = cam.read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nshow(gray, "Grayscale")`,
+cvEdges:`from zebjus_cv import Camera, show\nimport cv2\n\ncam = Camera(0)\nframe = cam.read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nedges = cv2.Canny(gray, 80, 160)\nshow(edges, "Canny Edges")`,
+cvThreshold:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n_, binary = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)\nshow(binary, "Threshold")`,
+hand:`from zebjus_ai import HandDetector\n\nhand = HandDetector()\nresult = hand.read()\n\nprint("Detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)`,
+handLed:`from zebjus import LED\nfrom zebjus_ai import HandDetector\n\nled = LED(1)\nresult = HandDetector().read()\n\nif result.detected and result.fingers >= 4:\n    led.on()\n    print("LED ON")\nelse:\n    led.off()\n    print("LED OFF")`,
+led:`from zebjus import LED, sleep\n\nled = LED(1)\n\nfor i in range(5):\n    led.on()\n    sleep(0.5)\n    led.off()\n    sleep(0.5)\n\nprint("Blink complete")`,
+servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\n\nfor angle in [0, 45, 90, 135, 180, 90]:\n    servo.write(angle)\n    sleep(0.5)`,
+motor:`from zebjus import Motor, sleep\n\nmotor = Motor(1)\nmotor.forward(50)\nsleep(2)\nmotor.stop()\nprint("Motor stopped")`
+};
 
-led = LED(1)
+const generic=[
+["and","keyword"],["as","keyword"],["assert","keyword"],["async","keyword"],["await","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["del","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["finally","keyword"],["for","keyword"],["from","keyword"],["global","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["is","keyword"],["lambda","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["raise","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],["yield","keyword"],
+["print","function","print(${1})"],["input","function",'input("${1:Prompt: }")'],["range","function","range(${1:5})"],["len","function","len(${1})"],["int","function","int(${1})"],["float","function","float(${1})"],["str","function","str(${1})"],["list","function","list(${1})"],["dict","function","dict(${1})"],["sum","function","sum(${1})"],["min","function","min(${1})"],["max","function","max(${1})"],["enumerate","function","enumerate(${1})"],
+["LED","class","LED(${1:1})"],["Motor","class","Motor(${1:1})"],["Servo","class","Servo(${1:1})"],["Camera","class","Camera(${1:0})"],["HandDetector","class","HandDetector()"],["sleep","function","sleep(${1:1})"],
+["cv2","module"],["np","module"]
+];
 
-print("Blinking LED 5 times...")
+const dotted={
+cv2:[
+["cvtColor","function","cvtColor(${1:src}, ${2:cv2.COLOR_BGR2GRAY})"],["Canny","function","Canny(${1:image}, ${2:80}, ${3:160})"],["threshold","function","threshold(${1:src}, ${2:120}, ${3:255}, ${4:cv2.THRESH_BINARY})"],["resize","function","resize(${1:image}, (${2:320}, ${3:240}))"],["GaussianBlur","function","GaussianBlur(${1:image}, (${2:5}, ${3:5}), ${4:0})"],["rectangle","function","rectangle(${1:image}, (${2:x1}, ${3:y1}), (${4:x2}, ${5:y2}), (${6:0}, ${7:255}, ${8:0}), ${9:2})"],["putText","function"],["COLOR_BGR2GRAY","constant"],["COLOR_BGR2RGB","constant"],["THRESH_BINARY","constant"],["RETR_EXTERNAL","constant"],["CHAIN_APPROX_SIMPLE","constant"]
+],
+led:[["on","method","on()"],["off","method","off()"],["blink","method","blink(${1:5}, ${2:0.5})"]],
+motor:[["forward","method","forward(${1:50})"],["backward","method","backward(${1:50})"],["stop","method","stop()"]],
+servo:[["write","method","write(${1:90})"]],
+hand:[["read","method","read()"]],
+result:[["detected","property"],["fingers","property"],["side","property"]],
+cam:[["read","method","read()"]]
+};
 
-for i in range(5):
-    led.on()
-    print("LED ON")
-    sleep(0.5)
-
-    led.off()
-    print("LED OFF")
-    sleep(0.5)
-
-print("Done")
-`;
-
-const aiExampleCode = `from zebjus import *
-from zebjus_ai import *
-
-led = LED(1)
-hand = HandDetector()
-result = hand.read()
-
-print("Hand detected:", result.detected)
-print("Fingers:", result.fingers)
-print("Side:", result.side)
-
-if result.detected and result.fingers >= 4:
-    led.on()
-    print("LED ON")
-else:
-    led.off()
-    print("LED OFF")
-`;
-
-const blankCode = `from zebjus import *
-
-# Write your code here
-`;
-
-function log(text){
-  terminal.textContent += (terminal.textContent ? "\\n" : "") + text;
-  terminal.scrollTop = terminal.scrollHeight;
+function completionSource(context){
+  const pos=context.pos,line=context.state.doc.lineAt(pos),before=line.text.slice(0,pos-line.from);
+  const dot=before.match(/([A-Za-z_]\w*)\.([A-Za-z_]\w*)?$/);
+  let prefix="",items=generic;
+  if(dot){const base=dot[1],p=dot[2]||"";prefix=p;items=dotted[base]||[];}
+  else{const m=before.match(/([A-Za-z_]\w*)$/);if(!m&&!context.explicit)return null;prefix=m?.[1]||"";}
+  const filtered=items.filter(x=>x[0].startsWith(prefix));
+  if(!filtered.length)return null;
+  return{
+    from:pos-prefix.length,
+    filter:false,
+    options:filtered.map(([label,type,apply])=>({label,type,apply:apply||label,detail:type}))
+  };
 }
 
-function setPythonStatus(text, ok=false){
-  pythonStatus.textContent = text;
-  pythonStatus.className = "badge " + (ok ? "ok" : "warn");
+const theme=EditorView.theme({
+  "&":{height:"100%",backgroundColor:"#0a101c",color:"#edf3ff"},
+  ".cm-content":{caretColor:"#ffffff"},
+  "&.cm-focused .cm-cursor":{borderLeftColor:"#ffffff"},
+  ".cm-selectionBackground,.cm-content ::selection":{backgroundColor:"#294675!important"},
+  ".cm-tooltip":{backgroundColor:"#111a2d",color:"#edf3ff",border:"1px solid #2a3959"},
+  ".cm-tooltip-autocomplete ul li[aria-selected]":{backgroundColor:"#294675",color:"#fff"}
+},{dark:true});
+
+function initEditor(){
+  const saved=localStorage.getItem("zebjus.lab.code")||examples.hello;
+  view=new EditorView({
+    state:EditorState.create({
+      doc:saved,
+      extensions:[
+        basicSetup,python(),theme,
+        autocompletion({override:[completionSource],activateOnTyping:true,maxRenderedOptions:14}),
+        keymap.of([...completionKeymap,indentWithTab]),
+        EditorView.updateListener.of(u=>{
+          if(u.docChanged){
+            $("saveState").textContent="Saving…";
+            clearTimeout(window.__saveTimer);
+            window.__saveTimer=setTimeout(()=>{localStorage.setItem("zebjus.lab.code",u.state.doc.toString());$("saveState").textContent="Saved";},250);
+          }
+        })
+      ]
+    }),
+    parent:$("editor")
+  });
 }
 
-function setKitStatus(text, ok=false){
-  kitStatus.textContent = text;
-  kitStatus.className = "badge " + (ok ? "ok" : "");
-}
+function code(){return view.state.doc.toString();}
+function setCode(text){view.dispatch({changes:{from:0,to:view.state.doc.length,insert:text}});view.focus();}
+function log(text){terminal.textContent+=(terminal.textContent?"\n":"")+String(text);terminal.scrollTop=terminal.scrollHeight;}
+function badge(el,text,mode=""){el.textContent=text;el.className="badge"+(mode?" "+mode:"");}
 
 function createWorker(){
-  if(worker) worker.terminate();
-  setPythonStatus("Python loading…");
-  worker = new Worker("py-worker.js");
-  worker.onmessage = (event) => {
-    const msg = event.data || {};
-    if(msg.type === "ready"){
-      setPythonStatus("Python ready", true);
-      log("Python runtime ready.");
-    }else if(msg.type === "stdout"){
-      if(msg.text !== undefined && msg.text !== "") log(msg.text);
-    }else if(msg.type === "stderr"){
-      if(msg.text !== undefined && msg.text !== "") log("ERROR: " + msg.text);
-    }else if(msg.type === "done"){
-      running = false;
-      log("Program finished.");
-    }else if(msg.type === "error"){
-      running = false;
-      log("ERROR: " + msg.text);
-    }else if(msg.type === "kit-command"){
-      handleKitCommand(msg.payload);
-    }
+  if(worker)worker.terminate();
+  const v=cfg.pyodideVersion||"314.0.6";
+  worker=new Worker("./py-worker.js");
+  worker.postMessage({type:"init",pyodideVersion:v});
+  badge($("pythonStatus"),"Python loading…","warn");
+  worker.onmessage=e=>{
+    const m=e.data||{};
+    if(m.type==="ready"){badge($("pythonStatus"),"Python ready","ok");log("Python ready.");}
+    else if(m.type==="status"){badge($("pythonStatus"),m.text,m.mode||"warn");}
+    else if(m.type==="stdout"&&m.text!=="")log(m.text);
+    else if(m.type==="stderr"&&m.text!=="")log("ERROR: "+m.text);
+    else if(m.type==="error"){running=false;log("ERROR: "+m.text);badge($("pythonStatus"),"Python ready","ok");}
+    else if(m.type==="done"){running=false;log("Program finished.");badge($("pythonStatus"),"Python ready","ok");}
+    else if(m.type==="kit-command")handleKit(m.payload);
+    else if(m.type==="image")showImage(m.dataUrl,m.title);
   };
-  worker.onerror = (e) => {
-    running = false;
-    log("Worker error: " + e.message);
-    setPythonStatus("Python error");
-  };
+  worker.onerror=e=>{running=false;log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
+}
+
+async function enumerateCameras(){
+  try{
+    const devices=await navigator.mediaDevices?.enumerateDevices?.()||[];
+    cameras=devices.filter(d=>d.kind==="videoinput");
+    const select=$("cameraSelect"),selected=select.value;
+    select.innerHTML="";
+    if(!cameras.length){
+      const o=document.createElement("option");o.value="";o.textContent="Camera 0 (default)";select.appendChild(o);
+    }else cameras.forEach((d,i)=>{
+      const o=document.createElement("option");o.value=d.deviceId;o.dataset.index=i;o.textContent=`Camera ${i}${d.label?" — "+d.label:""}`;select.appendChild(o);
+    });
+    if([...select.options].some(o=>o.value===selected))select.value=selected;
+    updateCameraLabel();
+  }catch(e){log("Camera list: "+e.message);}
+}
+
+function indexFromCode(text){
+  const m=text.match(/\bCamera\s*\(\s*(\d+)\s*\)/);
+  return m?Number(m[1]):null;
+}
+
+function selectCameraIndex(i){
+  if(!Number.isInteger(i)||i<0)return;
+  if(cameras[i])$("cameraSelect").value=cameras[i].deviceId;
+  updateCameraLabel(i);
+}
+
+function updateCameraLabel(forced=null){
+  let idx=forced;
+  if(idx===null){
+    const o=$("cameraSelect").selectedOptions[0];
+    idx=o?.dataset?.index!==undefined?Number(o.dataset.index):0;
+  }
+  $("cameraIndexLabel").textContent="Index "+(Number.isInteger(idx)?idx:0);
+}
+
+async function startCamera(index=null){
+  if(index!==null)selectCameraIndex(index);
+  const deviceId=$("cameraSelect").value||"";
+  try{
+    badge($("aiStatus"),"Starting camera…","warn");
+    await window.ZebjusAI.start(video,overlay,deviceId);
+    cameraRunning=true;placeholder.style.display="none";badge($("aiStatus"),"Camera + AI","ok");
+    await enumerateCameras();
+    if(index!==null)selectCameraIndex(index);
+    log("Camera started.");
+    return true;
+  }catch(e){
+    cameraRunning=false;badge($("aiStatus"),"Camera error");
+    log("Camera error: "+(e?.message||e));
+    return false;
+  }
+}
+
+function stopCamera(){
+  window.ZebjusAI?.stop(video,overlay);cameraRunning=false;placeholder.style.display="grid";badge($("aiStatus"),"Camera off");
+}
+
+function captureFrame(){
+  if(!cameraRunning||video.readyState<2)return null;
+  const w=cfg.cameraCaptureWidth||320,h=cfg.cameraCaptureHeight||240,c=document.createElement("canvas");
+  c.width=w;c.height=h;
+  const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(video,0,0,w,h);
+  const im=x.getImageData(0,0,w,h);
+  return{width:w,height:h,data:Array.from(im.data)};
+}
+
+async function runCode(){
+  if(running){log("Program is already running. Press Stop first.");return;}
+  const src=code(),needsCamera=/\bzebjus_ai\b|\bHandDetector\b|\bzebjus_cv\b|\bCamera\s*\(/.test(src);
+  const requested=indexFromCode(src);
+  terminal.textContent="";running=true;
+
+  if($("autoCamera").checked){
+    const ok=cameraRunning?(requested!==null?(stopCamera(),await startCamera(requested)):true):await startCamera(requested);
+    if(!ok&&needsCamera){running=false;log("Program stopped because this example needs a camera.");return;}
+  }else if(requested!==null&&cameras[requested])selectCameraIndex(requested);
+
+  if(cameraRunning)await new Promise(r=>setTimeout(r,180));
+  aiState=window.ZebjusAI?.getSnapshot?.()||aiState;
+  const frame=captureFrame();
+
+  badge($("pythonStatus"),"Running…","warn");
+  worker.postMessage({
+    type:"run",code:src,stdin:$("stdinBox").value||"",aiState,frame
+  });
+}
+
+function stopProgram(){
+  running=false;createWorker();stopCamera();
+  applyDemo({command:"LED_SET",id:1,value:0});applyDemo({command:"MOTOR_SET",id:1,speed:0});
+  log("Stopped. Camera off.");
 }
 
 function connectKit(){
-  if(demoModeInput.checked){
-    setKitStatus("Demo kit connected", true);
-    log("Demo kit connected.");
-    return;
-  }
-
-  const url = wsUrlInput.value.trim();
-  const kitId = kitIdInput.value.trim();
-  if(!url.startsWith("wss://")){
-    log("Use a secure wss:// WebSocket URL.");
-    return;
-  }
-  if(!kitId){
-    log("Enter a Kit ID.");
-    return;
-  }
-
-  disconnectKit(false);
-  log("Connecting to " + url + " …");
-
+  if($("demoMode").checked){badge($("kitStatus"),"Demo kit","ok");log("Demo kit connected.");return;}
+  const url=$("wsUrl").value.trim(),kitId=$("kitId").value.trim();
+  if(!url.startsWith("wss://")){log("Use a secure wss:// WebSocket URL.");return;}
   try{
-    ws = new WebSocket(url);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({type:"hello", kitId}));
-      setKitStatus("Kit connected", true);
-      log("WebSocket connected for " + kitId);
-    };
-    ws.onmessage = (event) => log("KIT → " + event.data);
-    ws.onerror = () => log("WebSocket error.");
-    ws.onclose = () => {
-      setKitStatus("Kit disconnected");
-      log("WebSocket disconnected.");
-    };
-  }catch(err){
-    log("Connection failed: " + err.message);
-  }
+    ws=new WebSocket(url);
+    ws.onopen=()=>{ws.send(JSON.stringify({type:"hello",kitId}));badge($("kitStatus"),"Kit connected","ok");};
+    ws.onmessage=e=>log("KIT → "+e.data);
+    ws.onerror=()=>log("WebSocket error.");
+    ws.onclose=()=>badge($("kitStatus"),"Kit disconnected");
+  }catch(e){log("Connection error: "+e.message);}
+}
+function disconnectKit(){if(ws){ws.close();ws=null;}badge($("kitStatus"),"Kit disconnected");}
+function handleKit(p){if(!p)return;if($("demoMode").checked){applyDemo(p);log("DEMO → "+JSON.stringify(p));}else if(ws?.readyState===WebSocket.OPEN){ws.send(JSON.stringify({type:"command",kitId:$("kitId").value.trim(),...p}));}}
+function applyDemo(p){
+  if(p.command==="LED_SET"&&+p.id===1)$("demoLed").classList.toggle("on",+p.value===1);
+  if(p.command==="MOTOR_SET"&&+p.id===1){const s=Math.max(-100,Math.min(100,+p.speed||0));$("motorMeter").style.width=Math.abs(s)+"%";$("motorLabel").textContent=`Motor ${s}%`;}
+  if(p.command==="SERVO_SET"&&+p.id===1){const a=Math.max(0,Math.min(180,+p.angle||0));$("servoNeedle").style.transform=`rotate(${a-90}deg)`;$("servoLabel").textContent=`Servo ${a}°`;}
 }
 
-function disconnectKit(writeLog=true){
-  if(ws){
-    try{ ws.close(); }catch(e){}
-    ws = null;
-  }
-  setKitStatus("Kit disconnected");
-  if(writeLog) log("Kit disconnected.");
+function showImage(dataUrl,title="Image"){
+  $("resultImage").src=dataUrl;$("resultImage").style.display="block";
+  document.querySelector(".image-placeholder").style.display="none";
+  switchOutput("imageView");
 }
 
-function sendRealCommand(payload){
-  if(!ws || ws.readyState !== WebSocket.OPEN){
-    log("Kit not connected. Enable Demo mode or connect WebSocket.");
-    return;
-  }
-  const packet = {
-    type:"command",
-    kitId:kitIdInput.value.trim(),
-    ...payload
-  };
-  ws.send(JSON.stringify(packet));
+function switchOutput(id){
+  document.querySelectorAll(".output-view").forEach(x=>x.classList.toggle("active",x.id===id));
+  document.querySelectorAll(".output-tab").forEach(x=>x.classList.toggle("active",x.dataset.output===id));
 }
 
-function handleKitCommand(payload){
-  if(!payload) return;
-
-  if(demoModeInput.checked){
-    applyDemoCommand(payload);
-    log("DEMO → " + JSON.stringify(payload));
-  }else{
-    sendRealCommand(payload);
-    log("SEND → " + JSON.stringify(payload));
-  }
-}
-
-function applyDemoCommand(p){
-  if(p.command === "LED_SET" && Number(p.id) === 1){
-    document.getElementById("demoLed").classList.toggle("on", Number(p.value) === 1);
-  }
-
-  if(p.command === "MOTOR_SET" && Number(p.id) === 1){
-    const speed = Math.max(-100, Math.min(100, Number(p.speed) || 0));
-    document.getElementById("motorMeter").style.width = Math.abs(speed) + "%";
-    document.getElementById("motorLabel").textContent =
-      speed === 0 ? "Motor 1: stopped" : `Motor 1: ${speed > 0 ? "forward" : "backward"} ${Math.abs(speed)}%`;
-  }
-
-  if(p.command === "SERVO_SET" && Number(p.id) === 1){
-    const angle = Math.max(0, Math.min(180, Number(p.angle) || 0));
-    document.getElementById("servoNeedle").style.transform = `rotate(${angle - 90}deg)`;
-    document.getElementById("servoLabel").textContent = `Servo 1: ${angle}°`;
-  }
-}
-
-function runCode(){
-  if(running){
-    log("A program is already running. Press Stop first.");
-    return;
-  }
-  running = true;
-  terminal.textContent = "";
-  worker.postMessage({type:"run", code:editor.getValue(), aiState:aiSnapshot});
-}
-
-function stopCode(){
-  running = false;
-  createWorker();
-  log("Program stopped.");
-  applyDemoCommand({command:"LED_SET", id:1, value:0});
-  applyDemoCommand({command:"MOTOR_SET", id:1, speed:0});
-}
-
-document.getElementById("connectBtn").onclick = connectKit;
-document.getElementById("disconnectBtn").onclick = () => disconnectKit();
-document.getElementById("runBtn").onclick = runCode;
-document.getElementById("stopBtn").onclick = stopCode;
-document.getElementById("clearBtn").onclick = () => terminal.textContent = "";
-document.getElementById("exampleBtn").onclick = () => editor.setValue(starterCode);
-document.getElementById("aiExampleBtn").onclick = () => editor.setValue(aiExampleCode);
-document.getElementById("resetBtn").onclick = () => editor.setValue(blankCode);
-
-
-async function startCamera(){
-  if(!window.ZebjusAI){log("AI module is still loading. Try again.");return;}
-  try{aiStatus.textContent="Loading MediaPipe…";aiStatus.className="badge warn";await window.ZebjusAI.start(cameraVideo,cameraOverlay);cameraPlaceholder.style.display="none";aiStatus.textContent="AI camera running";aiStatus.className="badge ok";log("MediaPipe hand tracking started.");}
-  catch(err){aiStatus.textContent="AI camera error";aiStatus.className="badge";log("AI camera error: "+err.message);}
-}
-function stopCamera(){if(window.ZebjusAI)window.ZebjusAI.stop(cameraVideo,cameraOverlay);cameraPlaceholder.style.display="grid";aiSnapshot={detected:false,fingers:0,side:""};document.getElementById("handDetected").textContent="Not detected";document.getElementById("fingerCount").textContent="0";document.getElementById("handSide").textContent="—";aiStatus.textContent="AI camera off";aiStatus.className="badge";}
-window.addEventListener("zebjus-ai-state",e=>{const d=e.detail||{};aiSnapshot={detected:!!d.detected,fingers:Number(d.fingers)||0,side:d.side||""};document.getElementById("handDetected").textContent=aiSnapshot.detected?"Detected":"Not detected";document.getElementById("fingerCount").textContent=String(aiSnapshot.fingers);document.getElementById("handSide").textContent=aiSnapshot.side||"—";});
-document.getElementById("startCameraBtn").onclick=startCamera;
-document.getElementById("stopCameraBtn").onclick=stopCamera;
-
-demoModeInput.onchange = () => {
-  if(demoModeInput.checked){
-    disconnectKit(false);
-    setKitStatus("Demo mode");
-    log("Demo mode enabled.");
-  }else{
-    setKitStatus("Kit disconnected");
-    log("Demo mode disabled. Connect your real kit.");
-  }
-};
-
-window.MonacoEnvironment = {
-  getWorkerUrl: function() {
-    return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
-      self.MonacoEnvironment = { baseUrl: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/' };
-      importScripts('https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/base/worker/workerMain.js');
-    `)}`;
-  }
-};
-
-require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs" }});
-
-require(["vs/editor/editor.main"], function(){
-  editor = monaco.editor.create(document.getElementById("editor"), {
-    value: starterCode,
-    language: "python",
-    theme: "vs-dark",
-    automaticLayout: true,
-    fontSize: 14,
-    minimap: {enabled:false},
-    lineNumbers: "on",
-    tabSize: 4,
-    insertSpaces: true,
-    quickSuggestions: {other:true, comments:false, strings:true},
-    suggestOnTriggerCharacters: true,
-    wordBasedSuggestions: "currentDocument",
-    padding: {top:12}
+function setupPanels(){
+  document.querySelectorAll(".side-tab").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".side-tab").forEach(x=>x.classList.toggle("active",x===b));
+    document.querySelectorAll(".side-panel").forEach(x=>x.classList.toggle("active",x.id===b.dataset.panel));
   });
-
-  monaco.languages.registerCompletionItemProvider("python", {
-    triggerCharacters: ["."],
-    provideCompletionItems: function(model, position){
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: model.getWordUntilPosition(position).startColumn,
-        endColumn: model.getWordUntilPosition(position).endColumn
-      };
-
-      const suggestions = [
-        {label:"LED", kind:monaco.languages.CompletionItemKind.Class, insertText:"LED(${1:1})", insertTextRules:4, detail:"ZEBJUS LED class", range},
-        {label:"Motor", kind:monaco.languages.CompletionItemKind.Class, insertText:"Motor(${1:1})", insertTextRules:4, detail:"ZEBJUS Motor class", range},
-        {label:"Servo", kind:monaco.languages.CompletionItemKind.Class, insertText:"Servo(${1:1})", insertTextRules:4, detail:"ZEBJUS Servo class", range},
-        {label:"HandDetector", kind:monaco.languages.CompletionItemKind.Class, insertText:"HandDetector()", detail:"MediaPipe hand snapshot", range},
-        {label:"sleep", kind:monaco.languages.CompletionItemKind.Function, insertText:"sleep(${1:1})", insertTextRules:4, detail:"Pause program in seconds", range},
-        {label:"print", kind:monaco.languages.CompletionItemKind.Function, insertText:"print(${1})", insertTextRules:4, range},
-        {label:"for loop", kind:monaco.languages.CompletionItemKind.Snippet, insertText:"for ${1:i} in range(${2:5}):\\n\\t${3:print(i)}", insertTextRules:4, detail:"Python for loop", range},
-        {label:"while loop", kind:monaco.languages.CompletionItemKind.Snippet, insertText:"while ${1:True}:\\n\\t${2:pass}", insertTextRules:4, detail:"Python while loop", range},
-        {label:"if", kind:monaco.languages.CompletionItemKind.Snippet, insertText:"if ${1:condition}:\\n\\t${2:pass}", insertTextRules:4, detail:"Python if statement", range},
-        {label:"on", kind:monaco.languages.CompletionItemKind.Method, insertText:"on()", detail:"LED ON", range},
-        {label:"off", kind:monaco.languages.CompletionItemKind.Method, insertText:"off()", detail:"LED OFF", range},
-        {label:"blink", kind:monaco.languages.CompletionItemKind.Method, insertText:"blink(${1:5}, ${2:0.5})", insertTextRules:4, detail:"Blink LED", range},
-        {label:"forward", kind:monaco.languages.CompletionItemKind.Method, insertText:"forward(${1:60})", insertTextRules:4, detail:"Motor forward 0-100%", range},
-        {label:"backward", kind:monaco.languages.CompletionItemKind.Method, insertText:"backward(${1:60})", insertTextRules:4, detail:"Motor backward 0-100%", range},
-        {label:"stop", kind:monaco.languages.CompletionItemKind.Method, insertText:"stop()", detail:"Stop motor", range},
-        {label:"write", kind:monaco.languages.CompletionItemKind.Method, insertText:"write(${1:90})", insertTextRules:4, detail:"Servo angle 0-180°", range},
-        {label:"read", kind:monaco.languages.CompletionItemKind.Method, insertText:"read()", detail:"Read latest AI snapshot", range},
-        {label:"fingers", kind:monaco.languages.CompletionItemKind.Property, insertText:"fingers", detail:"Finger count", range},
-        {label:"detected", kind:monaco.languages.CompletionItemKind.Property, insertText:"detected", detail:"Hand detected", range},
-        {label:"side", kind:monaco.languages.CompletionItemKind.Property, insertText:"side", detail:"Left/Right hand", range}
-      ];
-      return {suggestions};
-    }
+  document.querySelectorAll(".output-tab").forEach(b=>b.onclick=()=>switchOutput(b.dataset.output));
+  document.querySelectorAll("[data-mobile]").forEach(b=>b.onclick=()=>{
+    const side=$(".sidebar");
   });
+}
 
-  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runCode);
+function openMobilePanel(panelId){
+  const sidebar=document.querySelector(".sidebar"),dock=document.querySelector(".camera-dock");
+  if(panelId==="cameraPanel"){
+    sidebar.classList.remove("mobile-open");dock.classList.toggle("mobile-camera-open");return;
+  }
+  dock.classList.remove("mobile-camera-open");sidebar.classList.add("mobile-open");
+  document.querySelectorAll(".side-panel").forEach(x=>x.classList.toggle("mobile-active",x.id===panelId));
+}
+
+window.addEventListener("zebjus-ai-state",e=>{
+  const d=e.detail||{};aiState={detected:!!d.detected,fingers:+d.fingers||0,side:d.side||""};
+  $("handDetected").textContent=aiState.detected?"Yes":"No";$("fingerCount").textContent=aiState.fingers;$("handSide").textContent=aiState.side||"—";
 });
 
-createWorker();
+$("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.hello);
+$("resetBtn").onclick=()=>setCode(examples.hello);
+$("runBtn").onclick=runCode;$("mobileRun").onclick=runCode;$("stopBtn").onclick=stopProgram;
+$("clearBtn").onclick=()=>terminal.textContent="";
+$("refreshCameraBtn").onclick=enumerateCameras;$("startCameraBtn").onclick=()=>startCamera();$("stopCameraBtn").onclick=stopCamera;
+$("cameraSelect").onchange=updateCameraLabel;
+$("connectBtn").onclick=connectKit;$("disconnectBtn").onclick=disconnectKit;
+$("fullscreenBtn").onclick=()=>window.open(location.href.split("?")[0],"_blank","noopener");
+document.querySelectorAll("[data-mobile]").forEach(b=>b.onclick=()=>openMobilePanel(b.dataset.mobile));
+document.addEventListener("click",e=>{
+  if(innerWidth>800)return;
+  const sidebar=document.querySelector(".sidebar");
+  if(sidebar.classList.contains("mobile-open")&&!sidebar.contains(e.target)&&!e.target.closest("[data-mobile]"))sidebar.classList.remove("mobile-open");
+});
+
+if(new URLSearchParams(location.search).get("embed")==="1")document.body.classList.add("embed");
+$("kitId").value=cfg.defaultKitId||"ZB-000123";$("wsUrl").value=cfg.websocketUrl||"";
+initEditor();createWorker();enumerateCameras();
