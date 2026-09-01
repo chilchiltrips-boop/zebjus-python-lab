@@ -3,7 +3,7 @@
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[];
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
-  let imageFrame=null;
+  let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
   const isEmbedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
@@ -432,18 +432,74 @@ while True:
     return{width:w,height:h,data:Array.from(x.getImageData(0,0,w,h).data)};
   }
 
-  async function loadImageFile(file){
-    if(!file)return;
-    const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
-    const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=dataUrl;});
-    const maxW=720,maxH=520,scale=Math.min(1,maxW/img.width,maxH/img.height),w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale));
-    const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(img,0,0,w,h);
-    imageFrame={width:w,height:h,data:Array.from(x.getImageData(0,0,w,h).data)};
-    $("sourceImagePreview").src=dataUrl;$("sourceImagePreview").style.display="block";$("sourceImagePlaceholder").style.display="none";
-    $("sourceImageInfo").textContent=`${file.name} • ${w}×${h}`;
+  function safeUploadName(name){
+    const clean=String(name||"image").replace(/[\\/:*?"<>|]/g,"_").trim()||"image";
+    const dot=clean.lastIndexOf("."),base=dot>0?clean.slice(0,dot):clean,ext=dot>0?clean.slice(dot):"";
+    let candidate=clean,n=2;
+    const used=new Set(uploadedImages.map(x=>x.name.toLowerCase()));
+    while(used.has(candidate.toLowerCase()))candidate=`${base}_${n++}${ext}`;
+    return candidate;
   }
 
-  function clearLoadedImage(){imageFrame=null;$("imageInput").value="";$("sourceImagePreview").removeAttribute("src");$("sourceImagePreview").style.display="none";$("sourceImagePlaceholder").style.display="block";$("sourceImageInfo").textContent="Use OpenCV Image Graphics examples.";}
+  async function copyText(text){
+    try{await navigator.clipboard.writeText(text);return true;}
+    catch(_){
+      try{
+        const t=document.createElement("textarea");t.value=text;t.style.position="fixed";t.style.opacity="0";
+        document.body.appendChild(t);t.focus();t.select();const ok=document.execCommand("copy");t.remove();return ok;
+      }catch(e){return false;}
+    }
+  }
+
+  function setActiveUpload(item){
+    if(!item)return;
+    activeUploadPath=item.path;imageFrame=item.frame;
+    $("sourceImagePreview").src=item.dataUrl;$("sourceImagePreview").style.display="block";$("sourceImagePlaceholder").style.display="none";
+    $("sourceImageInfo").textContent=`${item.name} • ${item.width}×${item.height} • ${item.path}`;
+    renderUploadedFiles();
+  }
+
+  function renderUploadedFiles(){
+    const box=$("uploadedFileList");
+    if(!uploadedImages.length){box.innerHTML='<div class="uploaded-empty">Uploaded image paths will appear here.</div>';return;}
+    box.innerHTML=uploadedImages.map((item,i)=>`
+      <div class="uploaded-file-row ${item.path===activeUploadPath?"active":""}" data-upload-index="${i}">
+        <div class="uploaded-file-main" title="Click to preview this image">
+          <div class="uploaded-file-name">${escapeHtml(item.name)}</div>
+          <div class="uploaded-file-path">${escapeHtml(item.path)}</div>
+        </div>
+        <button class="copy-path-btn" data-copy-path="${escapeHtml(item.path)}" type="button">Copy Path</button>
+      </div>`).join("");
+  }
+
+  function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+  async function loadImageFiles(files){
+    const list=Array.from(files||[]).filter(f=>f&&String(f.type||"").startsWith("image/")).slice(0,10);
+    if(!list.length)return;
+    for(const file of list){
+      if(file.size>5*1024*1024){log(`Skipped ${file.name}: maximum image size is 5 MB.`);continue;}
+      const name=safeUploadName(file.name),path=`uploads/${name}`;
+      const buffer=await file.arrayBuffer(),bytes=Array.from(new Uint8Array(buffer));
+      const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});
+      const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=dataUrl;});
+      const maxW=720,maxH=520,scale=Math.min(1,maxW/img.width,maxH/img.height),w=Math.max(1,Math.round(img.width*scale)),h=Math.max(1,Math.round(img.height*scale));
+      const c=document.createElement("canvas");c.width=w;c.height=h;const x=c.getContext("2d",{willReadFrequently:true});x.drawImage(img,0,0,w,h);
+      const frame={width:w,height:h,data:Array.from(x.getImageData(0,0,w,h).data)};
+      const item={name,path,data:bytes,dataUrl,width:w,height:h,frame};
+      uploadedImages.push(item);setActiveUpload(item);
+      log(`Image uploaded: ${path}`);
+    }
+    $("imageInput").value="";
+    renderUploadedFiles();
+  }
+
+  function clearLoadedImage(){
+    imageFrame=null;uploadedImages=[];activeUploadPath="";$("imageInput").value="";
+    $("sourceImagePreview").removeAttribute("src");$("sourceImagePreview").style.display="none";$("sourceImagePlaceholder").style.display="block";
+    $("sourceImageInfo").textContent="Upload an image, copy its path, then use cv2.imread().";
+    renderUploadedFiles();
+  }
 
   async function runCode(){
     if(running){log("Program already running. Press Stop first.");return;}
@@ -525,7 +581,8 @@ while True:
       aiState,
       sensorState,
       frame:runFrame,
-      imageFrame
+      imageFrame,
+      uploadedFiles:uploadedImages.map(x=>({name:x.name,path:x.path,data:x.data}))
     });
   }
 
@@ -599,7 +656,20 @@ while True:
   $("resetBtn").onclick=()=>setCode(examples.hello);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
   $("cameraToggleBtn").onclick=()=>cameraRunning?stopCamera():startCamera();
   $("autocompleteBtn").onclick=()=>editor?.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false});
-  $("imageInput").onchange=e=>loadImageFile(e.target.files?.[0]).catch(err=>log("Image load error: "+err.message));
+  $("imageInput").onchange=e=>loadImageFiles(e.target.files).catch(err=>log("Image upload error: "+err.message));
+  $("uploadedFileList").onclick=async e=>{
+    const copy=e.target.closest("[data-copy-path]");
+    if(copy){
+      const path=copy.dataset.copyPath||"";
+      const ok=await copyText(path);
+      copy.textContent=ok?"Copied!":"Copy failed";
+      if(ok)log(`Copied image path: ${path}`);
+      setTimeout(()=>copy.textContent="Copy Path",900);
+      return;
+    }
+    const row=e.target.closest("[data-upload-index]");
+    if(row)setActiveUpload(uploadedImages[Number(row.dataset.uploadIndex)]);
+  };
   $("clearImageBtn").onclick=clearLoadedImage;
   document.querySelectorAll(".output-tab").forEach(b=>b.onclick=()=>switchOutput(b.dataset.view));
 

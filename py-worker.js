@@ -298,6 +298,19 @@ sys.modules["zebjus_cv"]=zc
 }
 
 let visionAssetsReady=false;
+async function syncUploadedFiles(files){
+  try{
+    pyodide.FS.mkdirTree("/home/pyodide/uploads");
+    for(const f of (files||[])){
+      const name=String(f?.name||"image").replace(/[\\/:*?"<>|]/g,"_");
+      if(!name||!Array.isArray(f?.data))continue;
+      pyodide.FS.writeFile(`/home/pyodide/uploads/${name}`,new Uint8Array(f.data));
+    }
+  }catch(e){
+    postMessage({type:"stdout",text:"Image upload sync error: "+String(e?.message||e)});
+  }
+}
+
 async function ensureVisionAssets(){
   if(visionAssetsReady)return;
   const names=["Potentiometer.jpg","Pin13Off.jpg","LedOff.jpg","Pin13On.jpg","LedOn.jpg","bg.png","1.jpeg","2.jpeg","lenna.jpeg","lena.png"];
@@ -386,6 +399,7 @@ _loaded_image=None
   `);
 
   if(needsCv && /\bcv2\.imread\s*\(|Resources[\/\\]/.test(code))await ensureVisionAssets();
+  if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFiles(m.uploadedFiles);
 
   if(needsCv){
     await frameToPython(m.frame,"camera");

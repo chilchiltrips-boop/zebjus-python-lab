@@ -1,42 +1,37 @@
 {
-  "version": "5.4",
   "js_checks": {
     "config.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     },
     "ai.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     },
     "app.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     },
     "settings.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     },
     "py-worker.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     },
     "camera-bridge.js": {
-      "ok": true,
+      "returncode": 0,
       "stderr": ""
     }
   },
   "critical": {
     "all_js_pass": true,
-    "student_blank": true,
-    "vision_projects_count": 10,
-    "serial_module": true,
-    "cvzone_serial": true,
-    "hand_tracking_module": true,
-    "wifi_bridge": true,
-    "hand_landmarks": true,
-    "legacy_loop_safe": true,
-    "assets_present": true,
-    "direct_camera_kept": true
+    "multiple_upload_input": true,
+    "copy_path_button": true,
+    "virtual_upload_path": true,
+    "uploaded_files_sent_to_worker": true,
+    "worker_upload_sync": true,
+    "cv2_imread_supported": true
   }
 }

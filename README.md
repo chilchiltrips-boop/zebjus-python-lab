@@ -265,3 +265,32 @@ Project resources from VISION AI Z are included under `vision-assets/` and prelo
 6. Re-run after changing code/input/hand position.
 
 For a final live-stream course mode, add a cooperative repeated-run scheduler instead of a blocking Python infinite loop.
+
+
+## v5.5 — Student Image Upload Paths
+
+Students can upload one or more images from Image Lab. Each image receives a browser project path:
+
+```text
+uploads/cat.jpg
+uploads/test-image.png
+```
+
+Use the **Copy Path** button and paste it into Python:
+
+```python
+import cv2
+
+img = cv2.imread("uploads/cat.jpg")
+print(img.shape)
+cv2.imshow("My Image", img)
+cv2.waitKey(1)
+```
+
+Notes:
+- Up to 10 images can be selected at once.
+- Maximum 5 MB per image.
+- Duplicate filenames are renamed automatically (`cat_2.jpg`, etc.).
+- Uploaded files belong to that student's current browser tab/session.
+- Files are copied into Pyodide at `/home/pyodide/uploads/`.
+- The visible student path stays simple: `uploads/<filename>`.

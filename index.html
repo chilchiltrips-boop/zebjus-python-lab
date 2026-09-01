@@ -194,14 +194,18 @@
           </div>
           <div class="image-loader">
             <label class="file-btn">
-              <input id="imageInput" type="file" accept="image/*">
-              <span>Load Image</span>
+              <input id="imageInput" type="file" accept="image/*" multiple>
+              <span>Upload Images</span>
             </label>
             <div class="source-image-wrap">
               <img id="sourceImagePreview" alt="Loaded source">
-              <div id="sourceImagePlaceholder">No image loaded</div>
+              <div id="sourceImagePlaceholder">No image uploaded</div>
             </div>
-            <span id="sourceImageInfo" class="muted">Use OpenCV Image Graphics examples.</span>
+            <span id="sourceImageInfo" class="muted">Upload an image, copy its path, then use cv2.imread().</span>
+            <div class="upload-path-hint"><code>cv2.imread("uploads/your-image.jpg")</code></div>
+            <div id="uploadedFileList" class="uploaded-file-list">
+              <div class="uploaded-empty">Uploaded image paths will appear here.</div>
+            </div>
           </div>
         </section>
       </aside>
