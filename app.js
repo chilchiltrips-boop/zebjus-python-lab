@@ -559,14 +559,43 @@ while True:
   }
   function badge(el,t,m=""){el.textContent=t;el.className="badge"+(m?" "+m:"");}
 
+  function updateRunControls(){
+    const run=$("runBtn"),end=$("stopBtn");
+    if(!run||!end)return;
+    run.disabled=!!running;
+    end.disabled=!running;
+    run.classList.toggle("run-faded",!!running);
+    end.classList.toggle("end-active",!!running);
+    run.setAttribute("aria-pressed",running?"true":"false");
+  }
+
+  function closeAllCvWindows(){
+    document.querySelectorAll(".opencv-float-window").forEach(win=>{
+      win.classList.remove("show","minimized");
+      const c=win.querySelector("canvas");
+      if(c){
+        const ctx=c.getContext("2d");
+        if(ctx)ctx.clearRect(0,0,c.width,c.height);
+      }
+    });
+    const result=$("resultImage");
+    if(result){
+      result.removeAttribute("src");
+      result.style.display="none";
+    }
+    const ph=$("imagePlaceholder");
+    if(ph)ph.style.display="block";
+  }
+
+
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.10",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.11",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
       if(m.type==="ready"){
-        badge($("pythonStatus"),"Python ready","ok");log("Python ready.");
+        badge($("pythonStatus"),"Python ready","ok");updateRunControls();
         setTimeout(()=>requestLint(getCode(),true),120);
       }
       else if(m.type==="lint-result"){
@@ -583,11 +612,12 @@ while True:
       }
       else if(m.type==="status")badge($("pythonStatus"),m.text,m.mode||"warn");
       else if(m.type==="stdout"&&m.text!=="")writeTerminalChunk(m.text);
-      else if(m.type==="runtime-stdout"&&m.text!=="")log(m.text);
+      else if(m.type==="runtime-stdout"){ /* Pyodide/package internal output hidden from student terminal */ }
       else if(m.type==="stderr"&&m.text!=="")log("ERROR: "+m.text);
+      else if(m.type==="close-images")closeAllCvWindows();
       else if(m.type==="error"){
         liveMode=false;if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
-        running=false;
+        running=false;updateRunControls();
         const issue={
           errorType:m.errorType||"PythonError",
           message:m.message||m.text||"Unknown error",
@@ -603,10 +633,10 @@ while True:
       else if(m.type==="done"){
         if(liveMode&&running){
           liveTimer=setTimeout(()=>runLiveCycle().catch(err=>{
-            liveMode=false;running=false;log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
+            liveMode=false;running=false;updateRunControls();log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
           }),70);
         }else{
-          running=false;clearEditorIssue();log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
+          running=false;updateRunControls();clearEditorIssue();log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
         }
       }
       else if(m.type==="kit-command")handleKit(m.payload);
@@ -615,7 +645,7 @@ while True:
         showCvFloatingUrl(m.dataUrl,m.title||"OpenCV Image");
       }
     };
-    worker.onerror=e=>{running=false;log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
+    worker.onerror=e=>{running=false;updateRunControls();log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
   }
 
   function setupCameraBridge(){
@@ -830,7 +860,10 @@ while True:
       <div class="opencv-resize-handle"></div>`;
     document.body.appendChild(win);
 
-    $("opencvFloatClose").onclick=()=>win.classList.remove("show");
+    $("opencvFloatClose").onclick=()=>{
+      if(running)stopProgram();
+      else closeAllCvWindows();
+    };
     $("opencvFloatMin").onclick=()=>{
       win.classList.toggle("minimized");
       $("opencvFloatMin").textContent=win.classList.contains("minimized")?"□":"—";
@@ -908,7 +941,7 @@ while True:
     const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
 
     terminal.textContent="";
-    running=true;
+    running=true;updateRunControls();
     liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
@@ -944,7 +977,7 @@ while True:
     // Open Camera Bridge only if direct camera access is blocked.
     if(needsCamera && !directCameraOk){
       if(!isEmbedded){
-        running=false;
+        running=false;updateRunControls();
         log("Program stopped because this project needs a camera.");
         return;
       }
@@ -964,7 +997,7 @@ while True:
 
         log(`AI snapshot → detected=${!!aiState.detected}, fingers=${Number(aiState.fingers)||0}, side=${aiState.side||"-"}`);
       }catch(e){
-        running=false;
+        running=false;updateRunControls();
         log("Camera error: "+(e?.message||e));
         return;
       }
@@ -985,9 +1018,13 @@ while True:
     liveMode=false;liveCode="";
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     clearTimeout(lintTimer);
-    running=false;createWorker();stopCamera();
+    running=false;
+    closeAllCvWindows();
+    stopCamera();
     applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});
     applyDemo({command:"MOTOR_SET",id:1,speed:0});
+    updateRunControls();
+    createWorker();
     log("Stopped.");
   }
 
@@ -1063,6 +1100,7 @@ while True:
 
   $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.hello);
   $("resetBtn").onclick=()=>setCode(examples.hello);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
+  updateRunControls();
   $("cameraToggleBtn").onclick=()=>cameraRunning?stopCamera():startCamera();
   $("autocompleteBtn").onclick=()=>editor?.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false});
   $("imageInput").onchange=e=>loadImageFiles(e.target.files).catch(err=>log("Image upload error: "+err.message));

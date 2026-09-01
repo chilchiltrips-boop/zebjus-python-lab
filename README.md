@@ -444,3 +444,18 @@ def calculate_total():
 ```
 
 Typing `dis`, `stu`, or `cal` can show these names in Suggestions.
+
+
+## v5.11 — Clean runtime + synchronized Run/End/OpenCV UI
+
+- Pyodide package chatter is hidden from the student Terminal.
+- OpenCV and NumPy are initialized only once per worker.
+- Repeated live-loop cycles no longer repeatedly initialize OpenCV packages.
+- Student `print()` output, errors, upload/path messages, and useful app events remain visible.
+- The Wix camera notice was removed from the page.
+- `cv2.imshow()` remains a floating OpenCV window.
+- Clicking the floating OpenCV window **X** ends a running program.
+- Clicking **End** closes all OpenCV floating/image outputs and stops the camera/program.
+- While a program runs, **Run** fades and is disabled; **End** becomes active.
+- After program end/error/End, **Run** becomes bright and usable again.
+- `cv2.destroyAllWindows()` closes browser OpenCV image windows.

@@ -174,3 +174,10 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c9d
 .editor-issue-bar strong{color:#ff7c88}
 .editor-issue-bar .issue-suggestion{display:block;color:#ffd17a;margin-top:2px}
 .CodeMirror-hint.hint-variable{color:#9CDCFE!important}
+
+/* v5.11 run/end state */
+#runBtn,#stopBtn{transition:opacity .16s ease,filter .16s ease,transform .16s ease,box-shadow .16s ease}
+#runBtn.run-faded{opacity:.38;filter:saturate(.55);cursor:not-allowed}
+#stopBtn:disabled{opacity:.38;filter:saturate(.55);cursor:not-allowed}
+#stopBtn.end-active{opacity:1;filter:brightness(1.18);box-shadow:0 0 0 2px rgba(255,95,109,.18),0 0 14px rgba(255,95,109,.20)}
+#runBtn:not(.run-faded):not(:disabled){opacity:1;filter:brightness(1.06)}

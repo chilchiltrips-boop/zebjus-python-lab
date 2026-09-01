@@ -1,6 +1,6 @@
 import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs";
 
-let pyodide=null,readyPromise=null;
+let pyodide=null,readyPromise=null,opencvReady=false,importLoadCache=new Set();
 
 async function initialize(){
   if(pyodide)return pyodide;
@@ -92,6 +92,9 @@ class Potentiometer:
     def value(self): return self.read()
 
 def sleep(seconds): time.sleep(float(seconds))
+
+def _close_cv_windows():
+    postMessage(to_js({"type":"close-images"},dict_converter=js.Object.fromEntries))
 
 class HandResult:
     def __init__(self,detected=False,fingers=0,side="",landmarks=None):
@@ -348,7 +351,7 @@ async function prepareRun(m){
   const code=m.code||"";
   const needsCv=/\bimport\s+cv2\b|\bzebjus_cv\b|\bCamera\s*\(|\bload_image\s*\(|\bdraw_(?:rgb_led|potentiometer|ultrasonic)\s*\(|\bcvzone\b|\bmediapipe\b|\bFaceDetector\b|\bHandTrackingModule\b/.test(code);
 
-  if(needsCv){
+  if(needsCv&&!opencvReady){
     postMessage({type:"status",text:"Loading OpenCV…",mode:"warn"});
     await pyodide.loadPackage(["numpy","opencv-python"]);
     await pyodide.runPythonAsync(`
@@ -368,12 +371,16 @@ def _browser_waitKey(delay=1): return -1
 cv2.VideoCapture=_BrowserVideoCapture
 cv2.imshow=_browser_imshow
 cv2.waitKey=_browser_waitKey
-cv2.destroyAllWindows=lambda:None
+cv2.destroyAllWindows=_close_cv_windows
     `);
+    opencvReady=true;
   }
   // Browser compatibility modules are local shims, not PyPI wheels.
   const scanCode=code.replace(/^\s*(?:from|import)\s+(?:zebjus(?:_ai|_cv)?|mediapipe|cvzone|SerialModule|HandTrackingModule|zebjus_wifi)(?:[.\w]*)?.*$/gm,"");
-  await pyodide.loadPackagesFromImports(scanCode);
+  if(scanCode.trim()&&!importLoadCache.has(scanCode)){
+    await pyodide.loadPackagesFromImports(scanCode);
+    importLoadCache.add(scanCode);
+  }
 
   pyodide.globals.set("__stdin_text",String(m.stdin||""));
   pyodide.globals.set("__ai_detected",!!m.aiState?.detected);
