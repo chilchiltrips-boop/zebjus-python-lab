@@ -590,7 +590,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.11",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.11.1",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -809,6 +809,9 @@ while True:
   async function refreshLiveAI(){
     let frame=null;
     if(liveNeedsCamera&&cameraRunning){
+      if(liveNeedsFace){
+        try{await ZebjusAI.enableFaceDetection();}catch(_){}
+      }
       const snap=ZebjusAI?.getSnapshot?.()||aiState;
       aiState={
         detected:!!snap.detected,
@@ -963,9 +966,23 @@ while True:
     }
 
     if(needsCamera && directCameraOk){
+      // Face detection is not started by the normal camera start path.
+      // Enable it explicitly before live FaceDetector loops begin.
+      if(needsFace){
+        try{
+          await ZebjusAI.enableFaceDetection();
+          if(liveMode){
+            // Give MediaPipe a few video frames to produce the first face result.
+            await new Promise(r=>setTimeout(r,220));
+          }
+        }catch(e){
+          log("Face detector error: "+(e?.message||e));
+        }
+      }
+
       let snap=ZebjusAI?.getSnapshot?.()||aiState;
       if(liveMode){
-        log(`LIVE initial state → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);
+        log(`LIVE initial state → faces=${Array.isArray(snap.faces)?snap.faces.length:0}, hand=${!!snap.detected}, fingers=${Number(snap.fingers)||0}`);
       }else{
         if(needsFace){snap=await ZebjusAI.waitForFaces(1500);log(`Face snapshot → faces=${Number(snap.faceCount)||0}`);}
         if(needsHand){snap=await ZebjusAI.waitForStable(1500);log(`Hand snapshot → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);}

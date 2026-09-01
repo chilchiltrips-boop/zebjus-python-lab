@@ -459,3 +459,19 @@ Typing `dis`, `stu`, or `cal` can show these names in Suggestions.
 - While a program runs, **Run** fades and is disabled; **End** becomes active.
 - After program end/error/End, **Run** becomes bright and usable again.
 - `cv2.destroyAllWindows()` closes browser OpenCV image windows.
+
+
+## v5.11.1 — Live FaceDetector fix
+
+Fixed `cvzone.FaceDetectionModule.FaceDetector` inside camera `while True` programs.
+
+Previously, normal camera startup enabled the hand detector but live face programs skipped the call that initializes MediaPipe FaceDetector. This caused:
+
+```text
+bboxs = []
+No face → GREEN
+```
+
+even when a face was visible.
+
+Live face programs now explicitly enable the MediaPipe face detector before the first cycle and keep it enabled during subsequent cycles.

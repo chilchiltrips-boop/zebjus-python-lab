@@ -1,5 +1,5 @@
 {
-  "version": "5.11",
+  "version": "5.11.1",
   "js_checks": {
     "config.js": {
       "returncode": 0,
@@ -30,20 +30,13 @@
     "all_js_pass": true,
     "worker_cache_busted": true,
     "app_cache_busted": true,
-    "runtime_stdout_hidden": true,
-    "python_ready_terminal_log_removed": true,
-    "opencv_once_per_worker": true,
-    "import_cache": true,
-    "wix_notice_removed": true,
-    "stop_renamed_end": true,
-    "close_window_stops_program": true,
-    "end_closes_cv": true,
-    "run_state_function": true,
-    "run_fade_css": true,
-    "destroy_all_windows_supported": true,
+    "live_face_enable_before_first_cycle": true,
+    "live_face_enable_refresh": true,
+    "face_model_config_present": true,
+    "ai_face_detector_present": true,
+    "cvzone_face_shim_present": true,
+    "clean_runtime_retained": true,
     "editor_diagnostics_retained": true,
-    "live_hand_retained": true,
-    "manual_upload_retained": true,
-    "realtime_print_retained": true
+    "opencv_float_retained": true
   }
 }
