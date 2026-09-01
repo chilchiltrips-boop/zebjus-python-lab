@@ -31,8 +31,6 @@
     whileloop:`count = 1\n\nwhile count <= 5:\n    print("Count:", count)\n    count += 1`,
     function:`def add(a, b):\n    return a + b\n\nprint("Answer =", add(10, 20))`,
     list:`fruits = ["apple", "orange", "mango"]\n\nfor fruit in fruits:\n    print(fruit)`,
-
-
     visionBlank:`# VISION AI Z — Student Project
 # Type your program below.
 
@@ -56,44 +54,6 @@ while True:
     print("Camera frame:", success)
     cv2.imshow("Result", img)
     cv2.waitKey(1)`,
-    visionLedSerial:`# VISION AI Z — RGB LED / SerialModule compatibility
-from SerialModule import SerialObject
-from time import sleep
-
-arduino = SerialObject("ZEBJUS")
-arduino.sendData([255, 0, 0])
-sleep(0.3)
-arduino.sendData([0, 255, 0])
-sleep(0.3)
-arduino.sendData([0, 0, 255])
-print("RGB test complete")`,
-    visionPotSerial:`# VISION AI Z — Potentiometer / SerialModule compatibility
-from SerialModule import SerialObject
-
-arduino = SerialObject("ZEBJUS")
-
-while True:
-    myData = arduino.getData()
-    print("Potentiometer:", myData[0])`,
-    visionPotGraphic:`# VISION AI Z — Potentiometer Graphics
-from cvzone.SerialModule import SerialObject
-import cv2
-import numpy as np
-
-arduino = SerialObject("ZEBJUS")
-
-while True:
-    myData = arduino.getData()
-    val = int(myData[0])
-    img = cv2.imread("uploads/Potentiometer.jpg")
-
-    cv2.putText(img, str(val).zfill(4), (260, 280),
-                cv2.FONT_HERSHEY_PLAIN, 3, (255, 255, 255), 3)
-    angle = np.interp(val, [0, 1023], [-90, 270])
-    cv2.ellipse(img, (320, 265), (131, 131), 0, -90, angle,
-                (255, 180, 0), 27)
-    cv2.imshow("Potentiometer", img)
-    cv2.waitKey(1)`,
     visionFaceBasic:`# VISION AI Z — Project: Face Detection Basics
 import cv2
 from cvzone.FaceDetectionModule import FaceDetector
@@ -107,106 +67,6 @@ while True:
     print("Faces:", len(bboxs))
     cv2.imshow("Image", img)
     cv2.waitKey(1)`,
-    visionFaceLed:`# VISION AI Z — Project: Face Detection → LED
-import cv2
-from cvzone.FaceDetectionModule import FaceDetector
-from SerialModule import SerialObject
-
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
-arduino = SerialObject("ZEBJUS")
-
-while True:
-    success, img = cap.read()
-    img, bboxs = detector.findFaces(img)
-
-    if bboxs:
-        arduino.sendData([100, 100, 100])
-        print("Face detected → LED ON")
-    else:
-        arduino.sendData([0, 0, 0])
-        print("No face → LED OFF")
-
-    cv2.imshow("Image", img)
-    cv2.waitKey(1)`,
-    visionFaceRgb:`# VISION AI Z — Project: Face Detection → RGB
-import cv2
-from cvzone.FaceDetectionModule import FaceDetector
-from SerialModule import SerialObject
-
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
-arduino = SerialObject("ZEBJUS")
-
-while True:
-    success, img = cap.read()
-    img, bboxs = detector.findFaces(img)
-
-    if bboxs:
-        arduino.sendData([255, 0, 0])
-        print("Face detected → RED")
-    else:
-        arduino.sendData([0, 255, 0])
-        print("No face → GREEN")
-
-    cv2.imshow("Image", img)
-    cv2.waitKey(1)`,
-    visionGripperSerial:`# VISION AI Z — Project: Hand Gripper (Serial style)
-import cv2
-import numpy as np
-import HandTrackingModule as htm
-import math
-from SerialModule import SerialObject
-
-arduino = SerialObject("ZEBJUS")
-cap = cv2.VideoCapture(0)
-detector = htm.handDetector(detectionCon=0.7)
-per = 0
-
-while True:
-    success, img = cap.read()
-    img = detector.findHands(img, draw=False)
-    lmList, bbox = detector.findPosition(img, draw=False)
-
-    if len(lmList) != 0:
-        x1, y1 = lmList[4][1], lmList[4][2]
-        x2, y2 = lmList[8][1], lmList[8][2]
-        length = math.hypot(x2 - x1, y2 - y1)
-        per = int(np.interp(length, (15, 170), (0, 90)))
-        arduino.sendData([0, 0, 255, per])
-        print("Gripper angle:", per)
-
-    cv2.imshow("Gripper", img)
-    cv2.waitKey(1)`,
-    visionGripperWifi:`# VISION AI Z — Project: Hand Gripper (Wi-Fi style)
-import cv2
-import numpy as np
-import HandTrackingModule as htm
-import math
-from zebjus_wifi import WifiBridge
-
-b = WifiBridge()
-b.start()
-b.set_format(digits=3, count=1)
-cap = cv2.VideoCapture(0)
-detector = htm.handDetector(detectionCon=0.7)
-
-while True:
-    success, img = cap.read()
-    img = detector.findHands(img, draw=False)
-    lmList, bbox = detector.findPosition(img, draw=False)
-
-    if len(lmList) != 0:
-        x1, y1 = lmList[4][1], lmList[4][2]
-        x2, y2 = lmList[8][1], lmList[8][2]
-        length = math.hypot(x2 - x1, y2 - y1)
-        per = int(np.interp(length, (15, 170), (0, 90)))
-        b.send_values([per])
-        print("Wi-Fi gripper angle:", per)
-
-    cv2.imshow("Gripper", img)
-    cv2.waitKey(1)`,
-
     hand:`from zebjus_ai import HandDetector\n\nresult = HandDetector().read()\nprint("Detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)`,
     handRgb:`from zebjus import RGBLED, sleep
 from zebjus_ai import HandDetector
@@ -236,22 +96,271 @@ while True:
         rgb.write(255, 0, 255)     # 5 = Purple
 
     sleep(0.10)`,
-
     faceCvzone:`from zebjus_cv import Camera, show\nfrom cvzone.FaceDetectionModule import FaceDetector\nimport cv2\nimport cvzone\nimport mediapipe as mp\n\nimg = Camera(0).read()\ndetector = FaceDetector(minDetectionCon=0.5)\nimg, bboxs = detector.findFaces(img, draw=False)\n\nprint("Faces:", len(bboxs))\nfor face in bboxs:\n    x, y, w, h = face["bbox"]\n    score = face["score"]\n    center = face["center"]\n    cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)\n    cvzone.putTextRect(img, f"{score}%", (x, max(25, y - 10)))\n    cvzone.cornerRect(img, (x, y, w, h))\n\nshow(img, "MediaPipe + CVZone Face Detection")`,
-
     cvGray:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nshow(gray, "Grayscale")`,
     cvEdges:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nedges = cv2.Canny(gray, 80, 160)\nshow(edges, "Canny Edges")`,
     cvBlur:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\nblurred = cv2.GaussianBlur(frame, (15, 15), 0)\nshow(blurred, "Gaussian Blur")`,
     cvThreshold:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n_, binary = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)\nshow(binary, "Threshold")`,
-
     imgRgb:`from zebjus_cv import load_image, draw_rgb_led, show\n\nimg = load_image()\ndraw_rgb_led(img, 90, 90, 255, 0, 0, 30)\ndraw_rgb_led(img, 170, 90, 0, 255, 0, 30)\ndraw_rgb_led(img, 250, 90, 0, 0, 255, 30)\nshow(img, "RGB LED Graphics")`,
     imgPot:`from zebjus import Potentiometer\nfrom zebjus_cv import load_image, draw_potentiometer, show\n\npot = Potentiometer(1)\nimg = load_image()\ndraw_potentiometer(img, 120, 120, pot.read(), 42)\nshow(img, "Potentiometer Graphic")`,
     imgDashboard:`from zebjus import Potentiometer, Ultrasonic\nfrom zebjus_cv import load_image, draw_rgb_led, draw_potentiometer, draw_ultrasonic, show\n\nimg = load_image()\npot = Potentiometer(1).read()\ndistance = Ultrasonic(1).read()\n\ndraw_rgb_led(img, 80, 80, 0, 255, 0, 28)\ndraw_potentiometer(img, 180, 80, pot, 34)\ndraw_ultrasonic(img, 260, 65, distance, 400, 180, 20)\nshow(img, "ZEBJUS Kit Dashboard")`,
-
     rgb:`from zebjus import RGBLED, sleep\n\nrgb = RGBLED(1)\n\nrgb.write(255, 0, 0)   # Red\nsleep(1)\nrgb.write(0, 255, 0)   # Green\nsleep(1)\nrgb.write(0, 0, 255)   # Blue\nsleep(1)\nrgb.write(255, 120, 0) # Orange\nsleep(1)\nrgb.off()`,
     sensors:`from zebjus import Ultrasonic, Potentiometer\n\nultra = Ultrasonic(1)\npot = Potentiometer(1)\n\nprint("Distance:", ultra.read(), "cm")\nprint("Pot value:", pot.read(), "/ 255")\nprint("Pot raw:", pot.raw())`,
     servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\nfor angle in [0, 45, 90, 135, 180, 90]:\n    servo.write(angle)\n    sleep(0.5)`,
-    motor:`from zebjus import Motor, sleep\n\nmotor = Motor(1)\nmotor.forward(50)\nsleep(2)\nmotor.stop()\nprint("Motor stopped")`
+    project01:`# Project 01 - Hello Python
+name = "ZEBJUS Student"
+print("Hello,", name)
+print("Welcome to Python Lab")`,
+    project02:`# Project 02 - Variables and Math
+a = 10
+b = 5
+
+print("A =", a)
+print("B =", b)
+print("Total =", a + b)
+print("Product =", a * b)`,
+    project03:`# Project 03 - If / Else
+temperature = 32
+
+if temperature > 30:
+    print("It is hot")
+else:
+    print("Temperature is normal")`,
+    project04:`# Project 04 - Loop Counter
+for i in range(1, 6):
+    print("Count:", i)`,
+    project05:`# Project 05 - RGB LED Colors
+from zebjus import RGBLED
+
+rgb = RGBLED(1)
+rgb.write(255, 0, 0)
+
+print("RGB LED = RED")
+
+# Try:
+# rgb.write(0, 255, 0)
+# rgb.write(0, 0, 255)
+# rgb.write(255, 255, 0)`,
+    project06:`# Project 06 - Potentiometer Reading
+from zebjus import Potentiometer
+
+pot = Potentiometer(1)
+value = pot.read()
+
+print("Potentiometer:", value)`,
+    project07:`# Project 07 - Ultrasonic Distance
+from zebjus import Ultrasonic
+
+sensor = Ultrasonic(1)
+distance = sensor.read()
+
+print("Distance:", distance, "cm")`,
+    project08:`# Project 08 - Ultrasonic Warning
+from zebjus import Ultrasonic, RGBLED
+
+sensor = Ultrasonic(1)
+rgb = RGBLED(1)
+
+distance = sensor.read()
+print("Distance:", distance, "cm")
+
+if distance < 30:
+    rgb.write(255, 0, 0)
+    print("WARNING - Object is near")
+else:
+    rgb.write(0, 255, 0)
+    print("Safe distance")`,
+    project09:`# Project 09 - Servo Angle
+from zebjus import Servo
+
+servo = Servo(1)
+servo.write(90)
+
+print("Servo angle = 90")`,
+    project10:`# Project 10 - Motor Speed
+from zebjus import Motor
+
+motor = Motor(1)
+motor.forward(50)
+
+print("Motor forward at 50%")
+
+# Try:
+# motor.backward(50)
+# motor.stop()`,
+    project11:`# Project 11 - Load and Display Image
+import cv2
+
+img = cv2.imread("uploads/test.jpg")
+
+print("Image shape:", img.shape)
+
+cv2.imshow("Uploaded Image", img)
+cv2.waitKey(1)`,
+    project12:`# Project 12 - Grayscale Image
+import cv2
+
+img = cv2.imread("uploads/test.jpg")
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+print("Converted to grayscale")
+
+cv2.imshow("Grayscale", gray)
+cv2.waitKey(1)`,
+    project13:`# Project 13 - Edge Detection
+import cv2
+
+img = cv2.imread("uploads/test.jpg")
+gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+edges = cv2.Canny(gray, 80, 160)
+
+print("Edge detection complete")
+
+cv2.imshow("Edges", edges)
+cv2.waitKey(1)`,
+    project14:`# Project 14 - Live Face Detection
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+
+while True:
+    success, img = cap.read()
+    img, faces = detector.findFaces(img)
+
+    print("Faces:", len(faces))
+
+    cv2.imshow("Face Detection", img)
+    cv2.waitKey(1)`,
+    project15:`# Project 15 - Face Presence Status
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+
+while True:
+    success, img = cap.read()
+    img, faces = detector.findFaces(img)
+
+    if faces:
+        print("Face detected")
+    else:
+        print("No face")
+
+    cv2.imshow("Face Status", img)
+    cv2.waitKey(1)`,
+    project16:`# Project 16 - Face Position
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+
+while True:
+    success, img = cap.read()
+    img, faces = detector.findFaces(img)
+
+    if faces:
+        x, y = faces[0]["center"]
+
+        if x < 220:
+            print("LEFT")
+        elif x > 420:
+            print("RIGHT")
+        else:
+            print("CENTER")
+
+    cv2.imshow("Face Position", img)
+    cv2.waitKey(1)`,
+    project17:`# Project 17 - Hand Finger Counter
+from zebjus import sleep
+from zebjus_ai import HandDetector
+
+hand = HandDetector()
+
+while True:
+    result = hand.read()
+
+    print("Detected:", result.detected)
+    print("Fingers:", result.fingers)
+    print("Side:", result.side)
+
+    sleep(0.15)`,
+    project18:`# Project 18 - Finger Count to RGB Color
+from zebjus import RGBLED, sleep
+from zebjus_ai import HandDetector
+
+rgb = RGBLED(1)
+hand = HandDetector()
+
+while True:
+    result = hand.read()
+    fingers = result.fingers
+
+    if not result.detected:
+        rgb.off()
+    elif fingers == 1:
+        rgb.write(255, 0, 0)
+    elif fingers == 2:
+        rgb.write(0, 255, 0)
+    elif fingers == 3:
+        rgb.write(0, 0, 255)
+    elif fingers == 4:
+        rgb.write(255, 255, 0)
+    elif fingers >= 5:
+        rgb.write(255, 0, 255)
+    else:
+        rgb.write(255, 255, 255)
+
+    print("Fingers:", fingers)
+    sleep(0.10)`,
+    project19:`# Project 19 - Hand Open / Closed
+from zebjus import sleep
+from zebjus_ai import HandDetector
+
+hand = HandDetector()
+
+while True:
+    result = hand.read()
+
+    if not result.detected:
+        print("No hand")
+    elif result.fingers >= 4:
+        print("HAND OPEN")
+    else:
+        print("HAND CLOSED")
+
+    sleep(0.15)`,
+    project20:`# Project 20 - Hand Gesture Controls Servo
+from zebjus import Servo, sleep
+from zebjus_ai import HandDetector
+
+servo = Servo(1)
+hand = HandDetector()
+
+while True:
+    result = hand.read()
+
+    if result.detected:
+        fingers = result.fingers
+
+        if fingers <= 1:
+            angle = 0
+        elif fingers == 2:
+            angle = 45
+        elif fingers == 3:
+            angle = 90
+        elif fingers == 4:
+            angle = 135
+        else:
+            angle = 180
+
+        servo.write(angle)
+        print("Fingers:", fingers, "Servo:", angle)
+
+    sleep(0.15)`,
   };
 
   const libraries=[
@@ -590,7 +699,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.11.1",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.12",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};

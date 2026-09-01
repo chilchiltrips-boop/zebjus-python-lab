@@ -475,3 +475,17 @@ No face → GREEN
 even when a face was visible.
 
 Live face programs now explicitly enable the MediaPipe face detector before the first cycle and keep it enabled during subsequent cycles.
+
+
+## v5.12 — 20 clean course projects
+
+Added 20 student-ready example projects and matching `.py` files in `examples/`.
+
+The new course examples do not use:
+- `SerialModule`
+- `SerialObject`
+- `arduino.sendData()`
+- `WifiBridge`
+- `HandTrackingModule`
+
+Hardware examples use the simple browser-supported `zebjus` API only.
