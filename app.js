@@ -4,6 +4,8 @@ import {basicSetup} from "https://esm.sh/codemirror@6.0.2";
 import {python} from "https://esm.sh/@codemirror/lang-python@6.2.1";
 import {autocompletion,completionKeymap} from "https://esm.sh/@codemirror/autocomplete@6.18.6";
 import {indentWithTab} from "https://esm.sh/@codemirror/commands@6.8.1";
+import {HighlightStyle,syntaxHighlighting} from "https://esm.sh/@codemirror/language@6.11.3";
+import {tags} from "https://esm.sh/@lezer/highlight@1.2.1";
 import "./ai.js";
 
 const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
@@ -38,31 +40,246 @@ servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\nfor angle in [0, 45,
 motor:`from zebjus import Motor, sleep\n\nmotor = Motor(1)\nmotor.forward(50)\nsleep(2)\nmotor.stop()\nprint("Motor stopped")`
 };
 
-const baseCompletions=[
-["and","keyword"],["as","keyword"],["assert","keyword"],["async","keyword"],["await","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["del","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["finally","keyword"],["for","keyword"],["from","keyword"],["global","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["is","keyword"],["lambda","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["raise","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],["yield","keyword"],
-["print","function","print(${1})"],["input","function",'input("${1:Prompt: }")'],["range","function","range(${1:5})"],["len","function","len(${1})"],["int","function","int(${1})"],["float","function","float(${1})"],["str","function","str(${1})"],["list","function","list(${1})"],["dict","function","dict(${1})"],["sum","function","sum(${1})"],["min","function","min(${1})"],["max","function","max(${1})"],["enumerate","function","enumerate(${1})"],
-["LED","class","LED(${1:1})"],["Motor","class","Motor(${1:1})"],["Servo","class","Servo(${1:1})"],["Camera","class","Camera(${1:0})"],["HandDetector","class","HandDetector()"],["sleep","function","sleep(${1:1})"],["cv2","module"],["np","module"]
+const libraryCompletions=[
+  ["cv2","module","OpenCV image processing"],
+  ["numpy","module","Numerical arrays and mathematics"],
+  ["math","module","Python mathematics"],
+  ["random","module","Random numbers and choices"],
+  ["time","module","Time utilities"],
+  ["statistics","module","Statistics functions"],
+  ["json","module","JSON encoding / decoding"],
+  ["re","module","Regular expressions"],
+  ["zebjus","module","ZEBJUS hardware library"],
+  ["zebjus_ai","module","ZEBJUS MediaPipe AI library"],
+  ["zebjus_cv","module","ZEBJUS browser camera/OpenCV bridge"]
 ];
-const dotted={
-cv2:[["cvtColor","function","cvtColor(${1:src}, ${2:cv2.COLOR_BGR2GRAY})"],["Canny","function","Canny(${1:image}, ${2:80}, ${3:160})"],["threshold","function","threshold(${1:src}, ${2:120}, ${3:255}, ${4:cv2.THRESH_BINARY})"],["resize","function","resize(${1:image}, (${2:320}, ${3:240}))"],["GaussianBlur","function","GaussianBlur(${1:image}, (${2:5}, ${3:5}), ${4:0})"],["COLOR_BGR2GRAY","constant"],["COLOR_BGR2RGB","constant"],["THRESH_BINARY","constant"]],
-led:[["on","method","on()"],["off","method","off()"],["blink","method","blink(${1:5}, ${2:0.5})"]],
-motor:[["forward","method","forward(${1:50})"],["backward","method","backward(${1:50})"],["stop","method","stop()"]],
-servo:[["write","method","write(${1:90})"]],
-result:[["detected","property"],["fingers","property"],["side","property"]],
-hand:[["read","method","read()"]],
-cam:[["read","method","read()"]]
+
+const baseCompletions=[
+  ["and","keyword"],["as","keyword"],["assert","keyword"],["async","keyword"],["await","keyword"],
+  ["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["del","keyword"],
+  ["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["finally","keyword"],
+  ["for","keyword"],["from","keyword"],["global","keyword"],["if","keyword"],["import","keyword"],
+  ["in","keyword"],["is","keyword"],["lambda","keyword"],["None","keyword"],["not","keyword"],
+  ["or","keyword"],["pass","keyword"],["raise","keyword"],["return","keyword"],["True","keyword"],
+  ["try","keyword"],["while","keyword"],["with","keyword"],["yield","keyword"],
+
+  ["print","function","print(${1})","Display a value in Output"],
+  ["input","function",'input("${1:Enter value: }")',"Read text from Program Input"],
+  ["range","function","range(${1:5})","Generate a sequence of integers"],
+  ["len","function","len(${1})","Length of a collection"],
+  ["int","function","int(${1})","Convert to integer"],
+  ["float","function","float(${1})","Convert to floating-point"],
+  ["str","function","str(${1})","Convert to string"],
+  ["list","function","list(${1})","Create a list"],
+  ["dict","function","dict(${1})","Create a dictionary"],
+  ["set","function","set(${1})","Create a set"],
+  ["tuple","function","tuple(${1})","Create a tuple"],
+  ["sum","function","sum(${1})","Sum values"],
+  ["min","function","min(${1})","Minimum value"],
+  ["max","function","max(${1})","Maximum value"],
+  ["abs","function","abs(${1})","Absolute value"],
+  ["round","function","round(${1:value}, ${2:2})","Round a number"],
+  ["enumerate","function","enumerate(${1})","Loop with index"],
+  ["zip","function","zip(${1:a}, ${2:b})","Combine iterables"],
+  ["sorted","function","sorted(${1})","Return sorted values"],
+  ["type","function","type(${1})","Get object type"],
+
+  ["LED","class","LED(${1:1})","ZEBJUS LED output"],
+  ["Motor","class","Motor(${1:1})","ZEBJUS motor output"],
+  ["Servo","class","Servo(${1:1})","ZEBJUS servo output"],
+  ["Camera","class","Camera(${1:0})","Browser camera by index"],
+  ["HandDetector","class","HandDetector()","MediaPipe hand detector"],
+  ["sleep","function","sleep(${1:1})","Pause for seconds"],
+  ["show","function","show(${1:image}, ${2:'Output'})","Display OpenCV image"],
+
+  ["cv2","module","cv2","OpenCV module"],
+  ["np","module","np","NumPy alias"],
+  ["math","module","math","Python math module"],
+  ["random","module","random","Python random module"],
+
+  ["for loop","snippet","for ${1:i} in range(${2:5}):\\n    ${3:print(i)}","Python for loop"],
+  ["while loop","snippet","while ${1:True}:\\n    ${2:pass}","Python while loop"],
+  ["if / else","snippet","if ${1:condition}:\\n    ${2:pass}\\nelse:\\n    ${3:pass}","Python condition"],
+  ["function","snippet","def ${1:function_name}(${2}):\\n    ${3:pass}","Create a function"],
+  ["class template","snippet","class ${1:MyClass}:\\n    def __init__(self):\\n        ${2:pass}","Create a class"],
+  ["try / except","snippet","try:\\n    ${1:pass}\\nexcept Exception as e:\\n    print(e)","Exception handling"]
+];
+
+const moduleMembers={
+  zebjus:[
+    ["LED","class","LED","LED output class"],
+    ["Motor","class","Motor","Motor output class"],
+    ["Servo","class","Servo","Servo output class"],
+    ["sleep","function","sleep","Pause function"]
+  ],
+  zebjus_ai:[
+    ["HandDetector","class","HandDetector","MediaPipe hand detector"],
+    ["HandResult","class","HandResult","Hand result object"]
+  ],
+  zebjus_cv:[
+    ["Camera","class","Camera","Browser camera wrapper"],
+    ["show","function","show","Display OpenCV image"]
+  ]
 };
 
-function completionSource(context){
-  const pos=context.pos,line=context.state.doc.lineAt(pos),before=line.text.slice(0,pos-line.from);
-  const dot=before.match(/([A-Za-z_]\w*)\.([A-Za-z_]\w*)?$/);
-  let prefix="",items=baseCompletions;
-  if(dot){prefix=dot[2]||"";items=dotted[dot[1]]||[];}
-  else{const m=before.match(/([A-Za-z_]\w*)$/);if(!m&&!context.explicit)return null;prefix=m?.[1]||"";}
-  const filtered=items.filter(x=>x[0].startsWith(prefix));
-  if(!filtered.length)return null;
-  return{from:pos-prefix.length,filter:false,options:filtered.map(([label,type,apply])=>({label,type,apply:apply||label,detail:type}))};
+const dotted={
+  cv2:[
+    ["cvtColor","function","cvtColor(${1:src}, ${2:cv2.COLOR_BGR2GRAY})","Convert color space"],
+    ["Canny","function","Canny(${1:image}, ${2:80}, ${3:160})","Canny edge detector"],
+    ["threshold","function","threshold(${1:src}, ${2:120}, ${3:255}, ${4:cv2.THRESH_BINARY})","Image threshold"],
+    ["resize","function","resize(${1:image}, (${2:320}, ${3:240}))","Resize image"],
+    ["GaussianBlur","function","GaussianBlur(${1:image}, (${2:5}, ${3:5}), ${4:0})","Gaussian blur"],
+    ["medianBlur","function","medianBlur(${1:image}, ${2:5})","Median blur"],
+    ["rectangle","function","rectangle(${1:image}, (${2:x1}, ${3:y1}), (${4:x2}, ${5:y2}), (${6:0}, ${7:255}, ${8:0}), ${9:2})","Draw rectangle"],
+    ["circle","function","circle(${1:image}, (${2:x}, ${3:y}), ${4:20}, (${5:0}, ${6:255}, ${7:0}), ${8:2})","Draw circle"],
+    ["line","function","line(${1:image}, (${2:x1}, ${3:y1}), (${4:x2}, ${5:y2}), (${6:255}, ${7:0}, ${8:0}), ${9:2})","Draw line"],
+    ["putText","function","putText(${1:image}, ${2:'Text'}, (${3:20}, ${4:40}), cv2.FONT_HERSHEY_SIMPLEX, ${5:1}, (${6:255}, ${7:255}, ${8:255}), ${9:2})","Draw text"],
+    ["findContours","function","findContours(${1:image}, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)","Find contours"],
+    ["contourArea","function","contourArea(${1:contour})","Contour area"],
+    ["boundingRect","function","boundingRect(${1:contour})","Contour bounding box"],
+    ["imencode","function","imencode(${1:'.png'}, ${2:image})","Encode image"],
+    ["COLOR_BGR2GRAY","constant","COLOR_BGR2GRAY","BGR to grayscale"],
+    ["COLOR_BGR2RGB","constant","COLOR_BGR2RGB","BGR to RGB"],
+    ["COLOR_RGB2BGR","constant","COLOR_RGB2BGR","RGB to BGR"],
+    ["THRESH_BINARY","constant","THRESH_BINARY","Binary threshold"],
+    ["THRESH_BINARY_INV","constant","THRESH_BINARY_INV","Inverse binary threshold"],
+    ["RETR_EXTERNAL","constant","RETR_EXTERNAL","External contours"],
+    ["RETR_TREE","constant","RETR_TREE","Contour hierarchy"],
+    ["CHAIN_APPROX_SIMPLE","constant","CHAIN_APPROX_SIMPLE","Contour compression"],
+    ["FONT_HERSHEY_SIMPLEX","constant","FONT_HERSHEY_SIMPLEX","OpenCV font"]
+  ],
+  np:[
+    ["array","function","array(${1})","Create NumPy array"],
+    ["asarray","function","asarray(${1})","Convert to array"],
+    ["zeros","function","zeros((${1:3}, ${2:3}))","Array of zeros"],
+    ["ones","function","ones((${1:3}, ${2:3}))","Array of ones"],
+    ["arange","function","arange(${1:0}, ${2:10}, ${3:1})","Numeric range"],
+    ["linspace","function","linspace(${1:0}, ${2:1}, ${3:50})","Evenly spaced values"],
+    ["mean","function","mean(${1})","Mean"],
+    ["sum","function","sum(${1})","Sum"],
+    ["min","function","min(${1})","Minimum"],
+    ["max","function","max(${1})","Maximum"],
+    ["sqrt","function","sqrt(${1})","Square root"],
+    ["clip","function","clip(${1:a}, ${2:min}, ${3:max})","Clip values"],
+    ["uint8","type","uint8","8-bit unsigned integer"],
+    ["float32","type","float32","32-bit floating point"]
+  ],
+  math:[
+    ["sqrt","function","sqrt(${1})","Square root"],
+    ["sin","function","sin(${1})","Sine"],
+    ["cos","function","cos(${1})","Cosine"],
+    ["tan","function","tan(${1})","Tangent"],
+    ["radians","function","radians(${1})","Degrees to radians"],
+    ["degrees","function","degrees(${1})","Radians to degrees"],
+    ["floor","function","floor(${1})","Floor"],
+    ["ceil","function","ceil(${1})","Ceiling"],
+    ["pi","constant","pi","Pi constant"],
+    ["e","constant","e","Euler constant"]
+  ],
+  random:[
+    ["randint","function","randint(${1:1}, ${2:10})","Random integer"],
+    ["random","function","random()","Random float"],
+    ["choice","function","choice(${1:list})","Random item"],
+    ["shuffle","function","shuffle(${1:list})","Shuffle list"]
+  ],
+  led:[
+    ["on","method","on()","Turn LED on"],
+    ["off","method","off()","Turn LED off"],
+    ["blink","method","blink(${1:5}, ${2:0.5})","Blink LED"]
+  ],
+  motor:[
+    ["forward","method","forward(${1:50})","Motor forward"],
+    ["backward","method","backward(${1:50})","Motor backward"],
+    ["stop","method","stop()","Stop motor"]
+  ],
+  servo:[
+    ["write","method","write(${1:90})","Set servo angle 0–180°"]
+  ],
+  result:[
+    ["detected","property","detected","True when hand is detected"],
+    ["fingers","property","fingers","Detected finger count"],
+    ["side","property","side","Left / Right hand"]
+  ],
+  hand:[
+    ["read","method","read()","Read latest MediaPipe result"]
+  ],
+  cam:[
+    ["read","method","read()","Capture latest browser camera frame"]
+  ]
+};
+
+function makeOptions(items,prefix,from){
+  return items
+    .filter(x=>x[0].startsWith(prefix))
+    .map(([label,type,apply,info])=>({
+      label,
+      type,
+      apply:apply||label,
+      detail:type,
+      info:info||"",
+      boost:type==="snippet"?2:1
+    }));
 }
+
+function completionSource(context){
+  const pos=context.pos;
+  const line=context.state.doc.lineAt(pos);
+  const before=line.text.slice(0,pos-line.from);
+
+  // import <library>
+  let m=before.match(/^\s*import\s+([A-Za-z_]\w*)?$/);
+  if(m){
+    const prefix=m[1]||"";
+    return {from:pos-prefix.length,filter:false,options:makeOptions(libraryCompletions,prefix,pos-prefix.length)};
+  }
+
+  // from <library>
+  m=before.match(/^\s*from\s+([A-Za-z_]\w*)?$/);
+  if(m){
+    const prefix=m[1]||"";
+    return {from:pos-prefix.length,filter:false,options:makeOptions(libraryCompletions,prefix,pos-prefix.length)};
+  }
+
+  // from zebjus import <member>
+  m=before.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv)\s+import\s+([A-Za-z_]\w*)?$/);
+  if(m){
+    const prefix=m[2]||"";
+    return {from:pos-prefix.length,filter:false,options:makeOptions(moduleMembers[m[1]]||[],prefix,pos-prefix.length)};
+  }
+
+  // object/module dot completion
+  m=before.match(/([A-Za-z_]\w*)\.([A-Za-z_]\w*)?$/);
+  if(m){
+    const base=m[1],prefix=m[2]||"";
+    const items=dotted[base]||[];
+    if(items.length)return {from:pos-prefix.length,filter:false,options:makeOptions(items,prefix,pos-prefix.length)};
+  }
+
+  // Standard case-sensitive Python completion
+  m=before.match(/([A-Za-z_]\w*)$/);
+  if(!m&&!context.explicit)return null;
+  const prefix=m?.[1]||"";
+  const options=makeOptions(baseCompletions,prefix,pos-prefix.length);
+  return options.length?{from:pos-prefix.length,filter:false,options}:null;
+}
+
+const pycharmHighlight=HighlightStyle.define([
+  {tag:tags.keyword,color:"#ff9d57",fontWeight:"600"},
+  {tag:[tags.bool,tags.null],color:"#ff9d57",fontWeight:"600"},
+  {tag:[tags.string,tags.special(tags.string)],color:"#6aab73"},
+  {tag:[tags.number,tags.integer,tags.float],color:"#2aacb8"},
+  {tag:tags.comment,color:"#7a7e85",fontStyle:"italic"},
+  {tag:[tags.function(tags.variableName),tags.function(tags.propertyName)],color:"#56a8f5"},
+  {tag:[tags.className,tags.typeName],color:"#ffc66d"},
+  {tag:tags.definition(tags.variableName),color:"#c9d1d9"},
+  {tag:tags.variableName,color:"#c9d1d9"},
+  {tag:tags.propertyName,color:"#c9d1d9"},
+  {tag:tags.operator,color:"#d7ba7d"},
+  {tag:tags.punctuation,color:"#a9b7c6"},
+  {tag:tags.meta,color:"#bbb529"},
+  {tag:tags.selfName,color:"#94558d"},
+  {tag:tags.invalid,color:"#ff6b68",textDecoration:"underline"}
+]);
 
 const darkTheme=EditorView.theme({
   "&":{height:"100%",backgroundColor:"#090f1b",color:"#eef4ff"},
@@ -77,7 +294,7 @@ function initEditor(){
   view=new EditorView({
     state:EditorState.create({
       doc:saved||examples.hello,
-      extensions:[basicSetup,python(),darkTheme,autocompletion({override:[completionSource],activateOnTyping:true,maxRenderedOptions:14}),keymap.of([...completionKeymap,indentWithTab]),
+      extensions:[basicSetup,python(),darkTheme,syntaxHighlighting(pycharmHighlight),autocompletion({override:[completionSource],activateOnTyping:true,maxRenderedOptions:14}),keymap.of([...completionKeymap,indentWithTab]),
         EditorView.updateListener.of(u=>{
           if(u.docChanged&&prefs.autoSave){
             $("saveState").textContent="Saving…";

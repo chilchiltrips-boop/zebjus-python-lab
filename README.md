@@ -84,3 +84,34 @@ https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs
 ```
 
 instead of using `importScripts()`.
+
+
+## v3.2 PyCharm-style editor
+
+Added richer case-sensitive autocomplete and syntax colors.
+
+Autocomplete includes:
+- `import ...` library suggestions
+- `from ...` library suggestions
+- `from zebjus import ...`
+- `from zebjus_ai import ...`
+- `from zebjus_cv import ...`
+- Python built-ins and snippets
+- `cv2.` OpenCV methods/constants
+- `np.` NumPy helpers
+- `math.` functions
+- `random.` functions
+- ZEBJUS LED/Motor/Servo methods
+- MediaPipe result properties
+
+PyCharm-like syntax colors distinguish:
+- keywords
+- strings
+- numbers
+- comments
+- functions
+- classes
+- variables/properties
+- operators
+
+Suggestions are intentionally case-sensitive to match Python behavior.
