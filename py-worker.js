@@ -460,6 +460,39 @@ except (SyntaxError,IndentationError,TabError) as e:
   }
 }
 
+async function executeStudentCode(execCode){
+  pyodide.globals.set("__student_exec_code",String(execCode||""));
+
+  const raw=await pyodide.runPythonAsync(`
+import json, traceback
+
+try:
+    exec(compile(str(__student_exec_code), "main.py", "exec"), globals(), globals())
+    json.dumps({"ok": True})
+except BaseException as e:
+    frames = traceback.extract_tb(e.__traceback__)
+    student_frames = [f for f in frames if f.filename == "main.py"]
+
+    if student_frames:
+        line = int(student_frames[-1].lineno)
+    else:
+        line = int(getattr(e, "lineno", 1) or 1)
+
+    offset = int(getattr(e, "offset", 1) or 1)
+    message = str(getattr(e, "msg", e))
+
+    json.dumps({
+        "ok": False,
+        "errorType": e.__class__.__name__,
+        "message": message,
+        "line": line,
+        "offset": offset
+    })
+  `);
+
+  return JSON.parse(String(raw||'{"ok":true}'));
+}
+
 self.onmessage=async e=>{
   const m=e.data||{};
 
@@ -472,8 +505,13 @@ self.onmessage=async e=>{
   try{
     await initialize();
     const execCode=await prepareRun(m);
-    await pyodide.runPythonAsync(execCode||"");
-    postMessage({type:"done"});
+    const result=await executeStudentCode(execCode);
+
+    if(result.ok){
+      postMessage({type:"done"});
+    }else{
+      postMessage({type:"error",...result});
+    }
   }catch(err){
     const info=parsePythonError(err,m.code||"");
     postMessage({type:"error",...info});

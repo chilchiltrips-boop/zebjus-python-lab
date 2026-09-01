@@ -1,40 +1,43 @@
 {
-  "version": "5.12",
-  "example_syntax": {
-    "01_hello_python.py": "PASS",
-    "02_variables_math.py": "PASS",
-    "03_if_else.py": "PASS",
-    "04_loop_counter.py": "PASS",
-    "05_rgb_led_colors.py": "PASS",
-    "06_potentiometer_reading.py": "PASS",
-    "07_ultrasonic_distance.py": "PASS",
-    "08_ultrasonic_warning.py": "PASS",
-    "09_servo_angle.py": "PASS",
-    "10_motor_speed.py": "PASS",
-    "11_load_display_image.py": "PASS",
-    "12_grayscale_image.py": "PASS",
-    "13_edge_detection.py": "PASS",
-    "14_live_face_detection.py": "PASS",
-    "15_face_presence_status.py": "PASS",
-    "16_face_position.py": "PASS",
-    "17_hand_finger_counter.py": "PASS",
-    "18_finger_count_rgb.py": "PASS",
-    "19_hand_open_closed.py": "PASS",
-    "20_hand_gesture_servo.py": "PASS"
+  "version": "5.14",
+  "js_checks": {
+    "config.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "ai.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "app.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "settings.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "py-worker.js": {
+      "returncode": 0,
+      "stderr": ""
+    },
+    "camera-bridge.js": {
+      "returncode": 0,
+      "stderr": ""
+    }
   },
+  "python_files": [],
   "critical": {
-    "20_examples_present": true,
-    "all_20_python_syntax_pass": true,
-    "dropdown_has_all_20": true,
-    "no_SerialModule_in_new_examples": true,
-    "no_SerialObject_in_new_examples": true,
-    "no_arduino_send_in_new_examples": true,
-    "no_WifiBridge_in_new_examples": true,
-    "manual_upload_example_present": true,
-    "face_examples_present": true,
-    "hand_examples_present": true,
-    "clean_runtime_retained": true,
+    "all_js_pass": true,
+    "no_python_example_files": true,
+    "no_examples_folder": true,
+    "all_20_dropdown_projects_retained": true,
+    "student_virtual_filename_main_py": true,
+    "traceback_filters_main_py": true,
+    "structured_runtime_line": true,
+    "editor_red_marker_retained": true,
     "editor_diagnostics_retained": true,
-    "live_runtime_retained": true
+    "camera_panel_imshow_retained": true,
+    "live_face_retained": true
   }
 }

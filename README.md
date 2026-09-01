@@ -479,7 +479,7 @@ Live face programs now explicitly enable the MediaPipe face detector before the 
 
 ## v5.12 — 20 clean course projects
 
-Added 20 student-ready example projects and matching `.py` files in `examples/`.
+Added 20 student-ready projects directly to the Example selector.
 
 The new course examples do not use:
 - `SerialModule`
@@ -489,3 +489,56 @@ The new course examples do not use:
 - `HandTrackingModule`
 
 Hardware examples use the simple browser-supported `zebjus` API only.
+
+
+## v5.13.1 — `cv2.imshow()` in Camera / MediaPipe panel
+
+The floating OpenCV popup window is disabled.
+
+When student code calls:
+
+```python
+cv2.imshow("Face Detection", img)
+```
+
+the processed OpenCV/MediaPipe frame is displayed directly inside the **Camera / MediaPipe** preview area.
+
+Behavior:
+- Raw camera continues running in the background.
+- Processed `imshow()` result replaces the visible raw preview.
+- Terminal stays separate for `print()` and errors.
+- **End** clears the processed image and restores normal camera preview/placeholder.
+- `cv2.destroyAllWindows()` also clears the processed image.
+- No minimize/restore floating-window problem.
+
+
+## v5.14 — Dropdown-only examples + exact error line mapping
+
+### Examples
+Separate Python example files were removed.
+
+Students use:
+
+```text
+Example selector → Project 01–20 → Load into editor
+```
+
+There is no `examples/` folder and no downloadable example `.py` files in this build.
+
+### Exact runtime error line
+Student code is compiled as a virtual file named `main.py`.
+
+Runtime exceptions now use the traceback frame from `main.py`, so blank lines are preserved correctly.
+
+Example:
+
+```python
+# lines 1–22 may be blank
+
+print(undefined_name)   # line 23
+```
+
+Expected:
+- `NameError · line 23`
+- red `●` on editor line 23
+- red underline/highlight on line 23

@@ -678,7 +678,48 @@ while True:
     run.setAttribute("aria-pressed",running?"true":"false");
   }
 
+  function showCameraProcessedImage(url,title="OpenCV Output"){
+    const img=$("cameraResultImage");
+    if(!img||!url)return;
+    img.src=url;
+    img.style.display="block";
+
+    const video=$("cameraVideo");
+    const overlay=$("cameraOverlay");
+    const placeholder=$("cameraPlaceholder");
+    const label=$("cameraResultLabel");
+
+    if(video)video.style.visibility="hidden";
+    if(overlay)overlay.style.visibility="hidden";
+    if(placeholder)placeholder.style.display="none";
+    if(label){
+      label.hidden=false;
+      label.textContent=title||"OpenCV Output";
+    }
+  }
+
+  function clearCameraProcessedImage(){
+    const img=$("cameraResultImage");
+    const video=$("cameraVideo");
+    const overlay=$("cameraOverlay");
+    const placeholder=$("cameraPlaceholder");
+    const label=$("cameraResultLabel");
+
+    if(img){
+      img.removeAttribute("src");
+      img.style.display="none";
+    }
+    if(video)video.style.visibility="";
+    if(overlay)overlay.style.visibility="";
+    if(label)label.hidden=true;
+
+    if(placeholder){
+      placeholder.style.display=cameraRunning?"none":"flex";
+    }
+  }
+
   function closeAllCvWindows(){
+    clearCameraProcessedImage();
     document.querySelectorAll(".opencv-float-window").forEach(win=>{
       win.classList.remove("show","minimized");
       const c=win.querySelector("canvas");
@@ -699,7 +740,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.12",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.14",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -751,7 +792,7 @@ while True:
       else if(m.type==="kit-command")handleKit(m.payload);
       else if(m.type==="image"){
         showImage(m.dataUrl);
-        showCvFloatingUrl(m.dataUrl,m.title||"OpenCV Image");
+        showCameraProcessedImage(m.dataUrl,m.title||"OpenCV Output");
       }
     };
     worker.onerror=e=>{running=false;updateRunControls();log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
@@ -952,86 +993,11 @@ while True:
   }
 
 
-  function ensureCvFloatWindow(){
-    let win=$("opencvFloatWindow");
-    if(win)return win;
-    win=document.createElement("div");
-    win.id="opencvFloatWindow";
-    win.className="opencv-float-window";
-    win.innerHTML=`
-      <div class="opencv-float-titlebar" id="opencvFloatTitlebar">
-        <div class="opencv-float-title"><span class="opencv-dot"></span><span id="opencvFloatTitle">OpenCV Image</span></div>
-        <div class="opencv-float-actions">
-          <button type="button" id="opencvFloatMin" title="Minimize">—</button>
-          <button type="button" id="opencvFloatClose" title="Close">×</button>
-        </div>
-      </div>
-      <div class="opencv-float-body" id="opencvFloatBody">
-        <canvas id="opencvFloatCanvas"></canvas>
-      </div>
-      <div class="opencv-resize-handle"></div>`;
-    document.body.appendChild(win);
+  function ensureCvFloatWindow(){ return null; }
+  function showCvFloatingImage(frame,title="OpenCV Image"){ return; }
+  function showCvFloatingUrl(url,title="OpenCV Image"){ return; }
 
-    $("opencvFloatClose").onclick=()=>{
-      if(running)stopProgram();
-      else closeAllCvWindows();
-    };
-    $("opencvFloatMin").onclick=()=>{
-      win.classList.toggle("minimized");
-      $("opencvFloatMin").textContent=win.classList.contains("minimized")?"□":"—";
-    };
 
-    const bar=$("opencvFloatTitlebar");
-    let dragging=false,dx=0,dy=0;
-    bar.addEventListener("pointerdown",e=>{
-      if(e.target.closest("button"))return;
-      dragging=true;bar.setPointerCapture(e.pointerId);
-      const r=win.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;
-      win.style.right="auto";win.style.bottom="auto";
-    });
-    bar.addEventListener("pointermove",e=>{
-      if(!dragging)return;
-      const maxX=Math.max(0,window.innerWidth-win.offsetWidth);
-      const maxY=Math.max(0,window.innerHeight-win.offsetHeight);
-      win.style.left=Math.max(0,Math.min(maxX,e.clientX-dx))+"px";
-      win.style.top=Math.max(0,Math.min(maxY,e.clientY-dy))+"px";
-    });
-    const endDrag=e=>{if(dragging){dragging=false;try{bar.releasePointerCapture(e.pointerId);}catch(_){}}};
-    bar.addEventListener("pointerup",endDrag);
-    bar.addEventListener("pointercancel",endDrag);
-    return win;
-  }
-
-  function showCvFloatingImage(frame,title="OpenCV Image"){
-    if(!frame||!frame.width||!frame.height||!frame.data)return;
-    const win=ensureCvFloatWindow();
-    const c=$("opencvFloatCanvas");
-    c.width=frame.width;c.height=frame.height;
-    const ctx=c.getContext("2d",{willReadFrequently:true});
-    const raw=frame.data instanceof Uint8ClampedArray?frame.data:new Uint8ClampedArray(frame.data);
-    ctx.putImageData(new ImageData(raw,frame.width,frame.height),0,0);
-    $("opencvFloatTitle").textContent=title||"OpenCV Image";
-    win.classList.remove("minimized");
-    win.classList.add("show");
-  }
-
-  function showCvFloatingUrl(url,title="OpenCV Image"){
-    if(!url)return;
-    const win=ensureCvFloatWindow();
-    const c=$("opencvFloatCanvas");
-    const img=new Image();
-    img.onload=()=>{
-      c.width=img.naturalWidth||img.width||640;
-      c.height=img.naturalHeight||img.height||480;
-      const ctx=c.getContext("2d",{willReadFrequently:true});
-      ctx.clearRect(0,0,c.width,c.height);
-      ctx.drawImage(img,0,0,c.width,c.height);
-      $("opencvFloatTitle").textContent=title||"OpenCV Image";
-      win.classList.remove("minimized");
-      win.classList.add("show");
-    };
-    img.src=url;
-  }
 
   async function runCode(){
     if(running){log("Program already running. Press Stop first.");return;}

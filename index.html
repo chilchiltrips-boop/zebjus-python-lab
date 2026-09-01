@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.9.1</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.14</span>
       <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
     </div>
     <div class="top-actions">
@@ -139,7 +139,9 @@
           <div class="camera-wrap">
             <video id="cameraVideo" playsinline muted></video>
             <canvas id="cameraOverlay"></canvas>
+            <img id="cameraResultImage" class="camera-result-image" alt="OpenCV / MediaPipe output">
             <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
+            <div id="cameraResultLabel" class="camera-result-label" hidden>OpenCV Output</div>
           </div>
           <div class="ai-stats">
             <div><span>Hand</span><strong id="handDetected">—</strong></div>
@@ -276,8 +278,8 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.12"></script>
-  <script src="./ai.js?v=5.12"></script>
-  <script src="./app.js?v=5.12"></script>
+  <script src="./config.js?v=5.14"></script>
+  <script src="./ai.js?v=5.14"></script>
+  <script src="./app.js?v=5.14"></script>
 </body>
 </html>
