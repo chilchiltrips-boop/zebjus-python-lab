@@ -1,14 +1,22 @@
 const terminal = document.getElementById("terminal");
 const pythonStatus = document.getElementById("pythonStatus");
 const kitStatus = document.getElementById("kitStatus");
+const aiStatus = document.getElementById("aiStatus");
 const kitIdInput = document.getElementById("kitId");
 const wsUrlInput = document.getElementById("wsUrl");
 const demoModeInput = document.getElementById("demoMode");
+const cameraVideo = document.getElementById("cameraVideo");
+const cameraOverlay = document.getElementById("cameraOverlay");
+const cameraPlaceholder = document.getElementById("cameraPlaceholder");
 
 let editor;
 let worker;
 let ws = null;
 let running = false;
+let aiSnapshot = {detected:false,fingers:0,side:""};
+const cfg = window.ZEBJUS_CONFIG || {};
+kitIdInput.value = cfg.defaultKitId || kitIdInput.value;
+wsUrlInput.value = cfg.websocketUrl || "";
 
 const starterCode = `from zebjus import *
 
@@ -26,6 +34,25 @@ for i in range(5):
     sleep(0.5)
 
 print("Done")
+`;
+
+const aiExampleCode = `from zebjus import *
+from zebjus_ai import *
+
+led = LED(1)
+hand = HandDetector()
+result = hand.read()
+
+print("Hand detected:", result.detected)
+print("Fingers:", result.fingers)
+print("Side:", result.side)
+
+if result.detected and result.fingers >= 4:
+    led.on()
+    print("LED ON")
+else:
+    led.off()
+    print("LED OFF")
 `;
 
 const blankCode = `from zebjus import *
@@ -177,7 +204,7 @@ function runCode(){
   }
   running = true;
   terminal.textContent = "";
-  worker.postMessage({type:"run", code:editor.getValue()});
+  worker.postMessage({type:"run", code:editor.getValue(), aiState:aiSnapshot});
 }
 
 function stopCode(){
@@ -194,7 +221,19 @@ document.getElementById("runBtn").onclick = runCode;
 document.getElementById("stopBtn").onclick = stopCode;
 document.getElementById("clearBtn").onclick = () => terminal.textContent = "";
 document.getElementById("exampleBtn").onclick = () => editor.setValue(starterCode);
+document.getElementById("aiExampleBtn").onclick = () => editor.setValue(aiExampleCode);
 document.getElementById("resetBtn").onclick = () => editor.setValue(blankCode);
+
+
+async function startCamera(){
+  if(!window.ZebjusAI){log("AI module is still loading. Try again.");return;}
+  try{aiStatus.textContent="Loading MediaPipe…";aiStatus.className="badge warn";await window.ZebjusAI.start(cameraVideo,cameraOverlay);cameraPlaceholder.style.display="none";aiStatus.textContent="AI camera running";aiStatus.className="badge ok";log("MediaPipe hand tracking started.");}
+  catch(err){aiStatus.textContent="AI camera error";aiStatus.className="badge";log("AI camera error: "+err.message);}
+}
+function stopCamera(){if(window.ZebjusAI)window.ZebjusAI.stop(cameraVideo,cameraOverlay);cameraPlaceholder.style.display="grid";aiSnapshot={detected:false,fingers:0,side:""};document.getElementById("handDetected").textContent="Not detected";document.getElementById("fingerCount").textContent="0";document.getElementById("handSide").textContent="—";aiStatus.textContent="AI camera off";aiStatus.className="badge";}
+window.addEventListener("zebjus-ai-state",e=>{const d=e.detail||{};aiSnapshot={detected:!!d.detected,fingers:Number(d.fingers)||0,side:d.side||""};document.getElementById("handDetected").textContent=aiSnapshot.detected?"Detected":"Not detected";document.getElementById("fingerCount").textContent=String(aiSnapshot.fingers);document.getElementById("handSide").textContent=aiSnapshot.side||"—";});
+document.getElementById("startCameraBtn").onclick=startCamera;
+document.getElementById("stopCameraBtn").onclick=stopCamera;
 
 demoModeInput.onchange = () => {
   if(demoModeInput.checked){
@@ -249,6 +288,7 @@ require(["vs/editor/editor.main"], function(){
         {label:"LED", kind:monaco.languages.CompletionItemKind.Class, insertText:"LED(${1:1})", insertTextRules:4, detail:"ZEBJUS LED class", range},
         {label:"Motor", kind:monaco.languages.CompletionItemKind.Class, insertText:"Motor(${1:1})", insertTextRules:4, detail:"ZEBJUS Motor class", range},
         {label:"Servo", kind:monaco.languages.CompletionItemKind.Class, insertText:"Servo(${1:1})", insertTextRules:4, detail:"ZEBJUS Servo class", range},
+        {label:"HandDetector", kind:monaco.languages.CompletionItemKind.Class, insertText:"HandDetector()", detail:"MediaPipe hand snapshot", range},
         {label:"sleep", kind:monaco.languages.CompletionItemKind.Function, insertText:"sleep(${1:1})", insertTextRules:4, detail:"Pause program in seconds", range},
         {label:"print", kind:monaco.languages.CompletionItemKind.Function, insertText:"print(${1})", insertTextRules:4, range},
         {label:"for loop", kind:monaco.languages.CompletionItemKind.Snippet, insertText:"for ${1:i} in range(${2:5}):\\n\\t${3:print(i)}", insertTextRules:4, detail:"Python for loop", range},
@@ -260,7 +300,11 @@ require(["vs/editor/editor.main"], function(){
         {label:"forward", kind:monaco.languages.CompletionItemKind.Method, insertText:"forward(${1:60})", insertTextRules:4, detail:"Motor forward 0-100%", range},
         {label:"backward", kind:monaco.languages.CompletionItemKind.Method, insertText:"backward(${1:60})", insertTextRules:4, detail:"Motor backward 0-100%", range},
         {label:"stop", kind:monaco.languages.CompletionItemKind.Method, insertText:"stop()", detail:"Stop motor", range},
-        {label:"write", kind:monaco.languages.CompletionItemKind.Method, insertText:"write(${1:90})", insertTextRules:4, detail:"Servo angle 0-180°", range}
+        {label:"write", kind:monaco.languages.CompletionItemKind.Method, insertText:"write(${1:90})", insertTextRules:4, detail:"Servo angle 0-180°", range},
+        {label:"read", kind:monaco.languages.CompletionItemKind.Method, insertText:"read()", detail:"Read latest AI snapshot", range},
+        {label:"fingers", kind:monaco.languages.CompletionItemKind.Property, insertText:"fingers", detail:"Finger count", range},
+        {label:"detected", kind:monaco.languages.CompletionItemKind.Property, insertText:"detected", detail:"Hand detected", range},
+        {label:"side", kind:monaco.languages.CompletionItemKind.Property, insertText:"side", detail:"Left/Right hand", range}
       ];
       return {suggestions};
     }

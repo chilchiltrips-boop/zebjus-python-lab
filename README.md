@@ -1,96 +1,39 @@
-# ZEBJUS Python Lab
+# ZEBJUS Python Lab v2
 
-A browser-based Python playground for training courses and Wi‑Fi hardware kits.
+Browser Python lab for Wix/GitHub Pages with Wi‑Fi kit commands and a MediaPipe hand-detection experiment.
 
-## Included
+## Features
+- Monaco editor + autocomplete
+- Pyodide in a Web Worker
+- LED / Motor / Servo demo APIs
+- secure WebSocket transport for future real kit control
+- MediaPipe Hand Landmarker camera panel
+- finger-count demo
+- `from zebjus_ai import *` and `HandDetector().read()`
+- GitHub Pages friendly relative paths and `.nojekyll`
 
-- Monaco code editor
-- Python autocomplete and ZEBJUS kit suggestions
-- Pyodide running in a Web Worker
-- Run / Stop / Reset / Clear Output
-- `from zebjus import *`
-- `LED`, `Motor`, `Servo`, `sleep`
-- Demo hardware simulator
-- Real hardware mode over secure WebSocket (`wss://`)
-
-## Run locally
-
-Because the app uses a Web Worker, do not open `index.html` directly with `file://`.
-
-From this folder run:
-
-```bash
-python3 -m http.server 8000
-```
-
-Then open:
-
-```text
-http://localhost:8000
-```
-
-## Example Python
-
+## AI + LED example
 ```python
 from zebjus import *
+from zebjus_ai import *
 
 led = LED(1)
+result = HandDetector().read()
 
-for i in range(5):
+if result.detected and result.fingers >= 4:
     led.on()
-    sleep(0.5)
+else:
     led.off()
-    sleep(0.5)
 ```
 
-## Real kit WebSocket protocol
+The AI bridge is snapshot-based in v2: MediaPipe runs continuously in JavaScript, and the newest camera state is copied into Python when Run is pressed. Continuous real-time Python loops will need a later async bridge.
 
-When the browser connects it sends:
+## GitHub Pages files
+Keep these in repository root:
+`index.html`, `styles.css`, `config.js`, `app.js`, `ai.js`, `py-worker.js`, `.nojekyll`, `README.md`.
 
-```json
-{"type":"hello","kitId":"ZB-000123"}
-```
+## Wix
+Embed the GitHub Pages HTTPS URL using Wix Embed Site/iFrame. Camera permission may be blocked by an iframe/browser policy; if so, use an **Open Python Lab** button that opens the lab in a new tab.
 
-LED ON:
-
-```json
-{"type":"command","kitId":"ZB-000123","command":"LED_SET","id":1,"value":1}
-```
-
-Motor:
-
-```json
-{"type":"command","kitId":"ZB-000123","command":"MOTOR_SET","id":1,"speed":60}
-```
-
-Servo:
-
-```json
-{"type":"command","kitId":"ZB-000123","command":"SERVO_SET","id":1,"angle":90}
-```
-
-Your cloud relay/server should authenticate the logged-in user, verify that they own/are allowed to control the supplied Kit ID, then forward the command to the correct physical kit.
-
-## Wix use
-
-Recommended deployment:
-
-1. Host this folder on an HTTPS host such as your own server, Cloudflare Pages, Netlify, Vercel or GitHub Pages.
-2. Embed the hosted HTTPS URL in your Wix Online Program using an HTML/iFrame element.
-3. Use only a secure WebSocket endpoint (`wss://`) for real hardware mode.
-
-Embedding a full playground as a hosted page is more reliable than pasting all JavaScript directly into a lesson HTML block.
-
-## Important production additions
-
-Before real students use this with hardware:
-
-- User authentication
-- Per-user Kit ID authorization
-- WSS/TLS
-- Rate limiting
-- Emergency stop
-- Command timeout/failsafe in the kit firmware
-- Server-side audit logs
-- Restrict allowed commands and ranges
-- Never expose server secrets in the browser
+## Production
+Before real hardware control, add authenticated users, per-user Kit ID authorization, WSS/TLS, command validation/rate limits, emergency stop, and firmware command-timeout failsafe.

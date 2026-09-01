@@ -15,6 +15,7 @@
     <div class="status-wrap">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
       <span id="kitStatus" class="badge">Kit disconnected</span>
+      <span id="aiStatus" class="badge">AI camera off</span>
     </div>
   </header>
 
@@ -28,7 +29,7 @@
         </label>
         <label>
           WebSocket URL
-          <input id="wsUrl" value="wss://YOUR-SERVER.example/ws" autocomplete="off" />
+          <input id="wsUrl" value="" placeholder="wss://your-server.example/ws" autocomplete="off" />
         </label>
       </div>
       <div class="row">
@@ -61,6 +62,30 @@
       </div>
     </section>
 
+
+    <section class="panel ai-panel">
+      <div class="panel-title ai-title">
+        <span>Browser AI Lab <small>BETA</small></span>
+        <div class="row compact">
+          <button id="startCameraBtn" class="btn primary">Start Camera</button>
+          <button id="stopCameraBtn" class="btn">Stop Camera</button>
+        </div>
+      </div>
+      <div class="ai-layout">
+        <div class="camera-wrap">
+          <video id="cameraVideo" playsinline muted></video>
+          <canvas id="cameraOverlay"></canvas>
+          <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
+        </div>
+        <div class="ai-readout">
+          <div class="readout-card"><span>Hand</span><strong id="handDetected">Not detected</strong></div>
+          <div class="readout-card"><span>Finger count</span><strong id="fingerCount">0</strong></div>
+          <div class="readout-card"><span>Hand side</span><strong id="handSide">—</strong></div>
+          <p class="muted">MediaPipe runs in the browser. Python receives the latest AI snapshot when you press Run.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="workspace">
       <div class="panel editor-panel">
         <div class="editor-toolbar">
@@ -69,7 +94,8 @@
             <span class="muted">Autocomplete enabled</span>
           </div>
           <div class="row compact">
-            <button id="exampleBtn" class="btn">Load LED Example</button>
+            <button id="exampleBtn" class="btn">LED Example</button>
+            <button id="aiExampleBtn" class="btn">AI + LED Example</button>
             <button id="resetBtn" class="btn">Reset</button>
             <button id="runBtn" class="btn success">▶ Run</button>
             <button id="stopBtn" class="btn danger">■ Stop</button>
@@ -88,7 +114,7 @@
     </section>
 
     <section class="panel help-panel">
-      <div class="panel-title">ZEBJUS Kit Library</div>
+      <div class="panel-title">Student Libraries</div>
       <div class="help-grid">
         <code>LED(1).on()</code>
         <code>LED(1).off()</code>
@@ -99,11 +125,20 @@
         <code>Servo(1).write(90)</code>
         <code>sleep(1)</code>
       </div>
-      <p class="muted">Real hardware mode sends JSON commands through the configured secure WebSocket. Demo mode simulates the LED, motor and servo in the browser.</p>
+      <div class="help-grid">
+        <code>HandDetector()</code>
+        <code>hand.read()</code>
+        <code>result.detected</code>
+        <code>result.fingers</code>
+        <code>result.side</code>
+      </div>
+      <p class="muted">Real hardware mode uses secure WebSocket (WSS). Camera requires HTTPS or localhost. Python AI uses the latest snapshot captured before Run.</p>
     </section>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="./ai.js"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
