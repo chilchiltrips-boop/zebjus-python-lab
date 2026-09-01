@@ -96,7 +96,7 @@ function badge(el,t,m=""){el.textContent=t;el.className="badge"+(m?" "+m:"");}
 
 function createWorker(){
   if(worker)worker.terminate();
-  worker=new Worker("./py-worker.js");
+  worker=new Worker("./py-worker.js",{type:"module"});
   worker.postMessage({type:"init",pyodideVersion:cfg.pyodideVersion||"314.0.6"});
   badge($("pythonStatus"),"Python loading…","warn");
   worker.onmessage=e=>{

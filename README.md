@@ -66,3 +66,21 @@ Recommended iframe:
 - width 100%
 - height about 720px on desktop
 - on mobile, allow the iframe to use full page width
+
+
+## v3.1.1 Pyodide Worker Fix
+
+Pyodide 314 requires a module-type Web Worker.
+This build uses:
+
+```js
+new Worker("./py-worker.js", { type: "module" })
+```
+
+and loads:
+
+```text
+https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs
+```
+
+instead of using `importScripts()`.
