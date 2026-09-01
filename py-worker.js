@@ -13,7 +13,7 @@ async function initialize(){
     pyodide.setStderr({batched:text=>postMessage({type:"stderr",text})});
 
     await pyodide.runPythonAsync(`
-import sys,types,time,io,base64,js,math,json
+import sys,types,time,io,base64,js,math,json,traceback
 from js import postMessage
 from pyodide.ffi import to_js
 
@@ -411,16 +411,65 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   return execCode;
 }
 
+function parsePythonError(err,code=""){
+  const text=String(err?.message||err||"Python error");
+  const lines=text.split(/\r?\n/).filter(Boolean);
+  let errorType="PythonError",message=lines[lines.length-1]||text,line=1,offset=1;
+
+  const last=message.match(/^([A-Za-z_]\w*(?:Error|Exception)):\s*(.*)$/);
+  if(last){errorType=last[1];message=last[2]||last[1];}
+
+  const fileMatches=[...text.matchAll(/File "(?:<exec>|<string>|main\.py)", line (\d+)/g)];
+  if(fileMatches.length)line=Number(fileMatches[fileMatches.length-1][1])||1;
+
+  const syntaxLine=text.match(/line (\d+)\s*\n[\s\S]*?\n\s*\^/);
+  if(syntaxLine)line=Number(syntaxLine[1])||line;
+
+  return {errorType,message,line,offset,text};
+}
+
+async function lintCode(code,requestId){
+  await initialize();
+  pyodide.globals.set("__lint_code",String(code||""));
+  try{
+    const raw=await pyodide.runPythonAsync(`
+import json
+try:
+    compile(str(__lint_code),"main.py","exec")
+    json.dumps({"ok":True})
+except (SyntaxError,IndentationError,TabError) as e:
+    json.dumps({
+        "ok":False,
+        "errorType":e.__class__.__name__,
+        "message":str(getattr(e,"msg",e)),
+        "line":int(getattr(e,"lineno",1) or 1),
+        "offset":int(getattr(e,"offset",1) or 1)
+    })
+    `);
+    const result=JSON.parse(String(raw||'{"ok":true}'));
+    postMessage({type:"lint-result",requestId,...result});
+  }catch(err){
+    postMessage({type:"lint-result",requestId,ok:true});
+  }
+}
+
 self.onmessage=async e=>{
   const m=e.data||{};
+
+  if(m.type==="lint"){
+    await lintCode(m.code||"",m.requestId||"");
+    return;
+  }
   if(m.type!=="run")return;
+
   try{
     await initialize();
     const execCode=await prepareRun(m);
     await pyodide.runPythonAsync(execCode||"");
     postMessage({type:"done"});
   }catch(err){
-    postMessage({type:"error",text:String(err)});
+    const info=parsePythonError(err,m.code||"");
+    postMessage({type:"error",...info});
   }
 };
 

@@ -1,4 +1,5 @@
 {
+  "version": "5.10",
   "js_checks": {
     "config.js": {
       "returncode": 0,
@@ -27,12 +28,20 @@
   },
   "critical": {
     "all_js_pass": true,
-    "live_cycle_present": true,
-    "live_done_restarts": true,
-    "hand_loop_adapted": true,
-    "stop_ends_live": true,
-    "realtime_print_retained": true,
+    "worker_cache_busted": true,
+    "app_cache_busted": true,
+    "lint_worker_present": true,
+    "runtime_structured_error": true,
+    "red_gutter_marker": true,
+    "error_line_class": true,
+    "issue_bar_present": true,
+    "dynamic_symbols": true,
+    "user_symbols_in_hint": true,
+    "nameerror_suggestion": true,
+    "typeerror_suggestion": true,
+    "live_hand_retained": true,
+    "floating_opencv_retained": true,
     "manual_upload_retained": true,
-    "hand_rgb_live_example": true
+    "realtime_print_retained": true
   }
 }

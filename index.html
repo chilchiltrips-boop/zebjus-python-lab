@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.9.1</span>
       <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
     </div>
     <div class="top-actions">
@@ -103,11 +103,12 @@
         <div class="panel-title editor-title">
           <div>
             <strong>main.py</strong>
-            <span class="muted">Student types code here • Run tests one browser cycle • Ctrl/⌘ + Space suggestions</span>
+            <span class="muted">Student types code here • Live error markers • Variables/functions autocomplete • Ctrl/⌘ + Space suggestions</span>
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
         <textarea id="codeEditor" spellcheck="false">print("Hello, ZEBJUS!")</textarea>
+        <div id="editorIssueBar" class="editor-issue-bar" hidden></div>
       </div>
 
       <aside class="side-column">
@@ -262,8 +263,8 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js"></script>
-  <script src="./ai.js"></script>
-  <script src="./app.js"></script>
+  <script src="./config.js?v=5.10"></script>
+  <script src="./ai.js?v=5.10"></script>
+  <script src="./app.js?v=5.10"></script>
 </body>
 </html>

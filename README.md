@@ -363,3 +363,84 @@ The latest MediaPipe hand state is supplied on every cycle.
 - 5 fingers: Purple
 
 Press **Stop** to end live mode. Stop also turns the RGB demo output off.
+
+
+## v5.8.1 — Live Hand Cache Fix
+
+This build cache-busts `app.js`, `ai.js`, `config.js`, and `py-worker.js`.
+
+When the correct build is loaded, Terminal starts with:
+
+```text
+ZEBJUS Python Lab v5.8.1
+LIVE MODE started — press Stop to end.
+```
+
+The old message below must **not** appear:
+
+```text
+Student test mode: desktop while True adapted to one browser cycle per Run.
+```
+
+Live hand loops now start immediately from the latest MediaPipe state and continue cycling until **Stop**.
+
+
+## v5.9 — Cleaner Student Output + OpenCV Floating Window
+
+### Hardware command noise hidden
+When the physical kit is not connected, browser demo graphics continue to update, but student Terminal no longer needs to show internal Arduino/Wi-Fi command-send lines such as `DEMO → ...` or `SEND → ...`.
+
+Student `print()` output remains visible.
+
+### `cv2.imshow()` floating window
+When Python calls:
+
+```python
+cv2.imshow("Image", img)
+```
+
+the browser opens a PyCharm-style floating OpenCV window over the lab. The Terminal remains visible and continues receiving `print()` output.
+
+The floating window can be:
+- dragged
+- resized
+- minimized
+- closed
+
+`cv2.imshow()` does not stop the running Python program.
+
+
+## v5.9.1 — Terminal and OpenCV shown separately
+
+- Student `print()` output stays in **Terminal**.
+- `cv2.imshow("Window Name", image)` opens/updates a floating OpenCV image window.
+- OpenCV output no longer automatically switches the bottom output tab away from Terminal.
+- Demo hardware commands still update RGB/Motor/Servo graphics, but internal Arduino/Wi-Fi command messages are hidden until real-kit work is needed.
+
+
+## v5.10 — Editor diagnostics + dynamic autocomplete
+
+### Live syntax diagnostics
+While the student types, Python syntax is checked after a short pause.
+
+Syntax/indentation problems show:
+- red `●` in the editor gutter
+- red highlighted/underlined line
+- error type and line number
+- a short correction suggestion
+
+### Runtime diagnostics
+Errors such as `TypeError`, `NameError`, `AttributeError`, `IndexError`, `ValueError`, and `ZeroDivisionError` are shown in Terminal and highlighted on the source line.
+
+### Student variable/function autocomplete
+Names created in the current script are added to autocomplete automatically:
+
+```python
+distance = 25
+student_name = "Asha"
+
+def calculate_total():
+    pass
+```
+
+Typing `dis`, `stu`, or `cal` can show these names in Suggestions.

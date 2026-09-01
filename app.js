@@ -1,7 +1,7 @@
 (function(){
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
-  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null;
+  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -317,6 +317,185 @@ while True:
   function hintItem(e){const [label,type,text,info]=e;return{text:text||label,displayText:label+(info?"   — "+info:""),className:"hint-"+type};}
   function filterItems(items,prefix){return items.filter(x=>x[0].replace(/\(\)$/,"").startsWith(prefix)).map(hintItem);}
 
+
+  function collectUserSymbols(code){
+    const found=new Map();
+    const add=(name,type="variable",info="Student variable")=>{
+      if(!name||/^(?:True|False|None)$/.test(name))return;
+      if(!found.has(name))found.set(name,[name,type,name,info]);
+    };
+
+    const lines=String(code||"").split(/\r?\n/);
+    for(const raw of lines){
+      const line=raw.replace(/#.*$/,"");
+
+      let m=line.match(/^\s*def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/);
+      if(m){
+        add(m[1],"function","Student function");
+        for(const p of m[2].split(",")){
+          const n=p.trim().replace(/^\*{1,2}/,"").split(/[=:]/)[0].trim();
+          if(/^[A-Za-z_]\w*$/.test(n))add(n,"variable","Function parameter");
+        }
+      }
+
+      m=line.match(/^\s*class\s+([A-Za-z_]\w*)/);
+      if(m)add(m[1],"class","Student class");
+
+      m=line.match(/^\s*for\s+(.+?)\s+in\b/);
+      if(m){
+        for(const n of m[1].split(",")){
+          const v=n.trim();
+          if(/^[A-Za-z_]\w*$/.test(v))add(v,"variable","Loop variable");
+        }
+      }
+
+      m=line.match(/^\s*(?:with\b.*?\bas|except\b.*?\bas)\s+([A-Za-z_]\w*)/);
+      if(m)add(m[1],"variable","Context variable");
+
+      m=line.match(/^\s*import\s+([A-Za-z_][\w.]*)\s+as\s+([A-Za-z_]\w*)/);
+      if(m)add(m[2],"module","Imported module");
+
+      m=line.match(/^\s*import\s+([A-Za-z_]\w*)\b/);
+      if(m)add(m[1],"module","Imported module");
+
+      m=line.match(/^\s*from\s+[A-Za-z_][\w.]*\s+import\s+(.+)$/);
+      if(m){
+        for(const part of m[1].split(",")){
+          const bit=part.trim();
+          const alias=bit.match(/\bas\s+([A-Za-z_]\w*)$/);
+          const name=alias?alias[1]:(bit.match(/^([A-Za-z_]\w*)/)||[])[1];
+          if(name)add(name,"variable","Imported name");
+        }
+      }
+
+      m=line.match(/^\s*([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/);
+      if(m)add(m[1],"variable","Student variable");
+
+      m=line.match(/^\s*\(([^)]+)\)\s*=/);
+      if(m){
+        for(const n of m[1].split(",")){
+          const v=n.trim();
+          if(/^[A-Za-z_]\w*$/.test(v))add(v,"variable","Student variable");
+        }
+      }
+    }
+    return [...found.values()];
+  }
+
+  function closeNames(target,names){
+    target=String(target||"").toLowerCase();
+    const score=(a,b)=>{
+      const dp=Array.from({length:b.length+1},(_,j)=>j);
+      for(let i=1;i<=a.length;i++){
+        let prev=dp[0];dp[0]=i;
+        for(let j=1;j<=b.length;j++){
+          const old=dp[j];
+          dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));
+          prev=old;
+        }
+      }
+      return dp[b.length];
+    };
+    return names
+      .map(n=>({n,d:score(target,String(n).toLowerCase())}))
+      .filter(x=>x.d<=Math.max(2,Math.floor(target.length/3)))
+      .sort((a,b)=>a.d-b.d||a.n.localeCompare(b.n))
+      .slice(0,3).map(x=>x.n);
+  }
+
+  function errorSuggestion(type,message,code){
+    type=String(type||"Error");message=String(message||"");
+    const symbols=collectUserSymbols(code).map(x=>x[0]);
+
+    if(type==="SyntaxError"){
+      if(/expected ':'/.test(message))return 'Add ":" at the end of the if/elif/else/for/while/def/class line.';
+      if(/was never closed|unexpected EOF|unterminated/.test(message))return "Check brackets, quotes, and parentheses on this line and the line above.";
+      if(/invalid syntax/.test(message))return "Check spelling, missing operators/commas, brackets, and the previous line.";
+      return "Check Python syntax on this line and the line immediately above it.";
+    }
+    if(type==="IndentationError"||type==="TabError")return "Use consistent 4-space indentation. Check the block after lines ending with ':'.";
+    if(type==="NameError"){
+      const m=message.match(/name ['"]([^'"]+)['"] is not defined/);
+      if(m){
+        const near=closeNames(m[1],symbols);
+        if(near.length)return `Did you mean ${near.map(x=>"'"+x+"'").join(" or ")}?`;
+        return `Define '${m[1]}' before using it, or check its spelling.`;
+      }
+      return "Check the variable/function name and make sure it is defined before this line.";
+    }
+    if(type==="TypeError"){
+      if(/can only concatenate str/.test(message))return "Convert values to the same type, e.g. str(value) for text or int()/float() for numbers.";
+      if(/unsupported operand type/.test(message))return "Check the data types on both sides of the operator; convert them if necessary.";
+      if(/not callable/.test(message))return "This value is not a function. Remove () or call the correct function/method.";
+      if(/missing .*required positional argument/.test(message))return "The function/method needs another argument. Check its parameter list.";
+      return "Check the value types and the arguments passed on this line.";
+    }
+    if(type==="AttributeError"){
+      const m=message.match(/has no attribute ['"]([^'"]+)['"]/);
+      return m?`Check method/property spelling: '${m[1]}' is not available on this object.`:"Check the object's method/property name.";
+    }
+    if(type==="IndexError")return "Check the list/array length before accessing this index.";
+    if(type==="KeyError")return "Check that this dictionary key exists before reading it.";
+    if(type==="ValueError")return "The value format is not valid for this operation. Check conversion/input data.";
+    if(type==="ModuleNotFoundError"||type==="ImportError")return "Check the library/module name. Some desktop-only Python packages are not available in browser Pyodide.";
+    if(type==="ZeroDivisionError")return "Check the divisor before division and make sure it is not 0.";
+    return "Check the highlighted line and the error message in Terminal.";
+  }
+
+  function clearEditorIssue(){
+    if(!editor||!editorIssue)return;
+    const {line,mark}=editorIssue;
+    editor.setGutterMarker(line,"zebjus-errors",null);
+    editor.removeLineClass(line,"background","zebjus-error-line");
+    try{mark?.clear?.();}catch(_){}
+    editorIssue=null;
+    const bar=$("editorIssueBar");
+    if(bar){bar.hidden=true;bar.innerHTML="";}
+  }
+
+  function showEditorIssue(issue){
+    if(!editor||!issue)return;
+    clearEditorIssue();
+    const total=Math.max(1,editor.lineCount());
+    const line=Math.max(0,Math.min(total-1,(Number(issue.line)||1)-1));
+    const ch=Math.max(0,Number(issue.offset||1)-1);
+    const text=editor.getLine(line)||"";
+    const suggestion=issue.suggestion||errorSuggestion(issue.errorType,issue.message,getCode());
+
+    const marker=document.createElement("span");
+    marker.className="zebjus-error-gutter";
+    marker.textContent="●";
+    marker.title=`${issue.errorType||"Error"}: ${issue.message||""}${suggestion?"\nSuggestion: "+suggestion:""}`;
+    editor.setGutterMarker(line,"zebjus-errors",marker);
+    editor.addLineClass(line,"background","zebjus-error-line");
+
+    const start=Math.min(ch,Math.max(0,text.length-1));
+    const end=Math.max(start+1,text.length);
+    const mark=editor.markText(
+      {line,ch:start},
+      {line,ch:end},
+      {className:"zebjus-error-underline",title:marker.title}
+    );
+    editorIssue={line,mark};
+
+    const bar=$("editorIssueBar");
+    if(bar){
+      bar.hidden=false;
+      bar.innerHTML=`<strong>${escapeHtml(issue.errorType||"Error")}</strong> · Line ${line+1}: ${escapeHtml(issue.message||"")}
+        ${suggestion?`<span class="issue-suggestion">Suggestion: ${escapeHtml(suggestion)}</span>`:""}`;
+    }
+  }
+
+  function requestLint(code,show=true){
+    if(!worker)return Promise.resolve({ok:true});
+    const requestId="lint-"+(++lintSeq)+"-"+Date.now();
+    return new Promise(resolve=>{
+      const timeout=setTimeout(()=>{lintWaiters.delete(requestId);resolve({ok:true,timeout:true});},2500);
+      lintWaiters.set(requestId,{resolve,timeout,show,code});
+      worker.postMessage({type:"lint",requestId,code:String(code||"")});
+    });
+  }
+
   function hintProvider(cm){
     const cur=cm.getCursor(),line=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
     let m,prefix="",items=[];
@@ -334,7 +513,8 @@ while True:
     }
 
     m=line.match(/([A-Za-z_]\w*)$/);prefix=m?.[1]||"";
-    return{list:filterItems(base,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
+    const userSymbols=collectUserSymbols(full);
+    return{list:filterItems([...userSymbols,...base],prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
   }
 
   function initEditor(){
@@ -342,7 +522,7 @@ while True:
     CodeMirror.registerHelper("hint","zebjusPython",hintProvider);
     $("codeEditor").value=(prefs.autoSave?localStorage.getItem("zebjus.lab.code"):null)||examples.hello;
     editor=CodeMirror.fromTextArea($("codeEditor"),{
-      mode:"python",theme:"zebjus",lineNumbers:true,indentUnit:4,tabSize:4,indentWithTabs:false,
+      mode:"python",theme:"zebjus",lineNumbers:true,gutters:["CodeMirror-linenumbers","zebjus-errors"],indentUnit:4,tabSize:4,indentWithTabs:false,
       matchBrackets:true,autoCloseBrackets:true,styleActiveLine:true,
       extraKeys:{
         "Ctrl-Space":cm=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),
@@ -356,6 +536,13 @@ while True:
       if((ch.origin==="+input"||ch.origin==="paste")&&!cm.state.completionActive){
         const typed=(ch.text||[]).join("\n"),cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch);
         if(/[A-Za-z0-9_.]$/.test(typed)||/\b(?:import|from)\s+$/.test(left))setTimeout(()=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),0);
+      }
+      clearTimeout(lintTimer);
+      if(!running){
+        lintTimer=setTimeout(async()=>{
+          const result=await requestLint(cm.getValue(),true);
+          if(result.ok)clearEditorIssue();
+        },500);
       }
     });
   }
@@ -374,18 +561,44 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.10",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
-      if(m.type==="ready"){badge($("pythonStatus"),"Python ready","ok");log("Python ready.");}
+      if(m.type==="ready"){
+        badge($("pythonStatus"),"Python ready","ok");log("Python ready.");
+        setTimeout(()=>requestLint(getCode(),true),120);
+      }
+      else if(m.type==="lint-result"){
+        const waiter=lintWaiters.get(m.requestId);
+        if(waiter){
+          lintWaiters.delete(m.requestId);clearTimeout(waiter.timeout);
+          const result={ok:!!m.ok,errorType:m.errorType||"",message:m.message||"",line:m.line||1,offset:m.offset||1};
+          if(!result.ok){
+            result.suggestion=errorSuggestion(result.errorType,result.message,waiter.code);
+            if(waiter.show)showEditorIssue(result);
+          }
+          waiter.resolve(result);
+        }
+      }
       else if(m.type==="status")badge($("pythonStatus"),m.text,m.mode||"warn");
       else if(m.type==="stdout"&&m.text!=="")writeTerminalChunk(m.text);
       else if(m.type==="runtime-stdout"&&m.text!=="")log(m.text);
       else if(m.type==="stderr"&&m.text!=="")log("ERROR: "+m.text);
       else if(m.type==="error"){
         liveMode=false;if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
-        running=false;log("ERROR: "+m.text);badge($("pythonStatus"),"Python ready","ok");
+        running=false;
+        const issue={
+          errorType:m.errorType||"PythonError",
+          message:m.message||m.text||"Unknown error",
+          line:Number(m.line)||1,
+          offset:Number(m.offset)||1
+        };
+        issue.suggestion=errorSuggestion(issue.errorType,issue.message,getCode());
+        showEditorIssue(issue);
+        log(`${issue.errorType} · line ${issue.line}: ${issue.message}`);
+        if(issue.suggestion)log("Suggestion: "+issue.suggestion);
+        badge($("pythonStatus"),"Python ready","ok");
       }
       else if(m.type==="done"){
         if(liveMode&&running){
@@ -393,11 +606,14 @@ while True:
             liveMode=false;running=false;log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
           }),70);
         }else{
-          running=false;log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
+          running=false;clearEditorIssue();log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
         }
       }
       else if(m.type==="kit-command")handleKit(m.payload);
-      else if(m.type==="image")showImage(m.dataUrl);
+      else if(m.type==="image"){
+        showImage(m.dataUrl);
+        showCvFloatingUrl(m.dataUrl,m.title||"OpenCV Image");
+      }
     };
     worker.onerror=e=>{running=false;log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
   }
@@ -593,10 +809,98 @@ while True:
     postProgramToWorker(liveCode,frame);
   }
 
+
+  function ensureCvFloatWindow(){
+    let win=$("opencvFloatWindow");
+    if(win)return win;
+    win=document.createElement("div");
+    win.id="opencvFloatWindow";
+    win.className="opencv-float-window";
+    win.innerHTML=`
+      <div class="opencv-float-titlebar" id="opencvFloatTitlebar">
+        <div class="opencv-float-title"><span class="opencv-dot"></span><span id="opencvFloatTitle">OpenCV Image</span></div>
+        <div class="opencv-float-actions">
+          <button type="button" id="opencvFloatMin" title="Minimize">—</button>
+          <button type="button" id="opencvFloatClose" title="Close">×</button>
+        </div>
+      </div>
+      <div class="opencv-float-body" id="opencvFloatBody">
+        <canvas id="opencvFloatCanvas"></canvas>
+      </div>
+      <div class="opencv-resize-handle"></div>`;
+    document.body.appendChild(win);
+
+    $("opencvFloatClose").onclick=()=>win.classList.remove("show");
+    $("opencvFloatMin").onclick=()=>{
+      win.classList.toggle("minimized");
+      $("opencvFloatMin").textContent=win.classList.contains("minimized")?"□":"—";
+    };
+
+    const bar=$("opencvFloatTitlebar");
+    let dragging=false,dx=0,dy=0;
+    bar.addEventListener("pointerdown",e=>{
+      if(e.target.closest("button"))return;
+      dragging=true;bar.setPointerCapture(e.pointerId);
+      const r=win.getBoundingClientRect();dx=e.clientX-r.left;dy=e.clientY-r.top;
+      win.style.right="auto";win.style.bottom="auto";
+    });
+    bar.addEventListener("pointermove",e=>{
+      if(!dragging)return;
+      const maxX=Math.max(0,window.innerWidth-win.offsetWidth);
+      const maxY=Math.max(0,window.innerHeight-win.offsetHeight);
+      win.style.left=Math.max(0,Math.min(maxX,e.clientX-dx))+"px";
+      win.style.top=Math.max(0,Math.min(maxY,e.clientY-dy))+"px";
+    });
+    const endDrag=e=>{if(dragging){dragging=false;try{bar.releasePointerCapture(e.pointerId);}catch(_){}}};
+    bar.addEventListener("pointerup",endDrag);
+    bar.addEventListener("pointercancel",endDrag);
+    return win;
+  }
+
+  function showCvFloatingImage(frame,title="OpenCV Image"){
+    if(!frame||!frame.width||!frame.height||!frame.data)return;
+    const win=ensureCvFloatWindow();
+    const c=$("opencvFloatCanvas");
+    c.width=frame.width;c.height=frame.height;
+    const ctx=c.getContext("2d",{willReadFrequently:true});
+    const raw=frame.data instanceof Uint8ClampedArray?frame.data:new Uint8ClampedArray(frame.data);
+    ctx.putImageData(new ImageData(raw,frame.width,frame.height),0,0);
+    $("opencvFloatTitle").textContent=title||"OpenCV Image";
+    win.classList.remove("minimized");
+    win.classList.add("show");
+  }
+
+  function showCvFloatingUrl(url,title="OpenCV Image"){
+    if(!url)return;
+    const win=ensureCvFloatWindow();
+    const c=$("opencvFloatCanvas");
+    const img=new Image();
+    img.onload=()=>{
+      c.width=img.naturalWidth||img.width||640;
+      c.height=img.naturalHeight||img.height||480;
+      const ctx=c.getContext("2d",{willReadFrequently:true});
+      ctx.clearRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      $("opencvFloatTitle").textContent=title||"OpenCV Image";
+      win.classList.remove("minimized");
+      win.classList.add("show");
+    };
+    img.src=url;
+  }
+
   async function runCode(){
     if(running){log("Program already running. Press Stop first.");return;}
 
     const src=getCode();
+    clearEditorIssue();
+    const lint=await requestLint(src,true);
+    if(!lint.ok){
+      terminal.textContent="";
+      log(`${lint.errorType} · line ${lint.line}: ${lint.message}`);
+      if(lint.suggestion)log("Suggestion: "+lint.suggestion);
+      badge($("pythonStatus"),"Fix code error","warn");
+      return;
+    }
     const needsHand=/\bzebjus_ai\b|\bHandDetector\b|\bHandTrackingModule\b|\bhandDetector\s*\(/.test(src);
     const needsFace=/\bFaceDetector\b|\bFaceDetectionModule\b|\bface_detection\b|\bmp\.solutions\.face_detection\b/.test(src);
     const needsCamera=needsHand||needsFace||/\bCamera\s*\(|\bcv2\.VideoCapture\s*\(/.test(src);
@@ -627,8 +931,12 @@ while True:
 
     if(needsCamera && directCameraOk){
       let snap=ZebjusAI?.getSnapshot?.()||aiState;
-      if(needsFace){snap=await ZebjusAI.waitForFaces(1500);log(`Face snapshot → faces=${Number(snap.faceCount)||0}`);}
-      if(needsHand){snap=await ZebjusAI.waitForStable(1500);log(`Hand snapshot → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);}
+      if(liveMode){
+        log(`LIVE initial state → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);
+      }else{
+        if(needsFace){snap=await ZebjusAI.waitForFaces(1500);log(`Face snapshot → faces=${Number(snap.faceCount)||0}`);}
+        if(needsHand){snap=await ZebjusAI.waitForStable(1500);log(`Hand snapshot → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);}
+      }
       aiState={detected:!!snap.detected,fingers:Number(snap.fingers)||0,side:snap.side||"",faces:Array.isArray(snap.faces)?snap.faces:[],landmarks:Array.isArray(snap.landmarks)?snap.landmarks:[]};
       runFrame=captureFrame();
     }
@@ -676,6 +984,7 @@ while True:
   function stopProgram(){
     liveMode=false;liveCode="";
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
+    clearTimeout(lintTimer);
     running=false;createWorker();stopCamera();
     applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});
     applyDemo({command:"MOTOR_SET",id:1,speed:0});
@@ -716,9 +1025,9 @@ while True:
 
   function handleKit(p){
     if(!p)return;
-    if(prefs.demoMode){applyDemo(p);log("DEMO → "+JSON.stringify(p));}
+    if(prefs.demoMode){applyDemo(p);}
     else if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:"command",kitId:prefs.kitId,...p}));
-    else log("Kit not connected.");
+    else { /* physical kit not connected: keep student terminal clean */ }
   }
 
   function connectRealKit(){
@@ -738,7 +1047,13 @@ while True:
     }catch(e){log("Kit connection error: "+e.message);}
   }
 
-  function showImage(url){$("resultImage").src=url;$("resultImage").style.display="block";$("imagePlaceholder").style.display="none";switchOutput("imageOutput");}
+  function showImage(url){
+    $("resultImage").src=url;
+    $("resultImage").style.display="block";
+    $("imagePlaceholder").style.display="none";
+    // Keep the student's current output tab unchanged.
+    // cv2.imshow() is shown in the floating OpenCV window.
+  }
   function switchOutput(id){document.querySelectorAll(".output-view").forEach(x=>x.classList.toggle("active",x.id===id));document.querySelectorAll(".output-tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));}
 
   window.addEventListener("zebjus-ai-state",e=>{
