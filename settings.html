@@ -62,6 +62,22 @@
       </div>
     </section>
 
+
+    <section class="panel settings-card">
+      <div class="panel-title"><strong>Demo Sensors</strong></div>
+      <div class="settings-body">
+        <label>
+          <span>Ultrasonic distance: <strong id="demoUltrasonicLabel">45 cm</strong></span>
+          <input id="demoUltrasonic" type="range" min="2" max="400" step="1">
+        </label>
+        <label>
+          <span>Potentiometer: <strong id="demoPotLabel">128 / 255</strong></span>
+          <input id="demoPot" type="range" min="0" max="255" step="1">
+        </label>
+        <p class="muted settings-note">These values are returned by <code>Ultrasonic(1).read()</code> and <code>Potentiometer(1).read()</code> while Demo mode is enabled.</p>
+      </div>
+    </section>
+
     <section class="panel settings-card">
       <div class="panel-title"><strong>Editor</strong></div>
       <div class="settings-body">

@@ -6,20 +6,19 @@
   <meta name="theme-color" content="#0b1020">
   <title>ZEBJUS Python Lab</title>
 
-  <!-- CodeMirror 5: classic non-module editor for reliable GitHub Pages/Wix use -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
-    Code editor library failed to load. Check internet/CDN access, then hard-refresh this page.
+    Code editor library failed to load. Check internet/CDN access, then hard-refresh.
   </div>
 
   <header class="topbar">
     <div>
       <h1>ZEBJUS Python Lab</h1>
-      <p>Learn Python • OpenCV • MediaPipe • Control your Wi‑Fi kit</p>
+      <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
     </div>
     <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
@@ -45,18 +44,28 @@
               <option value="function">Function</option>
               <option value="list">List</option>
             </optgroup>
-            <optgroup label="OpenCV">
+
+            <optgroup label="MediaPipe AI">
+              <option value="hand">Hand Detection</option>
+              <option value="handRgb">5 Fingers → RGB LED</option>
+            </optgroup>
+
+            <optgroup label="OpenCV Camera">
               <option value="cvGray">Camera → Grayscale</option>
               <option value="cvEdges">Camera → Canny Edges</option>
               <option value="cvBlur">Gaussian Blur</option>
               <option value="cvThreshold">Threshold</option>
             </optgroup>
-            <optgroup label="MediaPipe">
-              <option value="hand">Hand Detection</option>
-              <option value="handLed">Hand → LED</option>
+
+            <optgroup label="OpenCV Image Graphics">
+              <option value="imgRgb">Image → RGB LED Graphic</option>
+              <option value="imgPot">Image → Potentiometer Graphic</option>
+              <option value="imgDashboard">Image → Kit Dashboard</option>
             </optgroup>
+
             <optgroup label="ZEBJUS Kit">
-              <option value="led">LED Blink</option>
+              <option value="rgb">RGB LED 0–255</option>
+              <option value="sensors">Read Ultrasonic + Pot</option>
               <option value="servo">Servo Sweep</option>
               <option value="motor">Motor</option>
             </optgroup>
@@ -78,18 +87,17 @@
         <div class="panel-title editor-title">
           <div>
             <strong>main.py</strong>
-            <span class="muted">Case-sensitive Python autocomplete • Ctrl/⌘ + Space</span>
+            <span class="muted">Case-sensitive autocomplete • Ctrl/⌘ + Space</span>
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
-
         <textarea id="codeEditor" spellcheck="false">print("Hello, ZEBJUS!")</textarea>
       </div>
 
       <aside class="side-column">
         <section class="panel camera-panel">
           <div class="panel-title compact-title">
-            <strong>Camera</strong>
+            <strong>Camera / MediaPipe</strong>
             <div class="camera-head-actions">
               <span id="cameraIndexText" class="muted">Camera 0</span>
               <button id="cameraToggleBtn" class="btn tiny">Start</button>
@@ -109,22 +117,40 @@
 
         <section class="panel demo-panel">
           <div class="panel-title compact-title">
-            <strong>Kit Output</strong>
+            <strong>Kit Output / Sensors</strong>
             <span id="kitNameText" class="muted">ZB-000123</span>
           </div>
+
           <div class="demo-items">
             <div class="demo-card">
-              <div class="led-shell"><div id="demoLed" class="led"></div></div>
-              <div>
-                <strong>LED 1</strong>
-                <span id="ledLabel">OFF</span>
+              <div class="rgb-shell"><div id="rgbLed" class="rgb-led"></div></div>
+              <div class="demo-grow">
+                <strong>RGB LED</strong>
+                <span id="rgbLabel">R0 G0 B0</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="ultra-icon"><i></i><i></i></div>
+              <div class="demo-grow">
+                <strong>Ultrasonic</strong>
+                <div class="sensor-meter"><div id="ultraMeter" class="sensor-fill"></div></div>
+                <span id="ultraLabel">45.0 cm</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="pot-knob" id="potKnob"><div id="potNeedle" class="pot-needle"></div></div>
+              <div class="demo-grow">
+                <strong>Potentiometer</strong>
+                <span id="potLabel">128 / 255</span>
               </div>
             </div>
 
             <div class="demo-card">
               <div class="motor-icon">M</div>
               <div class="demo-grow">
-                <strong>Motor 1</strong>
+                <strong>Motor</strong>
                 <div class="meter"><div id="motorMeter" class="meter-fill"></div></div>
                 <span id="motorLabel">Stopped</span>
               </div>
@@ -135,10 +161,28 @@
                 <div id="servoNeedle" class="servo-needle"></div>
               </div>
               <div>
-                <strong>Servo 1</strong>
+                <strong>Servo</strong>
                 <span id="servoLabel">90°</span>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="panel image-load-panel">
+          <div class="panel-title compact-title">
+            <strong>Image Lab</strong>
+            <button id="clearImageBtn" class="btn tiny">Clear</button>
+          </div>
+          <div class="image-loader">
+            <label class="file-btn">
+              <input id="imageInput" type="file" accept="image/*">
+              <span>Load Image</span>
+            </label>
+            <div class="source-image-wrap">
+              <img id="sourceImagePreview" alt="Loaded source">
+              <div id="sourceImagePlaceholder">No image loaded</div>
+            </div>
+            <span id="sourceImageInfo" class="muted">Use OpenCV Image Graphics examples.</span>
           </div>
         </section>
       </aside>
@@ -162,26 +206,25 @@
     <section class="panel quick-help">
       <div class="panel-title compact-title">
         <strong>Quick Reference</strong>
-        <span class="muted">Start typing these commands to see suggestions</span>
+        <span class="muted">RGB channels use 0–255</span>
       </div>
       <div class="help-grid">
-        <code>import cv2</code>
-        <code>import numpy as np</code>
-        <code>from zebjus import *</code>
-        <code>print()</code>
-        <code>if / elif / else</code>
-        <code>for i in range()</code>
-        <code>LED(1).on()</code>
-        <code>Motor(1).forward()</code>
-        <code>Servo(1).write(90)</code>
+        <code>RGBLED(1).write(255,0,0)</code>
+        <code>Ultrasonic(1).read()</code>
+        <code>Potentiometer(1).read()</code>
         <code>Camera(0).read()</code>
-        <code>cv2.cvtColor()</code>
         <code>HandDetector().read()</code>
+        <code>load_image()</code>
+        <code>draw_rgb_led()</code>
+        <code>draw_potentiometer()</code>
+        <code>draw_ultrasonic()</code>
+        <code>cv2.cvtColor()</code>
+        <code>Servo(1).write(90)</code>
+        <code>Motor(1).forward(50)</code>
       </div>
     </section>
   </main>
 
-  <!-- Classic CodeMirror scripts: load in fixed order -->
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/mode/python/python.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.js"></script>

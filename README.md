@@ -1,202 +1,174 @@
-# ZEBJUS Python Lab — FULL v4
+# ZEBJUS Python Lab FULL v5 — RGB + Sensors + AI + Image Graphics
 
-This is a fresh complete project. You can delete the old GitHub repository contents and upload **all files from this ZIP**.
+Fresh complete build for the current ZEBJUS kit.
 
-## Why this version fixes the editor problem
+## Main fixes
 
-Previous builds used CodeMirror 6 through ES-module imports. If one module import failed, syntax colors and autocomplete could disappear.
+### Hand → RGB LED stability
+The MediaPipe result is now stabilized across several frames before Python starts.
 
-This build uses **CodeMirror 5.65.21 classic scripts** loaded in a fixed order:
-- CodeMirror core
-- Python mode
-- show-hint autocomplete
-- auto-close brackets
-- bracket matching
-- active-line highlighting
+When an AI example is Run:
+1. camera is started if needed
+2. MediaPipe gathers several frames
+3. a stable hand/finger snapshot is selected
+4. that snapshot is passed to Python
 
-The editor uses a custom PyCharm-inspired dark theme.
+The Output also shows the AI snapshot used by Python.
 
-## Editor features
-
-- Python syntax colors
-- keywords orange
-- strings green
-- numbers blue
-- comments gray italic
-- function definitions yellow
-- line numbers
-- active line
-- bracket matching
-- auto-close brackets
-- Tab = 4 spaces
-- autosave
-- case-sensitive autocomplete
-- autocomplete while typing
-- Ctrl+Space / Cmd+Space shows suggestions
-- Suggestions button
-
-### Autocomplete examples
-
-Type:
-- `pri` → `print()`
-- `imp` → `import`
-- `import c` → `cv2`
-- `from zebjus import ` → `LED`, `Motor`, `Servo`, `sleep`
-- `from zebjus_ai import ` → `HandDetector`
-- `from zebjus_cv import ` → `Camera`, `show`
-- `cv2.` → OpenCV functions/constants
-- `np.` → NumPy functions
-- `math.` → math functions
-- `random.` → random functions
-
-Object inference also works for common assignments:
+Example:
 
 ```python
-myled = LED(1)
-myled.
-```
-
-suggests LED methods.
-
-```python
-camera = Camera(0)
-camera.
-```
-
-suggests `read()`.
-
-## Python runtime
-
-Pyodide is pinned to **314.0.6** and is run in a **module-type Web Worker**, as required by current Pyodide.
-
-OpenCV is loaded only when needed.
-
-Pyodide includes:
-- NumPy
-- opencv-python
-- many standard scientific Python packages
-
-## Camera and MediaPipe
-
-MediaPipe Tasks Vision is pinned to 1.0.1.
-
-Run automatically starts the camera when Auto Camera is enabled in Settings.
-
-Camera projects can use:
-
-```python
-from zebjus_cv import Camera, show
-import cv2
-
-frame = Camera(0).read()
-gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-show(gray)
-```
-
-MediaPipe:
-
-```python
+from zebjus import RGBLED
 from zebjus_ai import HandDetector
 
+rgb = RGBLED(1)
 result = HandDetector().read()
-print(result.detected)
-print(result.fingers)
-print(result.side)
+
+if result.detected and result.fingers >= 4:
+    rgb.write(0, 255, 0)
+else:
+    rgb.off()
 ```
 
-## Kit demo
+Using `>= 4` is intentional because an open hand can briefly fluctuate between 4 and 5.
+
+## RGB LED API — 0 to 255 per channel
 
 ```python
-from zebjus import LED, Motor, Servo, sleep
+from zebjus import RGBLED
 
-led = LED(1)
-led.on()
-
-motor = Motor(1)
-motor.forward(50)
-
-servo = Servo(1)
-servo.write(90)
+rgb = RGBLED(1)
+rgb.write(255, 0, 0)       # red
+rgb.write(0, 255, 0)       # green
+rgb.write(0, 0, 255)       # blue
+rgb.write(255, 120, 0)     # orange
+rgb.off()
 ```
 
-Demo mode updates the visible LED, motor and servo graphics.
+WebSocket command:
 
-## Separate Settings page
+```json
+{"type":"command","kitId":"ZB-000123","command":"RGB_LED_SET","id":1,"r":255,"g":0,"b":0}
+```
 
-`settings.html` contains:
-- Camera selection
-- Allow camera / detect devices
-- Auto camera
-- Demo mode
-- Kit ID
-- WSS URL
-- Editor font size
-- Autosave
-- input() values
+Old `LED(1).on()` remains supported and maps to RGB white.
 
-## Diagnostics
+## Ultrasonic
 
-Open:
+```python
+from zebjus import Ultrasonic
 
-`diagnostics.html`
+distance = Ultrasonic(1).read()
+print(distance, "cm")
+```
 
-It checks:
-- HTTPS
-- CodeMirror load
-- Camera API
-- Worker API
-- Pyodide worker
+Expected real-kit sensor packet:
+
+```json
+{"type":"sensor","sensor":"ULTRASONIC","id":1,"distanceCm":34.7}
+```
+
+## Potentiometer
+
+Beginner value is normalized to 0–255:
+
+```python
+from zebjus import Potentiometer
+
+pot = Potentiometer(1)
+print(pot.read())   # 0 to 255
+print(pot.raw())    # raw ADC if supplied by kit
+```
+
+Expected packet:
+
+```json
+{"type":"sensor","sensor":"POT","id":1,"value255":128,"raw":2056}
+```
+
+## Demo sensor values
+
+Settings → Demo Sensors:
+- Ultrasonic: 2–400 cm
+- Potentiometer: 0–255
+
+These values are returned to Python in Demo mode.
+
+## Image Lab + OpenCV graphics
+
+Load a JPG/PNG from the **Image Lab** panel.
+
+Then:
+
+```python
+from zebjus_cv import load_image, draw_rgb_led, show
+
+img = load_image()
+draw_rgb_led(img, 100, 100, 255, 0, 0)
+show(img)
+```
+
+Pot graphic:
+
+```python
+from zebjus import Potentiometer
+from zebjus_cv import load_image, draw_potentiometer, show
+
+img = load_image()
+value = Potentiometer(1).read()
+draw_potentiometer(img, 120, 120, value)
+show(img)
+```
+
+Full dashboard:
+
+```python
+from zebjus import Potentiometer, Ultrasonic
+from zebjus_cv import load_image, draw_rgb_led, draw_potentiometer, draw_ultrasonic, show
+
+img = load_image()
+draw_rgb_led(img, 80, 80, 0, 255, 0)
+draw_potentiometer(img, 180, 80, Potentiometer(1).read())
+draw_ultrasonic(img, 260, 65, Ultrasonic(1).read())
+show(img)
+```
+
+## Browser graphics
+
+Main page now always shows:
+- RGB LED preview
+- Ultrasonic distance bar
+- Potentiometer dial
+- Motor graphic
+- Servo graphic
+- small camera / MediaPipe preview
+- image upload preview
+
+## Editor autocomplete
+
+Suggestions include:
+- `RGBLED`
+- `Ultrasonic`
+- `Potentiometer`
+- `draw_rgb_led`
+- `draw_potentiometer`
+- `draw_ultrasonic`
+- OpenCV functions
+- MediaPipe
+- existing Python basics
+
+## Important AI limitation
+
+`HandDetector().read()` is a stable snapshot taken immediately before Python starts. A blocking Python `while True` loop still does not receive continuously changing MediaPipe frames in this static browser architecture.
 
 ## GitHub upload
 
-Delete the old files and upload ALL of these:
+Delete old project files and upload ALL files from this ZIP.
 
-```text
-index.html
-settings.html
-diagnostics.html
-styles.css
-config.js
-ai.js
-app.js
-settings.js
-py-worker.js
-README.md
-.nojekyll
-```
+Commit:
 
-Commit message:
+`Install ZEBJUS Python Lab v5 RGB sensors image graphics`
 
-`Install complete ZEBJUS Python Lab v4`
-
-GitHub Pages URL remains:
-
-`https://chilchiltrips-boop.github.io/zebjus-python-lab/`
-
-After upload, hard refresh:
-- macOS Chrome: Cmd + Shift + R
-- Windows Chrome: Ctrl + Shift + R
-
-## First test
-
-1. Open the GitHub Pages URL.
-2. Confirm Python keywords/strings have different colors.
-3. Type `pri` and confirm `print()` suggestion.
-4. Type `cv2.` and confirm OpenCV suggestions.
-5. Run:
-
-```python
-print("Hello")
-```
-
-6. Run the LED example.
-7. Run the Hand Detection example.
-8. Run OpenCV Grayscale.
-
-## Wix embed
-
-Embed the GitHub Pages URL.
-
-Recommended desktop height: 700–760 px.
-
-On mobile, the layout automatically stacks the editor, small camera preview and kit output.
+Hard refresh after Pages deploy:
+- Mac: Cmd + Shift + R
+- Windows: Ctrl + Shift + R
