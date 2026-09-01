@@ -294,3 +294,29 @@ Notes:
 - Uploaded files belong to that student's current browser tab/session.
 - Files are copied into Pyodide at `/home/pyodide/uploads/`.
 - The visible student path stays simple: `uploads/<filename>`.
+
+
+## v5.6 — Manual Uploads Only
+
+Bundled course image/resource folders were removed.
+
+Students or instructors upload the required images manually from **Image Lab**.
+Each uploaded image receives a path such as:
+
+```text
+uploads/lena.png
+uploads/Potentiometer.jpg
+uploads/LedOn.jpg
+```
+
+Student code uses the copied path directly:
+
+```python
+import cv2
+
+img = cv2.imread("uploads/lena.png")
+cv2.imshow("Image", img)
+cv2.waitKey(1)
+```
+
+There is no preloaded `Resources` or `vision-assets` folder in this build.

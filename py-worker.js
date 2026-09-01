@@ -297,7 +297,6 @@ sys.modules["zebjus_cv"]=zc
   return readyPromise;
 }
 
-let visionAssetsReady=false;
 async function syncUploadedFiles(files){
   try{
     pyodide.FS.mkdirTree("/home/pyodide/uploads");
@@ -311,24 +310,7 @@ async function syncUploadedFiles(files){
   }
 }
 
-async function ensureVisionAssets(){
-  if(visionAssetsReady)return;
-  const names=["Potentiometer.jpg","Pin13Off.jpg","LedOff.jpg","Pin13On.jpg","LedOn.jpg","bg.png","1.jpeg","2.jpeg","lenna.jpeg","lena.png"];
-  try{
-    pyodide.FS.mkdirTree("/home/pyodide/Resources");
-    pyodide.FS.mkdirTree("/home/Resources");
-    for(const name of names){
-      const r=await fetch(`./vision-assets/${encodeURIComponent(name)}`);
-      if(!r.ok)continue;
-      const bytes=new Uint8Array(await r.arrayBuffer());
-      pyodide.FS.writeFile(`/home/pyodide/Resources/${name}`,bytes);
-      pyodide.FS.writeFile(`/home/Resources/${name}`,bytes);
-    }
-    visionAssetsReady=true;
-  }catch(e){
-    postMessage({type:"stdout",text:"VISION AI asset preload warning: "+String(e?.message||e)});
-  }
-}
+
 
 async function frameToPython(frame,targetName){
   if(!(frame?.data&&frame?.width&&frame?.height))return;
@@ -397,9 +379,7 @@ _sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":i
 _current_frame=None
 _loaded_image=None
   `);
-
-  if(needsCv && /\bcv2\.imread\s*\(|Resources[\/\\]/.test(code))await ensureVisionAssets();
-  if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFiles(m.uploadedFiles);
+if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFiles(m.uploadedFiles);
 
   if(needsCv){
     await frameToPython(m.frame,"camera");

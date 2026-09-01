@@ -40,7 +40,7 @@
     visionOpenCvImage:`# VISION AI Z — OpenCV Image Test
 import cv2
 
-img = cv2.imread("Resources/lena.png")
+img = cv2.imread("uploads/lena.png")
 print("Image shape:", img.shape)
 cv2.imshow("Lena", img)
 cv2.waitKey(1)`,
@@ -85,7 +85,7 @@ arduino = SerialObject("ZEBJUS")
 while True:
     myData = arduino.getData()
     val = int(myData[0])
-    img = cv2.imread("../Resources/Potentiometer.jpg")
+    img = cv2.imread("uploads/Potentiometer.jpg")
 
     cv2.putText(img, str(val).zfill(4), (260, 280),
                 cv2.FONT_HERSHEY_PLAIN, 3, (255, 255, 255), 3)

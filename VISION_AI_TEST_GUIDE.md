@@ -6,7 +6,7 @@ Students should type the project code themselves. The built-in VISION AI Z examp
 ## Test order
 
 1. **Test 01 — OpenCV Image**
-   Run. `Resources/lena.png` should display in OpenCV Image output.
+   Run. `uploads/lena.png` should display in OpenCV Image output.
 2. **Test 02 — OpenCV Camera**
    Allow camera. One current frame should display. The terminal should say the desktop `while True` loop was adapted to one browser cycle.
 3. **Test 03 — RGB LED**

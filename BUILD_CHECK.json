@@ -27,11 +27,9 @@
   },
   "critical": {
     "all_js_pass": true,
-    "multiple_upload_input": true,
-    "copy_path_button": true,
-    "virtual_upload_path": true,
-    "uploaded_files_sent_to_worker": true,
-    "worker_upload_sync": true,
-    "cv2_imread_supported": true
+    "no_resource_folders": true,
+    "manual_upload_sync_present": true,
+    "uploads_paths_present": true,
+    "no_Resources_path_in_app": true
   }
 }
