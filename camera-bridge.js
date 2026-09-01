@@ -44,23 +44,26 @@
     return{width:w,height:h,data:Array.from(x.getImageData(0,0,w,h).data)};
   }
 
-  async function sendSnapshot(requestId=""){
+  async function sendSnapshot(requestId="",needsFace=false){
     if(!cameraRunning){
       const ok=await startCamera(currentIndex);
       if(!ok)return;
     }
-    const stable=await window.ZebjusAI.waitForStable(1200);
+    if(needsFace)await window.ZebjusAI.enableFaceDetection();
+    const stable=needsFace?await window.ZebjusAI.waitForFaces(1200):await window.ZebjusAI.waitForStable(1200);
     channel.postMessage({
       type:"camera-snapshot",
       requestId,
       aiState:{
         detected:!!stable.detected,
         fingers:Number(stable.fingers)||0,
-        side:stable.side||""
+        side:stable.side||"",
+        faces:Array.isArray(stable.faces)?stable.faces:[],
+        landmarks:Array.isArray(stable.landmarks)?stable.landmarks:[]
       },
       frame:captureFrame()
     });
-    message(`Snapshot sent • hand=${!!stable.detected} • fingers=${Number(stable.fingers)||0}`);
+    message(`Snapshot sent • hand=${!!stable.detected} • fingers=${Number(stable.fingers)||0} • faces=${Number(stable.faceCount)||0}`);
   }
 
   channel.onmessage=async e=>{
@@ -74,7 +77,7 @@
         cameraRunning=false;
         await startCamera(idx);
       }
-      await sendSnapshot(m.requestId||"");
+      await sendSnapshot(m.requestId||"",!!m.needsFace);
     }
   };
 
@@ -83,6 +86,7 @@
     $("bHand").textContent=d.detected?"Yes":"No";
     $("bFingers").textContent=Number(d.fingers)||0;
     $("bSide").textContent=d.side||"—";
+    if($("bFaces"))$("bFaces").textContent=Number(d.faceCount)||0;
   });
 
   $("startBridgeBtn").onclick=()=>startCamera(currentIndex);

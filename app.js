@@ -2,7 +2,7 @@
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[];
-  let aiState={detected:false,fingers:0,side:""};
+  let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null;
 
   const isEmbedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
@@ -32,8 +32,185 @@
     function:`def add(a, b):\n    return a + b\n\nprint("Answer =", add(10, 20))`,
     list:`fruits = ["apple", "orange", "mango"]\n\nfor fruit in fruits:\n    print(fruit)`,
 
+
+    visionBlank:`# VISION AI Z — Student Project
+# Type your program below.
+
+`,
+    visionOpenCvImage:`# VISION AI Z — OpenCV Image Test
+import cv2
+
+img = cv2.imread("Resources/lena.png")
+print("Image shape:", img.shape)
+cv2.imshow("Lena", img)
+cv2.waitKey(1)`,
+    visionOpenCvCamera:`# VISION AI Z — OpenCV Webcam Test
+import cv2
+
+cap = cv2.VideoCapture(0)
+cap.set(3, 640)
+cap.set(4, 480)
+
+while True:
+    success, img = cap.read()
+    print("Camera frame:", success)
+    cv2.imshow("Result", img)
+    cv2.waitKey(1)`,
+    visionLedSerial:`# VISION AI Z — RGB LED / SerialModule compatibility
+from SerialModule import SerialObject
+from time import sleep
+
+arduino = SerialObject("ZEBJUS")
+arduino.sendData([255, 0, 0])
+sleep(0.3)
+arduino.sendData([0, 255, 0])
+sleep(0.3)
+arduino.sendData([0, 0, 255])
+print("RGB test complete")`,
+    visionPotSerial:`# VISION AI Z — Potentiometer / SerialModule compatibility
+from SerialModule import SerialObject
+
+arduino = SerialObject("ZEBJUS")
+
+while True:
+    myData = arduino.getData()
+    print("Potentiometer:", myData[0])`,
+    visionPotGraphic:`# VISION AI Z — Potentiometer Graphics
+from cvzone.SerialModule import SerialObject
+import cv2
+import numpy as np
+
+arduino = SerialObject("ZEBJUS")
+
+while True:
+    myData = arduino.getData()
+    val = int(myData[0])
+    img = cv2.imread("../Resources/Potentiometer.jpg")
+
+    cv2.putText(img, str(val).zfill(4), (260, 280),
+                cv2.FONT_HERSHEY_PLAIN, 3, (255, 255, 255), 3)
+    angle = np.interp(val, [0, 1023], [-90, 270])
+    cv2.ellipse(img, (320, 265), (131, 131), 0, -90, angle,
+                (255, 180, 0), 27)
+    cv2.imshow("Potentiometer", img)
+    cv2.waitKey(1)`,
+    visionFaceBasic:`# VISION AI Z — Project: Face Detection Basics
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+
+while True:
+    success, img = cap.read()
+    img, bboxs = detector.findFaces(img)
+    print("Faces:", len(bboxs))
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)`,
+    visionFaceLed:`# VISION AI Z — Project: Face Detection → LED
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+from SerialModule import SerialObject
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+arduino = SerialObject("ZEBJUS")
+
+while True:
+    success, img = cap.read()
+    img, bboxs = detector.findFaces(img)
+
+    if bboxs:
+        arduino.sendData([100, 100, 100])
+        print("Face detected → LED ON")
+    else:
+        arduino.sendData([0, 0, 0])
+        print("No face → LED OFF")
+
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)`,
+    visionFaceRgb:`# VISION AI Z — Project: Face Detection → RGB
+import cv2
+from cvzone.FaceDetectionModule import FaceDetector
+from SerialModule import SerialObject
+
+cap = cv2.VideoCapture(0)
+detector = FaceDetector()
+arduino = SerialObject("ZEBJUS")
+
+while True:
+    success, img = cap.read()
+    img, bboxs = detector.findFaces(img)
+
+    if bboxs:
+        arduino.sendData([255, 0, 0])
+        print("Face detected → RED")
+    else:
+        arduino.sendData([0, 255, 0])
+        print("No face → GREEN")
+
+    cv2.imshow("Image", img)
+    cv2.waitKey(1)`,
+    visionGripperSerial:`# VISION AI Z — Project: Hand Gripper (Serial style)
+import cv2
+import numpy as np
+import HandTrackingModule as htm
+import math
+from SerialModule import SerialObject
+
+arduino = SerialObject("ZEBJUS")
+cap = cv2.VideoCapture(0)
+detector = htm.handDetector(detectionCon=0.7)
+per = 0
+
+while True:
+    success, img = cap.read()
+    img = detector.findHands(img, draw=False)
+    lmList, bbox = detector.findPosition(img, draw=False)
+
+    if len(lmList) != 0:
+        x1, y1 = lmList[4][1], lmList[4][2]
+        x2, y2 = lmList[8][1], lmList[8][2]
+        length = math.hypot(x2 - x1, y2 - y1)
+        per = int(np.interp(length, (15, 170), (0, 90)))
+        arduino.sendData([0, 0, 255, per])
+        print("Gripper angle:", per)
+
+    cv2.imshow("Gripper", img)
+    cv2.waitKey(1)`,
+    visionGripperWifi:`# VISION AI Z — Project: Hand Gripper (Wi-Fi style)
+import cv2
+import numpy as np
+import HandTrackingModule as htm
+import math
+from zebjus_wifi import WifiBridge
+
+b = WifiBridge()
+b.start()
+b.set_format(digits=3, count=1)
+cap = cv2.VideoCapture(0)
+detector = htm.handDetector(detectionCon=0.7)
+
+while True:
+    success, img = cap.read()
+    img = detector.findHands(img, draw=False)
+    lmList, bbox = detector.findPosition(img, draw=False)
+
+    if len(lmList) != 0:
+        x1, y1 = lmList[4][1], lmList[4][2]
+        x2, y2 = lmList[8][1], lmList[8][2]
+        length = math.hypot(x2 - x1, y2 - y1)
+        per = int(np.interp(length, (15, 170), (0, 90)))
+        b.send_values([per])
+        print("Wi-Fi gripper angle:", per)
+
+    cv2.imshow("Gripper", img)
+    cv2.waitKey(1)`,
+
     hand:`from zebjus_ai import HandDetector\n\nresult = HandDetector().read()\nprint("Detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)`,
     handRgb:`from zebjus import RGBLED\nfrom zebjus_ai import HandDetector\n\nrgb = RGBLED(1)\nresult = HandDetector().read()\n\nprint("Hand detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)\n\n# Open palm can briefly read 4 or 5, so >= 4 is more stable.\nif result.detected and result.fingers >= 4:\n    rgb.write(0, 255, 0)\n    print("RGB LED GREEN")\nelse:\n    rgb.off()\n    print("RGB LED OFF")`,
+
+    faceCvzone:`from zebjus_cv import Camera, show\nfrom cvzone.FaceDetectionModule import FaceDetector\nimport cv2\nimport cvzone\nimport mediapipe as mp\n\nimg = Camera(0).read()\ndetector = FaceDetector(minDetectionCon=0.5)\nimg, bboxs = detector.findFaces(img, draw=False)\n\nprint("Faces:", len(bboxs))\nfor face in bboxs:\n    x, y, w, h = face["bbox"]\n    score = face["score"]\n    center = face["center"]\n    cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)\n    cvzone.putTextRect(img, f"{score}%", (x, max(25, y - 10)))\n    cvzone.cornerRect(img, (x, y, w, h))\n\nshow(img, "MediaPipe + CVZone Face Detection")`,
 
     cvGray:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nshow(gray, "Grayscale")`,
     cvEdges:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nedges = cv2.Canny(gray, 80, 160)\nshow(edges, "Canny Edges")`,
@@ -51,14 +228,16 @@
   };
 
   const libraries=[
-    ["cv2","module","OpenCV"],["numpy","module","NumPy"],["math","module","Math"],["random","module","Random"],
-    ["zebjus","module","ZEBJUS hardware"],["zebjus_ai","module","MediaPipe AI"],["zebjus_cv","module","Camera/Image OpenCV bridge"]
+    ["cv2","module","OpenCV"],["mediapipe","module","MediaPipe compatibility"],["cvzone","module","CVZone compatibility"],["numpy","module","NumPy"],["math","module","Math"],["random","module","Random"],
+    ["zebjus","module","ZEBJUS hardware"],["zebjus_ai","module","MediaPipe AI"],["zebjus_cv","module","Camera/Image OpenCV bridge"],
+    ["SerialModule","module","VISION AI serial compatibility"],["HandTrackingModule","module","VISION AI hand tracking compatibility"],["zebjus_wifi","module","ZEBJUS Wi-Fi compatibility"]
   ];
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED()","RGB LED 0–255"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer()","0–255 pot"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
-    ["cv2","module","cv2","OpenCV"],["np","module","np","NumPy"]
+    ["RGBLED()","class","RGBLED()","RGB LED 0–255"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer()","0–255 pot"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
+    ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
 
   const moduleMembers={
@@ -66,12 +245,17 @@
       ["RGBLED","class","RGBLED","RGB LED"],["LED","class","LED","LED"],["Ultrasonic","class","Ultrasonic","Ultrasonic"],
       ["Potentiometer","class","Potentiometer","Potentiometer"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
     ],
-    zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"]],
+    zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
+    cvzone:[["putTextRect","function","putTextRect","Text box"],["cornerRect","function","cornerRect","Corner rectangle"],["FaceDetectionModule","module","FaceDetectionModule","Face detector module"]],
+    mediapipe:[["solutions","module","solutions","MediaPipe solutions compatibility"]],
     zebjus_cv:[
       ["Camera","class","Camera","Camera"],["load_image","function","load_image","Loaded image"],["show","function","show","Show image"],
       ["draw_rgb_led","function","draw_rgb_led","Draw LED"],["draw_potentiometer","function","draw_potentiometer","Draw pot"],["draw_ultrasonic","function","draw_ultrasonic","Draw ultrasonic"]
-    ]
-  };
+    ],
+    SerialModule:[["SerialObject","class","SerialObject","VISION AI serial bridge"]],
+    HandTrackingModule:[["handDetector","class","handDetector","VISION AI hand tracker"]],
+    zebjus_wifi:[["WifiBridge","class","WifiBridge","ZEBJUS Wi-Fi bridge"]]
+    };
 
   const members={
     cv2:[["cvtColor()","function","cvtColor()","Color conversion"],["Canny()","function","Canny()","Edges"],["threshold()","function","threshold()","Threshold"],["resize()","function","resize()","Resize"],["GaussianBlur()","function","GaussianBlur()","Blur"],["rectangle()","function","rectangle()","Rectangle"],["circle()","function","circle()","Circle"],["putText()","function","putText()","Text"],["COLOR_BGR2GRAY","constant","COLOR_BGR2GRAY","Gray"],["THRESH_BINARY","constant","THRESH_BINARY","Binary"]],
@@ -83,12 +267,17 @@
     Servo:[["write()","method","write()","Angle"]],
     HandDetector:[["read()","method","read()","Stable hand snapshot"]],
     HandResult:[["detected","property","detected","Detected"],["fingers","property","fingers","0–5"],["side","property","side","Side"]],
-    Camera:[["read()","method","read()","Camera frame"]]
+    Camera:[["read()","method","read()","Camera frame"]],
+    FaceDetector:[["read()","method","read()","Face snapshot"],["findFaces()","method","findFaces()","Detect faces"]],
+    FaceResult:[["detected","property","detected","Detected"],["count","property","count","Face count"],["faces","property","faces","Faces"]],
+    SerialObject:[["getData()","method","getData()","Read input data"],["sendData()","method","sendData()","Send kit data"]],
+    handDetector:[["findHands()","method","findHands()","Find hand landmarks"],["findPosition()","method","findPosition()","Get landmark coordinates"]],
+    WifiBridge:[["start()","method","start()","Start bridge"],["set_format()","method","set_format()","Set value format"],["send_values()","method","send_values()","Send values"]]
   };
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","Ultrasonic","Potentiometer","Motor","Servo","Camera","HandDetector"]){
+    for(const type of ["RGBLED","LED","Ultrasonic","Potentiometer","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*(?:HandDetector\\s*\\(\\s*\\)|\\w+)\\.read\\s*\\(").test(code))return "HandResult";
@@ -108,7 +297,7 @@
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv)\s+import\s+([A-Za-z_]\w*)?$/);
+    m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[2]||"";return{list:filterItems(moduleMembers[m[1]]||[],prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
     m=line.match(/([A-Za-z_]\w*)\.([A-Za-z_]\w*)?$/);
@@ -194,7 +383,7 @@
     return bridgeWindow;
   }
 
-  function requestBridgeSnapshot(cameraIndex=0,timeoutMs=30000){
+  function requestBridgeSnapshot(cameraIndex=0,timeoutMs=30000,needsFace=false){
     return new Promise((resolve,reject)=>{
       if(!bridgeChannel){reject(new Error("BroadcastChannel unavailable."));return;}
       const requestId="req-"+Date.now()+"-"+Math.random().toString(36).slice(2);
@@ -210,7 +399,7 @@
 
       // Give a newly opened bridge a short moment to subscribe.
       setTimeout(()=>{
-        bridgeChannel.postMessage({type:"request-snapshot",requestId,cameraIndex});
+        bridgeChannel.postMessage({type:"request-snapshot",requestId,cameraIndex,needsFace});
       },500);
     });
   }
@@ -260,8 +449,9 @@
     if(running){log("Program already running. Press Stop first.");return;}
 
     const src=getCode();
-    const needsCamera=/\bzebjus_ai\b|\bHandDetector\b|\bCamera\s*\(/.test(src);
-    const needsAI=/\bzebjus_ai\b|\bHandDetector\b/.test(src);
+    const needsHand=/\bzebjus_ai\b|\bHandDetector\b|\bHandTrackingModule\b|\bhandDetector\s*\(/.test(src);
+    const needsFace=/\bFaceDetector\b|\bFaceDetectionModule\b|\bface_detection\b|\bmp\.solutions\.face_detection\b/.test(src);
+    const needsCamera=needsHand||needsFace||/\bCamera\s*\(|\bcv2\.VideoCapture\s*\(/.test(src);
     const idx=requestedCamera(src);
     const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
 
@@ -284,17 +474,10 @@
     }
 
     if(needsCamera && directCameraOk){
-      if(needsAI){
-        const stable=await ZebjusAI.waitForStable(1500);
-        aiState={
-          detected:!!stable.detected,
-          fingers:Number(stable.fingers)||0,
-          side:stable.side||""
-        };
-        log(`AI snapshot → detected=${aiState.detected}, fingers=${aiState.fingers}, side=${aiState.side||"-"}`);
-      }else{
-        aiState=ZebjusAI?.getSnapshot?.()||aiState;
-      }
+      let snap=ZebjusAI?.getSnapshot?.()||aiState;
+      if(needsFace){snap=await ZebjusAI.waitForFaces(1500);log(`Face snapshot → faces=${Number(snap.faceCount)||0}`);}
+      if(needsHand){snap=await ZebjusAI.waitForStable(1500);log(`Hand snapshot → detected=${!!snap.detected}, fingers=${Number(snap.fingers)||0}, side=${snap.side||"-"}`);}
+      aiState={detected:!!snap.detected,fingers:Number(snap.fingers)||0,side:snap.side||"",faces:Array.isArray(snap.faces)?snap.faces:[],landmarks:Array.isArray(snap.landmarks)?snap.landmarks:[]};
       runFrame=captureFrame();
     }
 
@@ -310,13 +493,14 @@
         log("Direct camera blocked → opening Camera Bridge fallback…");
         openCameraBridge(requestedIdx);
 
-        const snap=await requestBridgeSnapshot(requestedIdx,30000);
-        aiState=snap.aiState||{detected:false,fingers:0,side:""};
+        const snap=await requestBridgeSnapshot(requestedIdx,30000,needsFace);
+        aiState=snap.aiState||{detected:false,fingers:0,side:"",faces:[],landmarks:[]};
         runFrame=snap.frame||null;
 
         $("handDetected").textContent=aiState.detected?"Yes":"No";
         $("fingerCount").textContent=Number(aiState.fingers)||0;
         $("handSide").textContent=aiState.side||"—";
+        $("faceCount").textContent=Array.isArray(aiState.faces)?aiState.faces.length:0;
 
         log(`AI snapshot → detected=${!!aiState.detected}, fingers=${Number(aiState.fingers)||0}, side=${aiState.side||"-"}`);
       }catch(e){
@@ -407,8 +591,8 @@
   function switchOutput(id){document.querySelectorAll(".output-view").forEach(x=>x.classList.toggle("active",x.id===id));document.querySelectorAll(".output-tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));}
 
   window.addEventListener("zebjus-ai-state",e=>{
-    const d=e.detail||{};aiState={detected:!!d.detected,fingers:Number(d.fingers)||0,side:d.side||""};
-    $("handDetected").textContent=aiState.detected?"Yes":"No";$("fingerCount").textContent=aiState.fingers;$("handSide").textContent=aiState.side||"—";
+    const d=e.detail||{};aiState={detected:!!d.detected,fingers:Number(d.fingers)||0,side:d.side||"",faces:Array.isArray(d.faces)?d.faces:[],landmarks:Array.isArray(d.landmarks)?d.landmarks:[]};
+    $("handDetected").textContent=aiState.detected?"Yes":"No";$("fingerCount").textContent=aiState.fingers;$("handSide").textContent=aiState.side||"—";$("faceCount").textContent=aiState.faces.length;
   });
 
   $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.hello);

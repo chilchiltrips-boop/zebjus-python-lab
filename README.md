@@ -211,3 +211,57 @@ The lab now:
 2. uses the normal browser camera permission prompt
 3. keeps the camera preview inside the embedded lab
 4. opens Camera Bridge only if direct iframe access is blocked
+
+
+## v5.3 — MediaPipe Face Detection + CVZone compatibility
+
+Added browser-compatible imports used by common CVZone tutorials:
+
+```python
+import cv2
+import mediapipe as mp
+import cvzone
+from cvzone.FaceDetectionModule import FaceDetector
+```
+
+Supported Face Detection APIs include:
+- `mp.solutions.face_detection.FaceDetection(...)`
+- `cvzone.putTextRect(...)`
+- `cvzone.cornerRect(...)`
+- `cvzone.FaceDetectionModule.FaceDetector(...).findFaces(...)`
+- `zebjus_ai.FaceDetector().read()`
+
+Important: `mediapipe` and `cvzone` here are ZEBJUS browser compatibility modules. The face inference itself runs with MediaPipe Tasks Vision in JavaScript because the normal native MediaPipe Python wheel is not a browser/Pyodide wheel.
+
+The browser lab remains snapshot-based for Python camera programs. Desktop-style infinite webcam loops such as `while True: cap.read(); cv2.imshow(...)` should be adapted to `Camera(0).read()` + `show(...)` in this version.
+
+Desktop OpenCV tutorial compatibility:
+- `cv2.VideoCapture(0)` reads the browser camera snapshot.
+- `cv2.imshow(...)` is redirected to the OpenCV Image output panel.
+- a `while True` webcam loop used with `cv2.VideoCapture` is adapted to one frame per Run so the Pyodide worker does not lock up.
+
+
+## v5.4 — VISION AI Z Student Projects
+
+This build is prepared so students can type and test the VISION AI Z course projects in the browser.
+
+Added browser compatibility:
+- `SerialModule.SerialObject`
+- `cvzone.SerialModule.SerialObject`
+- `HandTrackingModule.handDetector`
+- `zebjus_wifi.WifiBridge`
+- existing `cv2`, `mediapipe`, `cvzone`, ZEBJUS kit APIs
+
+Desktop `while True` tutorial loops are automatically converted to one cycle per Run in student test mode. This prevents a browser Python worker from being locked forever.
+
+Project resources from VISION AI Z are included under `vision-assets/` and preloaded for `cv2.imread()` examples.
+
+### Student workflow
+1. Choose **Blank Student Project** or clear the editor.
+2. Student types the lesson code manually.
+3. Press **Run**.
+4. Camera/AI code uses the current camera snapshot.
+5. Hardware code updates the demo kit graphics or the assigned real kit.
+6. Re-run after changing code/input/hand position.
+
+For a final live-stream course mode, add a cooperative repeated-run scheduler instead of a blocking Python infinite loop.

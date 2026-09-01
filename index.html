@@ -45,9 +45,24 @@
               <option value="list">List</option>
             </optgroup>
 
+            <optgroup label="VISION AI Z — Student Projects">
+              <option value="visionBlank">Blank Student Project</option>
+              <option value="visionOpenCvImage">Test 01 — OpenCV Image</option>
+              <option value="visionOpenCvCamera">Test 02 — OpenCV Camera</option>
+              <option value="visionLedSerial">Test 03 — RGB LED</option>
+              <option value="visionPotSerial">Test 04 — Potentiometer</option>
+              <option value="visionPotGraphic">Test 05 — Potentiometer Graphics</option>
+              <option value="visionFaceBasic">Project 1 — Face Detection</option>
+              <option value="visionFaceLed">Project 1B — Face → LED</option>
+              <option value="visionFaceRgb">Project 1C — Face → RGB</option>
+              <option value="visionGripperSerial">Project 2 — Hand Gripper</option>
+              <option value="visionGripperWifi">Project 2B — Wi-Fi Gripper</option>
+            </optgroup>
+
             <optgroup label="MediaPipe AI">
               <option value="hand">Hand Detection</option>
               <option value="handRgb">5 Fingers → RGB LED</option>
+              <option value="faceCvzone">Face Detection → CVZone</option>
             </optgroup>
 
             <optgroup label="OpenCV Camera">
@@ -87,7 +102,7 @@
         <div class="panel-title editor-title">
           <div>
             <strong>main.py</strong>
-            <span class="muted">Case-sensitive autocomplete • Ctrl/⌘ + Space</span>
+            <span class="muted">Student types code here • Run tests one browser cycle • Ctrl/⌘ + Space suggestions</span>
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
@@ -112,6 +127,7 @@
             <div><span>Hand</span><strong id="handDetected">—</strong></div>
             <div><span>Fingers</span><strong id="fingerCount">0</strong></div>
             <div><span>Side</span><strong id="handSide">—</strong></div>
+            <div><span>Faces</span><strong id="faceCount">0</strong></div>
           </div>
           <div id="embedCameraNotice" class="embed-camera-notice" hidden>
             Camera runs inside the Wix page when permission is allowed. Camera Bridge opens only as a fallback.
@@ -217,6 +233,12 @@
         <code>Potentiometer(1).read()</code>
         <code>Camera(0).read()</code>
         <code>HandDetector().read()</code>
+        <code>import mediapipe as mp</code>
+        <code>import cvzone</code>
+        <code>from cvzone.FaceDetectionModule import FaceDetector</code>
+        <code>from SerialModule import SerialObject</code>
+        <code>import HandTrackingModule as htm</code>
+        <code>from zebjus_wifi import WifiBridge</code>
         <code>load_image()</code>
         <code>draw_rgb_led()</code>
         <code>draw_potentiometer()</code>
