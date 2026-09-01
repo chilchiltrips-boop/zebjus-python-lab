@@ -264,17 +264,52 @@
     const needsAI=/\bzebjus_ai\b|\bHandDetector\b/.test(src);
     const idx=requestedCamera(src);
     const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
+
     terminal.textContent="";
     running=true;
 
     let runFrame=null;
+    let directCameraOk=false;
 
-    // Wix Online Programs / embedded mode:
-    // open a top-level Camera Bridge because the parent iframe blocks getUserMedia().
-    if(needsCamera&&isEmbedded){
+    // First try camera INSIDE the Wix page.
+    if(needsCamera && prefs.autoCamera){
+      if(!cameraRunning || requestedIdx!==currentCameraIndex){
+        if(cameraRunning)stopCamera();
+        directCameraOk=await startCamera(requestedIdx);
+      }else{
+        directCameraOk=true;
+      }
+    }else if(cameraRunning){
+      directCameraOk=true;
+    }
+
+    if(needsCamera && directCameraOk){
+      if(needsAI){
+        const stable=await ZebjusAI.waitForStable(1500);
+        aiState={
+          detected:!!stable.detected,
+          fingers:Number(stable.fingers)||0,
+          side:stable.side||""
+        };
+        log(`AI snapshot → detected=${aiState.detected}, fingers=${aiState.fingers}, side=${aiState.side||"-"}`);
+      }else{
+        aiState=ZebjusAI?.getSnapshot?.()||aiState;
+      }
+      runFrame=captureFrame();
+    }
+
+    // Open Camera Bridge only if direct camera access is blocked.
+    if(needsCamera && !directCameraOk){
+      if(!isEmbedded){
+        running=false;
+        log("Program stopped because this project needs a camera.");
+        return;
+      }
+
       try{
-        log("Wix embedded mode → opening Camera Bridge…");
+        log("Direct camera blocked → opening Camera Bridge fallback…");
         openCameraBridge(requestedIdx);
+
         const snap=await requestBridgeSnapshot(requestedIdx,30000);
         aiState=snap.aiState||{detected:false,fingers:0,side:""};
         runFrame=snap.frame||null;
@@ -286,28 +321,9 @@
         log(`AI snapshot → detected=${!!aiState.detected}, fingers=${Number(aiState.fingers)||0}, side=${aiState.side||"-"}`);
       }catch(e){
         running=false;
-        log("Camera Bridge error: "+(e?.message||e));
-        log("Allow popups/camera, then press Run again.");
+        log("Camera error: "+(e?.message||e));
         return;
       }
-    }else{
-      if(prefs.autoCamera&&needsCamera){
-        if(!cameraRunning || (idx!==null&&idx!==currentCameraIndex)){
-          if(cameraRunning)stopCamera();
-          const ok=await startCamera(idx);
-          if(!ok){running=false;log("Program stopped because this project needs a camera.");return;}
-        }
-      }
-
-      if(needsAI&&cameraRunning){
-        const stable=await ZebjusAI.waitForStable(1500);
-        aiState={detected:!!stable.detected,fingers:Number(stable.fingers)||0,side:stable.side||""};
-        log(`AI snapshot → detected=${aiState.detected}, fingers=${aiState.fingers}, side=${aiState.side||"-"}`);
-      }else{
-        aiState=ZebjusAI?.getSnapshot?.()||aiState;
-      }
-
-      runFrame=captureFrame();
     }
 
     if(prefs.demoMode){

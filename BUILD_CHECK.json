@@ -27,11 +27,8 @@
   },
   "critical": {
     "all_js_pass": true,
-    "camera_bridge_page": true,
-    "broadcast_channel": true,
-    "bridge_snapshot": true,
-    "embedded_detection": true,
-    "hand_stable": true,
-    "rgb_api": true
+    "direct_camera_first": true,
+    "bridge_fallback_only": true,
+    "module_worker": true
   }
 }

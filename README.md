@@ -194,3 +194,20 @@ This works for:
 The Camera Bridge window can remain open for later Runs.
 
 If a browser blocks the popup, allow popups for the Wix/GitHub lab and press Run again.
+
+
+## v5.2 — Normal Wix Page Direct Camera
+
+Use this Velo Page Code on the normal Wix page:
+
+```js
+$w.onReady(function () {
+    $w("#html1").allow = "camera; fullscreen";
+});
+```
+
+The lab now:
+1. tries camera access inside the Wix page first
+2. uses the normal browser camera permission prompt
+3. keeps the camera preview inside the embedded lab
+4. opens Camera Bridge only if direct iframe access is blocked
