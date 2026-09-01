@@ -1,124 +1,68 @@
-# ZEBJUS Python Lab v3 — Student IDE
+# ZEBJUS Python Lab v3.1 Classic
 
-A compact, responsive browser Python IDE intended for Wix embedding and student learning.
+This version returns to the clearer classic layout while keeping the newer learning features.
 
-## Why CodeMirror instead of Monaco
-
-Monaco is excellent on desktop but its official documentation says mobile browsers are not supported. v3 uses CodeMirror 6, which supports mobile native selection/editing, syntax highlighting, line numbers and autocomplete.
-
-## Main features
-
-- Compact Wix-friendly layout
-- Desktop + tablet + mobile responsive UI
-- Mobile-friendly CodeMirror 6 editor
-- Case-sensitive Python autocomplete
-- Python keyword and built-in suggestions
-- ZEBJUS kit autocomplete
-- OpenCV autocomplete
-- MediaPipe/ZEBJUS AI autocomplete
-- Local autosave of student code
-- Program input box for `input()`
+## Main page
+- Large Python editor
 - Run / Stop / Reset
-- Camera device/index selector
-- `Camera(0)`, `Camera(1)` style camera selection
-- Camera auto-start on Run
-- MediaPipe hand detection
-- OpenCV `cv2` support through Pyodide
-- OpenCV image output with `show(image)`
-- Demo LED / motor / servo
-- Real kit WSS structure retained
-- Python Basics / OpenCV / MediaPipe / Hardware examples
+- Small camera preview
+- Visible LED / Motor / Servo graphics
+- Compact output terminal
+- Python / OpenCV / MediaPipe / kit examples
+- Case-sensitive autocomplete
+- Mobile responsive layout
 
-## Upload to GitHub
+## Separate Settings page
+Settings are moved to `settings.html`:
+- Camera index
+- Auto-start camera
+- Demo mode
+- Kit ID
+- Secure WebSocket URL
+- Editor font size
+- Auto-save
+- Values for Python `input()`
 
-Replace the old repository files with all files from this ZIP:
+## OpenCV
+Pyodide 314.0.6 includes `opencv-python`. It loads only when an OpenCV example imports `cv2`.
 
-```text
-index.html
-styles.css
-config.js
-app.js
-ai.js
-py-worker.js
-.nojekyll
-README.md
-```
-
-Commit example:
-
-```text
-Upgrade ZEBJUS Python Lab to v3 responsive student IDE
-```
-
-Your existing GitHub Pages URL remains the same.
-
-## Wix embed
-
-Recommended URL:
-
-```text
-https://chilchiltrips-boop.github.io/zebjus-python-lab/?embed=1
-```
-
-Use an Embed Site / iframe element and give it as much width as practical.
-
-Recommended desktop iframe:
-- width: 100%
-- height: 650–750 px
-
-On phones, allow the embedded element to use most of the page width. The app automatically switches to its mobile layout.
-
-### Camera note for Wix
-
-Camera APIs require HTTPS, which GitHub Pages provides. Some parent iframe configurations can still block camera permission. If a browser/Wix combination blocks it, the top-right ↗ button opens the same lab directly in a new tab, where camera permission can be granted normally.
-
-## Camera index
-
-The Camera tab lists browser cameras as Camera 0, Camera 1, etc.
-
-Student OpenCV examples use:
+Use browser camera through:
 
 ```python
 from zebjus_cv import Camera, show
 import cv2
 
-cam = Camera(0)
-frame = cam.read()
+frame = Camera(0).read()
 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 show(gray)
 ```
 
-If the code contains `Camera(1)`, the web app attempts to select browser camera index 1 before running.
-
-This intentionally uses `zebjus_cv.Camera()` instead of `cv2.VideoCapture()` because normal OpenCV desktop camera capture is not available inside a browser sandbox.
-
-## OpenCV loading
-
-OpenCV is only loaded when code imports `cv2` or `zebjus_cv`, which avoids making Python basics wait for the large OpenCV package.
-
 ## MediaPipe
+MediaPipe Tasks Vision 1.0.1 runs in the browser.
 
-MediaPipe runs in JavaScript/WASM and its newest hand snapshot is exposed to student Python:
+## GitHub update
+Upload/replace all files in the repository root:
 
-```python
-from zebjus_ai import HandDetector
+- index.html
+- settings.html
+- styles.css
+- config.js
+- app.js
+- settings.js
+- ai.js
+- py-worker.js
+- .nojekyll
+- README.md
 
-result = HandDetector().read()
-print(result.detected)
-print(result.fingers)
-print(result.side)
-```
+Commit example:
+`Restore classic UI and add separate settings page`
 
-## Current live-loop limitation
+Your GitHub Pages URL stays the same.
 
-`HandDetector().read()` returns the latest snapshot at the moment Run begins. A blocking Python `while True` loop does not continuously receive new MediaPipe states in this static/Wix-compatible version. Press Stop to terminate accidental infinite loops.
+For Wix embedding, use:
+`https://chilchiltrips-boop.github.io/zebjus-python-lab/`
 
-## Real kit
-
-Edit `config.js` to set your future secure relay:
-
-```js
-websocketUrl: "wss://lab-api.zebjus.com/ws"
-```
-
-Before real internet-controlled hardware use, add authenticated users, per-kit authorization, TLS/WSS, command validation, rate limiting, command timeout/failsafe, emergency stop and server-side logs.
+Recommended iframe:
+- width 100%
+- height about 720px on desktop
+- on mobile, allow the iframe to use full page width

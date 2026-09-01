@@ -1,6 +1,4 @@
 window.ZEBJUS_CONFIG = {
-  defaultKitId: "ZB-000123",
-  websocketUrl: "",
   pyodideVersion: "314.0.6",
   mediaPipe: {
     moduleUrl: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/+esm",

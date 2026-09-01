@@ -9,29 +9,24 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <strong>ZEBJUS Python Lab</strong>
-      <span>Learn • Code • Run • Control</span>
+    <div>
+      <h1>ZEBJUS Python Lab</h1>
+      <p>Learn Python • OpenCV • MediaPipe • Control your kit</p>
     </div>
-    <div class="statusbar">
+
+    <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
-      <span id="kitStatus" class="badge">Demo kit</span>
+      <span id="kitStatus" class="badge">Demo mode</span>
       <span id="aiStatus" class="badge">Camera off</span>
-      <button id="fullscreenBtn" class="icon-btn" title="Open lab in a new tab">↗</button>
+      <a class="btn settings-btn" href="./settings.html">⚙ Settings</a>
     </div>
   </header>
 
-  <main class="ide">
-    <aside class="sidebar panel">
-      <div class="side-tabs">
-        <button class="side-tab active" data-panel="learnPanel">Learn</button>
-        <button class="side-tab" data-panel="cameraPanel">Camera</button>
-        <button class="side-tab" data-panel="kitPanel">Kit</button>
-      </div>
-
-      <div id="learnPanel" class="side-panel active">
-        <label class="field">
-          <span>Learning example</span>
+  <main class="layout">
+    <section class="panel project-bar">
+      <div class="project-left">
+        <label>
+          <span>Example</span>
           <select id="exampleSelect">
             <optgroup label="Python Basics">
               <option value="hello">Hello World</option>
@@ -39,8 +34,8 @@
               <option value="input">Input</option>
               <option value="ifelse">If / Else</option>
               <option value="forloop">For Loop</option>
-              <option value="function">Functions</option>
-              <option value="list">Lists</option>
+              <option value="function">Function</option>
+              <option value="list">List</option>
             </optgroup>
             <optgroup label="OpenCV">
               <option value="cvGray">Camera → Grayscale</option>
@@ -58,119 +53,121 @@
             </optgroup>
           </select>
         </label>
-
-        <button id="loadExampleBtn" class="btn primary full">Load Example</button>
-
-        <div class="tip">
-          <strong>Autocomplete</strong>
-          <p>Suggestions are case-sensitive like Python. Type <code>pri</code> → <code>print()</code>, <code>LED</code> → <code>LED()</code>, or <code>cv2.</code> for OpenCV.</p>
-        </div>
-
-        <details>
-          <summary>Program input</summary>
-          <textarea id="stdinBox" rows="4" placeholder="One input() value per line"></textarea>
-        </details>
+        <button id="loadExampleBtn" class="btn">Load Example</button>
       </div>
 
-      <div id="cameraPanel" class="side-panel">
-        <label class="field">
-          <span>Camera index / device</span>
-          <select id="cameraSelect">
-            <option value="">Camera 0 (default)</option>
-          </select>
-        </label>
-        <div class="button-grid">
-          <button id="refreshCameraBtn" class="btn">Refresh</button>
-          <button id="startCameraBtn" class="btn primary">Start</button>
-          <button id="stopCameraBtn" class="btn">Stop</button>
-        </div>
-        <label class="check">
-          <input id="autoCamera" type="checkbox" checked>
-          <span>Auto-start camera on Run</span>
-        </label>
-        <p class="hint">Using <code>Camera(1)</code> in student code automatically selects camera index 1 when available.</p>
+      <div class="project-actions">
+        <button id="resetBtn" class="btn">Reset</button>
+        <button id="runBtn" class="btn success">▶ Run</button>
+        <button id="stopBtn" class="btn danger">■ Stop</button>
       </div>
-
-      <div id="kitPanel" class="side-panel">
-        <label class="check">
-          <input id="demoMode" type="checkbox" checked>
-          <span>Demo mode</span>
-        </label>
-        <label class="field">
-          <span>Kit ID</span>
-          <input id="kitId" value="ZB-000123">
-        </label>
-        <label class="field advanced">
-          <span>Secure WebSocket</span>
-          <input id="wsUrl" placeholder="wss://lab-api.example/ws">
-        </label>
-        <div class="button-grid two">
-          <button id="connectBtn" class="btn primary">Connect</button>
-          <button id="disconnectBtn" class="btn">Disconnect</button>
-        </div>
-
-        <div class="mini-kit">
-          <div><i id="demoLed" class="led"></i><span>LED 1</span></div>
-          <div><div class="meter"><b id="motorMeter"></b></div><span id="motorLabel">Motor 0%</span></div>
-          <div><div class="servo"><b id="servoNeedle"></b></div><span id="servoLabel">Servo 90°</span></div>
-        </div>
-      </div>
-    </aside>
-
-    <section class="main-workspace">
-      <section class="editor-panel panel">
-        <div class="editor-head">
-          <div class="file-title"><span class="dot"></span><strong>main.py</strong><small id="saveState">Saved</small></div>
-          <div class="toolbar">
-            <button id="resetBtn" class="btn small">Reset</button>
-            <button id="runBtn" class="btn success">▶ Run</button>
-            <button id="stopBtn" class="btn danger">■ Stop</button>
-          </div>
-        </div>
-        <div id="editor" aria-label="Python code editor"></div>
-      </section>
-
-      <section class="output-panel panel">
-        <div class="output-head">
-          <div class="output-tabs">
-            <button class="output-tab active" data-output="consoleView">Console</button>
-            <button class="output-tab" data-output="imageView">Image</button>
-          </div>
-          <button id="clearBtn" class="btn tiny">Clear</button>
-        </div>
-        <pre id="consoleView" class="output-view active">Starting Python…</pre>
-        <div id="imageView" class="output-view image-view">
-          <div class="image-placeholder">OpenCV <code>show(image)</code> output appears here.</div>
-          <img id="resultImage" alt="OpenCV result">
-        </div>
-      </section>
     </section>
 
-    <aside class="camera-dock panel">
-      <div class="camera-head">
-        <strong>Camera</strong>
-        <span id="cameraIndexLabel">Index 0</span>
+    <section class="workspace">
+      <div class="panel editor-panel">
+        <div class="panel-title editor-title">
+          <div>
+            <strong>main.py</strong>
+            <span class="muted">Python autocomplete enabled</span>
+          </div>
+          <span id="saveState" class="save-state">Saved</span>
+        </div>
+        <div id="editor"></div>
       </div>
-      <div class="camera-wrap">
-        <video id="cameraVideo" playsinline muted></video>
-        <canvas id="cameraOverlay"></canvas>
-        <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
-      </div>
-      <div class="ai-readout">
-        <div><span>Hand</span><strong id="handDetected">—</strong></div>
-        <div><span>Fingers</span><strong id="fingerCount">0</strong></div>
-        <div><span>Side</span><strong id="handSide">—</strong></div>
-      </div>
-      <p class="hint camera-note">MediaPipe runs locally in the browser. OpenCV uses a camera snapshot for each Run.</p>
-    </aside>
-  </main>
 
-  <nav class="mobile-nav">
-    <button data-mobile="learnPanel">Learn</button>
-    <button data-mobile="cameraPanel">Camera</button>
-    <button data-mobile="kitPanel">Kit</button>
-    <button id="mobileRun" class="run-mobile">▶ Run</button>
-  </nav>
+      <aside class="side-column">
+        <section class="panel camera-panel">
+          <div class="panel-title compact-title">
+            <strong>Camera</strong>
+            <div class="camera-head-actions">
+              <span id="cameraIndexText" class="muted">Camera 0</span>
+              <button id="cameraToggleBtn" class="btn tiny">Start</button>
+            </div>
+          </div>
+
+          <div class="camera-wrap">
+            <video id="cameraVideo" playsinline muted></video>
+            <canvas id="cameraOverlay"></canvas>
+            <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div>
+          </div>
+
+          <div class="ai-stats">
+            <div><span>Hand</span><strong id="handDetected">—</strong></div>
+            <div><span>Fingers</span><strong id="fingerCount">0</strong></div>
+            <div><span>Side</span><strong id="handSide">—</strong></div>
+          </div>
+        </section>
+
+        <section class="panel demo-panel">
+          <div class="panel-title compact-title">
+            <strong>Kit Output</strong>
+            <span id="kitNameText" class="muted">ZB-000123</span>
+          </div>
+
+          <div class="demo-items">
+            <div class="demo-card">
+              <div class="led-shell"><div id="demoLed" class="led"></div></div>
+              <div>
+                <strong>LED 1</strong>
+                <span id="ledLabel">OFF</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="motor-icon">M</div>
+              <div class="demo-grow">
+                <strong>Motor 1</strong>
+                <div class="meter"><div id="motorMeter" class="meter-fill"></div></div>
+                <span id="motorLabel">Stopped</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="servo">
+                <div id="servoNeedle" class="servo-needle"></div>
+              </div>
+              <div>
+                <strong>Servo 1</strong>
+                <span id="servoLabel">90°</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="panel output-panel">
+      <div class="terminal-toolbar">
+        <div class="output-tabs">
+          <button class="output-tab active" data-view="terminal">Output</button>
+          <button class="output-tab" data-view="imageOutput">Image</button>
+        </div>
+        <button id="clearBtn" class="btn tiny">Clear</button>
+      </div>
+      <pre id="terminal" class="output-view active">Starting Python worker…</pre>
+      <div id="imageOutput" class="output-view image-output">
+        <p id="imagePlaceholder">OpenCV <code>show(image)</code> output appears here.</p>
+        <img id="resultImage" alt="OpenCV output">
+      </div>
+    </section>
+
+    <section class="panel quick-help">
+      <div class="panel-title compact-title">
+        <strong>Quick Reference</strong>
+        <span class="muted">Type to see case-sensitive suggestions</span>
+      </div>
+      <div class="help-grid">
+        <code>print()</code>
+        <code>if / elif / else</code>
+        <code>for i in range()</code>
+        <code>LED(1).on()</code>
+        <code>Servo(1).write(90)</code>
+        <code>Camera(0).read()</code>
+        <code>cv2.cvtColor()</code>
+        <code>HandDetector().read()</code>
+      </div>
+    </section>
+  </main>
 
   <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>
