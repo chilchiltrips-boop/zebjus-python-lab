@@ -1,7 +1,7 @@
 (function(){
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
-  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[];
+  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -208,7 +208,34 @@ while True:
     cv2.waitKey(1)`,
 
     hand:`from zebjus_ai import HandDetector\n\nresult = HandDetector().read()\nprint("Detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)`,
-    handRgb:`from zebjus import RGBLED\nfrom zebjus_ai import HandDetector\n\nrgb = RGBLED(1)\nresult = HandDetector().read()\n\nprint("Hand detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)\n\n# Open palm can briefly read 4 or 5, so >= 4 is more stable.\nif result.detected and result.fingers >= 4:\n    rgb.write(0, 255, 0)\n    print("RGB LED GREEN")\nelse:\n    rgb.off()\n    print("RGB LED OFF")`,
+    handRgb:`from zebjus import RGBLED, sleep
+from zebjus_ai import HandDetector
+
+rgb = RGBLED(1)
+hand = HandDetector()
+
+while True:
+    result = hand.read()
+    fingers = result.fingers
+
+    print("Hand:", result.detected, "| Fingers:", fingers, "| Side:", result.side)
+
+    if not result.detected:
+        rgb.off()
+    elif fingers == 0:
+        rgb.write(255, 255, 255)   # Fist = White
+    elif fingers == 1:
+        rgb.write(255, 0, 0)       # 1 = Red
+    elif fingers == 2:
+        rgb.write(0, 255, 0)       # 2 = Green
+    elif fingers == 3:
+        rgb.write(0, 0, 255)       # 3 = Blue
+    elif fingers == 4:
+        rgb.write(255, 255, 0)     # 4 = Yellow
+    else:
+        rgb.write(255, 0, 255)     # 5 = Purple
+
+    sleep(0.10)`,
 
     faceCvzone:`from zebjus_cv import Camera, show\nfrom cvzone.FaceDetectionModule import FaceDetector\nimport cv2\nimport cvzone\nimport mediapipe as mp\n\nimg = Camera(0).read()\ndetector = FaceDetector(minDetectionCon=0.5)\nimg, bboxs = detector.findFaces(img, draw=False)\n\nprint("Faces:", len(bboxs))\nfor face in bboxs:\n    x, y, w, h = face["bbox"]\n    score = face["score"]\n    center = face["center"]\n    cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)\n    cvzone.putTextRect(img, f"{score}%", (x, max(25, y - 10)))\n    cvzone.cornerRect(img, (x, y, w, h))\n\nshow(img, "MediaPipe + CVZone Face Detection")`,
 
@@ -336,6 +363,13 @@ while True:
   function getCode(){return editor?editor.getValue():$("codeEditor").value;}
   function setCode(t){if(editor){editor.setValue(t);editor.focus();}}
   function log(t){terminal.textContent+=(terminal.textContent?"\n":"")+String(t);terminal.scrollTop=terminal.scrollHeight;}
+  function writeTerminalChunk(t){
+    const s=String(t??"");
+    if(!s)return;
+    terminal.textContent+=s;
+    if(terminal.textContent.length>60000)terminal.textContent=terminal.textContent.slice(-45000);
+    terminal.scrollTop=terminal.scrollHeight;
+  }
   function badge(el,t,m=""){el.textContent=t;el.className="badge"+(m?" "+m:"");}
 
   function createWorker(){
@@ -346,10 +380,22 @@ while True:
       const m=e.data||{};
       if(m.type==="ready"){badge($("pythonStatus"),"Python ready","ok");log("Python ready.");}
       else if(m.type==="status")badge($("pythonStatus"),m.text,m.mode||"warn");
-      else if(m.type==="stdout"&&m.text!=="")log(m.text);
+      else if(m.type==="stdout"&&m.text!=="")writeTerminalChunk(m.text);
+      else if(m.type==="runtime-stdout"&&m.text!=="")log(m.text);
       else if(m.type==="stderr"&&m.text!=="")log("ERROR: "+m.text);
-      else if(m.type==="error"){running=false;log("ERROR: "+m.text);badge($("pythonStatus"),"Python ready","ok");}
-      else if(m.type==="done"){running=false;log("Program finished.");badge($("pythonStatus"),"Python ready","ok");}
+      else if(m.type==="error"){
+        liveMode=false;if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
+        running=false;log("ERROR: "+m.text);badge($("pythonStatus"),"Python ready","ok");
+      }
+      else if(m.type==="done"){
+        if(liveMode&&running){
+          liveTimer=setTimeout(()=>runLiveCycle().catch(err=>{
+            liveMode=false;running=false;log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
+          }),70);
+        }else{
+          running=false;log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
+        }
+      }
       else if(m.type==="kit-command")handleKit(m.payload);
       else if(m.type==="image")showImage(m.dataUrl);
     };
@@ -501,6 +547,52 @@ while True:
     renderUploadedFiles();
   }
 
+  function postProgramToWorker(code,frame){
+    worker.postMessage({
+      type:"run",
+      code,
+      stdin:prefs.stdin||"",
+      aiState,
+      sensorState,
+      frame,
+      imageFrame,
+      uploadedFiles:uploadedImages.map(x=>({name:x.name,path:x.path,data:x.data}))
+    });
+  }
+
+  async function refreshLiveAI(){
+    let frame=null;
+    if(liveNeedsCamera&&cameraRunning){
+      const snap=ZebjusAI?.getSnapshot?.()||aiState;
+      aiState={
+        detected:!!snap.detected,
+        fingers:Number(snap.fingers)||0,
+        side:snap.side||"",
+        faces:Array.isArray(snap.faces)?snap.faces:[],
+        landmarks:Array.isArray(snap.landmarks)?snap.landmarks:[]
+      };
+      frame=captureFrame();
+      $("handDetected").textContent=aiState.detected?"Yes":"No";
+      $("fingerCount").textContent=aiState.fingers;
+      $("handSide").textContent=aiState.side||"—";
+      $("faceCount").textContent=aiState.faces.length;
+    }
+    return frame;
+  }
+
+  async function runLiveCycle(){
+    if(!liveMode||!running)return;
+    if(prefs.demoMode){
+      sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
+      sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
+      sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
+      updateSensorGraphics();
+    }
+    const frame=await refreshLiveAI();
+    if(!liveMode||!running)return;
+    postProgramToWorker(liveCode,frame);
+  }
+
   async function runCode(){
     if(running){log("Program already running. Press Stop first.");return;}
 
@@ -513,6 +605,10 @@ while True:
 
     terminal.textContent="";
     running=true;
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b/.test(src));
+    liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
+    if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
+    if(liveMode)log("LIVE MODE started — press Stop to end.");
 
     let runFrame=null;
     let directCameraOk=false;
@@ -573,20 +669,18 @@ while True:
       updateSensorGraphics();
     }
 
-    badge($("pythonStatus"),"Running…","warn");
-    worker.postMessage({
-      type:"run",
-      code:src,
-      stdin:prefs.stdin||"",
-      aiState,
-      sensorState,
-      frame:runFrame,
-      imageFrame,
-      uploadedFiles:uploadedImages.map(x=>({name:x.name,path:x.path,data:x.data}))
-    });
+    badge($("pythonStatus"),liveMode?"Live running…":"Running…","warn");
+    postProgramToWorker(src,runFrame);
   }
 
-  function stopProgram(){running=false;createWorker();stopCamera();applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});applyDemo({command:"MOTOR_SET",id:1,speed:0});log("Stopped.");}
+  function stopProgram(){
+    liveMode=false;liveCode="";
+    if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
+    running=false;createWorker();stopCamera();
+    applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});
+    applyDemo({command:"MOTOR_SET",id:1,speed:0});
+    log("Stopped.");
+  }
 
   function updateSensorGraphics(){
     const d=Math.max(0,Number(sensorState.ultrasonicCm)||0),p=Math.max(0,Math.min(255,Number(sensorState.potValue)||0));

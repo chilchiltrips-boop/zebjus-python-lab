@@ -27,9 +27,12 @@
   },
   "critical": {
     "all_js_pass": true,
-    "no_resource_folders": true,
-    "manual_upload_sync_present": true,
-    "uploads_paths_present": true,
-    "no_Resources_path_in_app": true
+    "live_cycle_present": true,
+    "live_done_restarts": true,
+    "hand_loop_adapted": true,
+    "stop_ends_live": true,
+    "realtime_print_retained": true,
+    "manual_upload_retained": true,
+    "hand_rgb_live_example": true
   }
 }

@@ -9,7 +9,7 @@ async function initialize(){
   readyPromise=(async()=>{
     const base="https://cdn.jsdelivr.net/pyodide/v314.0.6/full/";
     pyodide=await loadPyodide({indexURL:base});
-    pyodide.setStdout({batched:text=>postMessage({type:"stdout",text})});
+    pyodide.setStdout({batched:text=>postMessage({type:"runtime-stdout",text})});
     pyodide.setStderr({batched:text=>postMessage({type:"stderr",text})});
 
     await pyodide.runPythonAsync(`
@@ -23,6 +23,21 @@ _hand_landmarks=[]
 _sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056}
 _current_frame=None
 _loaded_image=None
+
+class _ZebjusTerminalStream:
+    def __init__(self,kind="stdout"): self.kind=kind
+    def write(self,text):
+        text=str(text)
+        if text:
+            postMessage(to_js({"type":self.kind,"text":text},dict_converter=js.Object.fromEntries))
+        return len(text)
+    def flush(self): pass
+    def isatty(self): return False
+    @property
+    def encoding(self): return "utf-8"
+
+_zebjus_stdout=_ZebjusTerminalStream("stdout")
+_zebjus_stderr=_ZebjusTerminalStream("stderr")
 
 def _clamp255(v): return max(0,min(255,int(v)))
 
@@ -372,6 +387,8 @@ cv2.destroyAllWindows=lambda:None
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
+sys.stdout=_zebjus_stdout
+sys.stderr=_zebjus_stderr
 _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_json) else []
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
@@ -387,10 +404,9 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
-    postMessage({type:"stdout",text:"Student test mode: desktop while True adapted to one browser cycle per Run."});
   }
   return execCode;
 }

@@ -320,3 +320,46 @@ cv2.waitKey(1)
 ```
 
 There is no preloaded `Resources` or `vision-assets` folder in this build.
+
+
+## v5.7 — Real-Time `print()` Terminal
+
+Student Python output is now streamed directly to the Terminal while the program runs.
+
+Supported examples:
+
+```python
+print("Hello")
+
+name = "ZEBJUS"
+print(name)
+
+if True:
+    print("Inside if")
+
+for i in range(3):
+    print(i)
+
+print("A", end=" ")
+print("B")
+```
+
+`print()` can be placed anywhere valid Python allows it: top level, functions, `if`, loops, OpenCV/AI projects, and hardware projects.
+
+The terminal bridge preserves Python output chunks, including `end=""` / `end=" "` behavior.
+
+
+## v5.8 — Live Hand / Vision while True
+
+Camera/AI programs containing `while True:` now run repeatedly in browser live mode.
+The latest MediaPipe hand state is supplied on every cycle.
+
+- No hand: RGB OFF
+- Fist / 0 fingers: White
+- 1 finger: Red
+- 2 fingers: Green
+- 3 fingers: Blue
+- 4 fingers: Yellow
+- 5 fingers: Purple
+
+Press **Stop** to end live mode. Stop also turns the RGB demo output off.
