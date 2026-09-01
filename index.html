@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ZEBJUS Python Lab</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>ZEBJUS Python Lab</h1>
+      <p>Write Python. Run it in the browser. Control your Wi‑Fi kit.</p>
+    </div>
+    <div class="status-wrap">
+      <span id="pythonStatus" class="badge warn">Python loading…</span>
+      <span id="kitStatus" class="badge">Kit disconnected</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel connection-panel">
+      <div class="panel-title">Kit Connection</div>
+      <div class="form-grid">
+        <label>
+          Kit ID
+          <input id="kitId" value="ZB-000123" autocomplete="off" />
+        </label>
+        <label>
+          WebSocket URL
+          <input id="wsUrl" value="wss://YOUR-SERVER.example/ws" autocomplete="off" />
+        </label>
+      </div>
+      <div class="row">
+        <button id="connectBtn" class="btn primary">Connect Kit</button>
+        <button id="disconnectBtn" class="btn">Disconnect</button>
+        <label class="switch-label">
+          <input id="demoMode" type="checkbox" checked />
+          Demo mode
+        </label>
+      </div>
+
+      <div class="demo-board">
+        <div class="demo-title">Demo Kit</div>
+        <div class="demo-items">
+          <div class="demo-card">
+            <div id="demoLed" class="led"></div>
+            <span>LED 1</span>
+          </div>
+          <div class="demo-card">
+            <div class="meter"><div id="motorMeter" class="meter-fill"></div></div>
+            <span id="motorLabel">Motor 1: stopped</span>
+          </div>
+          <div class="demo-card">
+            <div class="servo">
+              <div id="servoNeedle" class="servo-needle"></div>
+            </div>
+            <span id="servoLabel">Servo 1: 90°</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <div class="panel editor-panel">
+        <div class="editor-toolbar">
+          <div>
+            <strong>main.py</strong>
+            <span class="muted">Autocomplete enabled</span>
+          </div>
+          <div class="row compact">
+            <button id="exampleBtn" class="btn">Load LED Example</button>
+            <button id="resetBtn" class="btn">Reset</button>
+            <button id="runBtn" class="btn success">▶ Run</button>
+            <button id="stopBtn" class="btn danger">■ Stop</button>
+          </div>
+        </div>
+        <div id="editor"></div>
+      </div>
+
+      <div class="panel terminal-panel">
+        <div class="terminal-toolbar">
+          <strong>Output</strong>
+          <button id="clearBtn" class="btn small">Clear</button>
+        </div>
+        <pre id="terminal">Starting Python worker…</pre>
+      </div>
+    </section>
+
+    <section class="panel help-panel">
+      <div class="panel-title">ZEBJUS Kit Library</div>
+      <div class="help-grid">
+        <code>LED(1).on()</code>
+        <code>LED(1).off()</code>
+        <code>LED(1).blink(5, 0.5)</code>
+        <code>Motor(1).forward(60)</code>
+        <code>Motor(1).backward(40)</code>
+        <code>Motor(1).stop()</code>
+        <code>Servo(1).write(90)</code>
+        <code>sleep(1)</code>
+      </div>
+      <p class="muted">Real hardware mode sends JSON commands through the configured secure WebSocket. Demo mode simulates the LED, motor and servo in the browser.</p>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
