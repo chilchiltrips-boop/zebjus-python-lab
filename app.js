@@ -397,7 +397,30 @@ while True:
     };
 
   const members={
-    cv2:[["cvtColor()","function","cvtColor()","Color conversion"],["Canny()","function","Canny()","Edges"],["threshold()","function","threshold()","Threshold"],["resize()","function","resize()","Resize"],["GaussianBlur()","function","GaussianBlur()","Blur"],["rectangle()","function","rectangle()","Rectangle"],["circle()","function","circle()","Circle"],["putText()","function","putText()","Text"],["COLOR_BGR2GRAY","constant","COLOR_BGR2GRAY","Gray"],["THRESH_BINARY","constant","THRESH_BINARY","Binary"]],
+    cv2:[
+      ["waitKey()","function","waitKey()","Delay/event wait in milliseconds"],
+      ["imshow()","function","imshow()","Show image in OpenCV output"],
+      ["destroyAllWindows()","function","destroyAllWindows()","Close OpenCV output windows"],
+      ["VideoCapture()","class","VideoCapture()","Open browser camera"],
+      ["imread()","function","imread()","Read uploaded image"],
+      ["imwrite()","function","imwrite()","Encode/write image"],
+      ["cvtColor()","function","cvtColor()","Color conversion"],
+      ["Canny()","function","Canny()","Edge detection"],
+      ["threshold()","function","threshold()","Threshold"],
+      ["resize()","function","resize()","Resize"],
+      ["GaussianBlur()","function","GaussianBlur()","Gaussian blur"],
+      ["rectangle()","function","rectangle()","Rectangle"],
+      ["circle()","function","circle()","Circle"],
+      ["line()","function","line()","Line"],
+      ["putText()","function","putText()","Draw text"],
+      ["getTextSize()","function","getTextSize()","Measure text"],
+      ["COLOR_BGR2GRAY","constant","COLOR_BGR2GRAY","BGR to grayscale"],
+      ["COLOR_BGR2RGB","constant","COLOR_BGR2RGB","BGR to RGB"],
+      ["COLOR_RGB2BGR","constant","COLOR_RGB2BGR","RGB to BGR"],
+      ["THRESH_BINARY","constant","THRESH_BINARY","Binary threshold"],
+      ["FONT_HERSHEY_SIMPLEX","constant","FONT_HERSHEY_SIMPLEX","OpenCV font"],
+      ["FILLED","constant","FILLED","Filled drawing"]
+    ],
     RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"]],
@@ -615,12 +638,14 @@ while True:
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s+([A-Za-z_]\w*)?$/);
+    m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cv2|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[2]||"";return{list:filterItems(moduleMembers[m[1]]||[],prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
     m=line.match(/([A-Za-z_]\w*)\.([A-Za-z_]\w*)?$/);
     if(m){
-      prefix=m[2]||"";items=members[inferType(full,m[1])]||[];
+      prefix=m[2]||"";
+      if(m[1]==="cv2") items=members.cv2||[];
+      else items=members[inferType(full,m[1])]||[];
       return{list:filterItems(items,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
     }
 
@@ -743,7 +768,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.16",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.17",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};

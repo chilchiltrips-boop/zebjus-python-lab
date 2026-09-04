@@ -399,7 +399,13 @@ class _BrowserVideoCapture:
     def release(self): self.opened=False
 
 def _browser_imshow(title,img): show(img,str(title))
-def _browser_waitKey(delay=1): return -1
+def _browser_waitKey(delay=1):
+    # Browser/Pyodide compatibility: OpenCV waitKey uses milliseconds.
+    # The Python runtime lives in a Web Worker, so this delay does not freeze the page UI.
+    try: ms=max(0,int(delay))
+    except Exception: ms=1
+    if ms>0: time.sleep(ms/1000.0)
+    return -1
 cv2.VideoCapture=_BrowserVideoCapture
 cv2.imshow=_browser_imshow
 cv2.waitKey=_browser_waitKey

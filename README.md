@@ -1,3 +1,10 @@
+
+## v5.17 OpenCV waitKey + autocomplete
+
+- `cv2.waitKey(ms)` now waits for the requested number of **milliseconds** in the browser worker (`cv2.waitKey(1000)` = 1 second).
+- The page UI and End button remain available because Python executes in a Web Worker.
+- Typing `cv2.` now suggests common OpenCV APIs including `waitKey()`, `imshow()`, `VideoCapture()`, `imread()`, `cvtColor()`, `Canny()`, drawing functions, and common constants.
+
 # ZEBJUS Python Lab FULL v5 — RGB + Sensors + AI + Image Graphics
 
 Fresh complete build for the current ZEBJUS kit.
