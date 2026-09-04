@@ -3,6 +3,7 @@
 
   const KNOWN_KEY="zebjus.lab.knownKits";
   const SAFE_RGB_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
+  const SAFE_ADC_PINS=[32,33,34,35,36,39];
 
   function normalizeKitName(value){
     let s=String(value||"").trim().toLowerCase();
@@ -124,34 +125,80 @@
 
   class KitClient{
     constructor(){
-      this.base="";this.status=null;this._commandChain=Promise.resolve();this._commandEpoch=0;
+      this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";
+      this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
       this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};
     }
     get connected(){return !!this.base&&!!this.status;}
+    _accept(status,base){
+      this.base=base;this.status=status;this.name=status?.name||this.name;this.ipHint=status?.ip||this.ipHint;this.chipId=String(status?.chipId||this.chipId||"");
+      if(status?.rgb)this._lastRgb={rPin:status.rgb.rPin??25,gPin:status.rgb.gPin??26,bPin:status.rgb.bPin??27,commonAnode:!!status.rgb.commonAnode};
+      return status;
+    }
     async connect(name,ipHint=""){
-      const r=await connect(name,ipHint);this.base=r.base;this.status=r.status;
-      if(r.status?.rgb)this._lastRgb={rPin:r.status.rgb.rPin??25,gPin:r.status.rgb.gPin??26,bPin:r.status.rgb.bPin??27,commonAnode:!!r.status.rgb.commonAnode};
-      return r.status;
+      const requested=normalizeKitName(name||this.name);
+      const r=await connect(requested,ipHint||this.ipHint);
+      if(this.chipId&&r.status?.chipId&&String(r.status.chipId)!==String(this.chipId))throw new Error("A different kit is using that network name. Re-scan kits in Settings.");
+      return this._accept(r.status,r.base);
     }
-    disconnect(){this._commandEpoch++;this._commandChain=Promise.resolve();this.base="";this.status=null;}
-    async refresh(){if(!this.base)throw new Error("Kit not connected.");this.status=await requestBase(this.base,"/api/status");rememberKit(this.status,this.base);return this.status;}
-    async beginRun(){
+    disconnect({forgetIdentity=false}={}){
+      this._commandEpoch++;this._commandChain=Promise.resolve();this.base="";this.status=null;
+      if(forgetIdentity){this.name="";this.ipHint="";this.chipId="";}
+    }
+    async refresh(){
       if(!this.base)throw new Error("Kit not connected.");
-      this._commandEpoch++;this._commandChain=Promise.resolve();
-      return requestBase(this.base,"/api/run/start",{method:"POST",data:{start:1},timeout:1800});
+      try{
+        const st=await requestBase(this.base,"/api/status",{timeout:1400});
+        if(this.chipId&&st?.chipId&&String(st.chipId)!==String(this.chipId))throw new Error("Connected device identity changed.");
+        rememberKit(st,this.base);return this._accept(st,this.base);
+      }catch(e){this.base="";this.status=null;throw e;}
     }
-    async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:1400});}
+    async reconnect(retries=4){
+      if(this._reconnectPromise)return this._reconnectPromise;
+      const name=normalizeKitName(this.name||this.status?.name||"");
+      const ip=this.ipHint||this.status?.ip||"";
+      if(!name)throw new Error("No kit name saved for reconnect.");
+      this._reconnectPromise=(async()=>{
+        let last=null;const waits=[0,350,800,1500,2500];
+        for(let i=0;i<Math.max(1,retries);i++){
+          if(waits[i])await new Promise(r=>setTimeout(r,waits[i]));
+          try{
+            const r=await connect(name,ip);
+            if(this.chipId&&r.status?.chipId&&String(r.status.chipId)!==String(this.chipId))throw new Error("A different kit is using the saved name.");
+            return this._accept(r.status,r.base);
+          }catch(e){last=e;}
+        }
+        throw last||new Error("Kit reconnect failed.");
+      })();
+      try{return await this._reconnectPromise;}finally{this._reconnectPromise=null;}
+    }
+    async ensureLive(){
+      if(this.connected){try{return await this.refresh();}catch(_){/* reconnect below */}}
+      return this.reconnect(4);
+    }
+    async _request(path,opts={},retry=true){
+      if(!this.base)await this.reconnect(4);
+      try{return await requestBase(this.base,path,opts);}
+      catch(e){
+        if(!retry||e?.status&&e.status<500)throw e;
+        this.base="";this.status=null;await this.reconnect(4);return requestBase(this.base,path,opts);
+      }
+    }
+    async beginRun(){
+      await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();
+      return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
+    }
+    async pingRun(){return this._request("/api/run/ping",{method:"POST",data:{ping:1},timeout:1400},false);}
     async endRun(){
       if(!this.base)return {ok:true};
       this._commandEpoch++;this._commandChain=Promise.resolve();
-      try{return await requestBase(this.base,"/api/run/end",{method:"POST",data:{end:1},timeout:1800});}
+      try{return await this._request("/api/run/end",{method:"POST",data:{end:1},timeout:1800},false);}
       catch(e){
         const d={r:0,g:0,b:0,...this._lastRgb};
-        try{return await requestBase(this.base,"/api/rgb/off",{method:"POST",data:d,timeout:1200});}catch(_){throw e;}
+        try{return await this._request("/api/rgb/off",{method:"POST",data:d,timeout:1200},false);}catch(_){throw e;}
       }
     }
     async rgb(p={}){
-      if(!this.base)throw new Error("Kit not connected.");
       const data={r:p.r??0,g:p.g??0,b:p.b??0,id:p.id??1};
       if(p.rPin!==undefined){data.rPin=p.rPin;data.gPin=p.gPin;data.bPin=p.bPin;}
       if(p.commonAnode!==undefined)data.commonAnode=p.commonAnode?1:0;
@@ -159,29 +206,30 @@
       const epoch=this._commandEpoch;
       const task=async()=>{
         if(epoch!==this._commandEpoch)return {ok:true,skipped:true};
-        const r=await requestBase(this.base,"/api/rgb",{method:"POST",data,timeout:1600});
+        const r=await this._request("/api/rgb",{method:"POST",data,timeout:1600});
         if(epoch!==this._commandEpoch)return {ok:true,skipped:true};
         return r;
       };
-      this._commandChain=this._commandChain.then(task,task);
-      return this._commandChain;
+      this._commandChain=this._commandChain.then(task,task);return this._commandChain;
+    }
+    async analog(pin=34){
+      pin=Number(pin);if(!SAFE_ADC_PINS.includes(pin))throw new Error("Potentiometer pin must be one of: "+SAFE_ADC_PINS.join(", "));
+      return this._request(`/api/analog?pin=${encodeURIComponent(pin)}`,{timeout:1400});
     }
     async rename(name){
-      if(!this.base)throw new Error("Kit not connected.");
-      const clean=normalizeKitName(name);
-      if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");
-      return requestBase(this.base,"/api/name",{method:"POST",data:{name:clean},timeout:4500});
+      if(!this.base)await this.reconnect(4);const clean=normalizeKitName(name);if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");
+      return this._request("/api/name",{method:"POST",data:{name:clean},timeout:4500},false);
     }
-    async resetName(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/name/reset",{method:"POST",data:{reset:1},timeout:4500});}
-    async scanWifi(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi/scan",{timeout:12000});}
-    async savedWifi(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi/saved",{timeout:2500});}
-    async setWifi(ssid,password){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi",{method:"POST",data:{ssid,password},timeout:4500});}
-    async useWifi(ssid){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi/use",{method:"POST",data:{ssid},timeout:3500});}
-    async forgetWifi(ssid){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi/remove",{method:"POST",data:{ssid},timeout:2500});}
-    async resetWifi(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/wifi/reset",{method:"POST",data:{reset:1},timeout:4500});}
+    async resetName(){if(!this.base)await this.reconnect(4);return this._request("/api/name/reset",{method:"POST",data:{reset:1},timeout:4500},false);}
+    async scanWifi(){return this._request("/api/wifi/scan",{timeout:12000});}
+    async savedWifi(){return this._request("/api/wifi/saved",{timeout:2500});}
+    async setWifi(ssid,password){return this._request("/api/wifi",{method:"POST",data:{ssid,password},timeout:4500},false);}
+    async useWifi(ssid){return this._request("/api/wifi/use",{method:"POST",data:{ssid},timeout:3500},false);}
+    async forgetWifi(ssid){return this._request("/api/wifi/remove",{method:"POST",data:{ssid},timeout:2500});}
+    async resetWifi(){return this._request("/api/wifi/reset",{method:"POST",data:{reset:1},timeout:4500},false);}
   }
 
   global.ZebjusKit={
-    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS
+    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS,SAFE_ADC_PINS
   };
 })(window);

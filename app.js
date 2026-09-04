@@ -3,7 +3,7 @@
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
-  let kitCommandErrorShown=false,kitHeartbeatTimer=null,currentRunUsesKit=false;
+  let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,kitReconnectBusy=false,activePotPin=34;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -11,7 +11,7 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056};
+  let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0};
 
   const defaults={
     autoCamera:true,demoMode:true,kitName:"",kitId:"",kitIp:"",wsUrl:"",
@@ -26,344 +26,224 @@
   sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
 
   const examples={
-    hello:`print("Hello, ZEBJUS!")`,
-    variables:`name = "Anna"\nage = 14\nscore = 92.5\n\nprint(name)\nprint(age)\nprint(score)`,
-    input:`name = input("Enter your name: ")\nage = int(input("Enter your age: "))\n\nprint("Hello", name)\nprint("Next year you will be", age + 1)`,
-    ifelse:`mark = 78\n\nif mark >= 80:\n    print("Excellent")\nelif mark >= 50:\n    print("Pass")\nelse:\n    print("Try again")`,
-    forloop:`for i in range(1, 6):\n    print("Count:", i)`,
-    whileloop:`count = 1\n\nwhile count <= 5:\n    print("Count:", count)\n    count += 1`,
-    function:`def add(a, b):\n    return a + b\n\nprint("Answer =", add(10, 20))`,
-    list:`fruits = ["apple", "orange", "mango"]\n\nfor fruit in fruits:\n    print(fruit)`,
-    visionBlank:`# VISION AI Z — Student Project
-# Type your program below.
-
-`,
-    visionOpenCvImage:`# VISION AI Z — OpenCV Image Test
+    ledBasic:`# RGB LED Basic Colors
 import cv2
-
-img = cv2.imread("uploads/lena.png")
-print("Image shape:", img.shape)
-cv2.imshow("Lena", img)
-cv2.waitKey(1)`,
-    visionOpenCvCamera:`# VISION AI Z — OpenCV Webcam Test
-import cv2
-
-cap = cv2.VideoCapture(0)
-cap.set(3, 640)
-cap.set(4, 480)
-
-while True:
-    success, img = cap.read()
-    print("Camera frame:", success)
-    cv2.imshow("Result", img)
-    cv2.waitKey(1)`,
-    visionFaceBasic:`# VISION AI Z — Project: Face Detection Basics
-import cv2
-from cvzone.FaceDetectionModule import FaceDetector
-
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
-
-while True:
-    success, img = cap.read()
-    img, bboxs = detector.findFaces(img)
-    print("Faces:", len(bboxs))
-    cv2.imshow("Image", img)
-    cv2.waitKey(1)`,
-    hand:`from zebjus_ai import HandDetector\n\nresult = HandDetector().read()\nprint("Detected:", result.detected)\nprint("Fingers:", result.fingers)\nprint("Side:", result.side)`,
-    handRgb:`from zebjus import RGBLED, sleep
-from zebjus_ai import HandDetector
-
-rgb = RGBLED(1)
-hand = HandDetector()
-
-while True:
-    result = hand.read()
-    fingers = result.fingers
-
-    print("Hand:", result.detected, "| Fingers:", fingers, "| Side:", result.side)
-
-    if not result.detected:
-        rgb.off()
-    elif fingers == 0:
-        rgb.write(255, 255, 255)   # Fist = White
-    elif fingers == 1:
-        rgb.write(255, 0, 0)       # 1 = Red
-    elif fingers == 2:
-        rgb.write(0, 255, 0)       # 2 = Green
-    elif fingers == 3:
-        rgb.write(0, 0, 255)       # 3 = Blue
-    elif fingers == 4:
-        rgb.write(255, 255, 0)     # 4 = Yellow
-    else:
-        rgb.write(255, 0, 255)     # 5 = Purple
-
-    sleep(0.10)`,
-    faceCvzone:`from zebjus_cv import Camera, show\nfrom cvzone.FaceDetectionModule import FaceDetector\nimport cv2\nimport cvzone\nimport mediapipe as mp\n\nimg = Camera(0).read()\ndetector = FaceDetector(minDetectionCon=0.5)\nimg, bboxs = detector.findFaces(img, draw=False)\n\nprint("Faces:", len(bboxs))\nfor face in bboxs:\n    x, y, w, h = face["bbox"]\n    score = face["score"]\n    center = face["center"]\n    cv2.circle(img, center, 5, (255, 0, 255), cv2.FILLED)\n    cvzone.putTextRect(img, f"{score}%", (x, max(25, y - 10)))\n    cvzone.cornerRect(img, (x, y, w, h))\n\nshow(img, "MediaPipe + CVZone Face Detection")`,
-    cvGray:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nshow(gray, "Grayscale")`,
-    cvEdges:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\nedges = cv2.Canny(gray, 80, 160)\nshow(edges, "Canny Edges")`,
-    cvBlur:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\nblurred = cv2.GaussianBlur(frame, (15, 15), 0)\nshow(blurred, "Gaussian Blur")`,
-    cvThreshold:`from zebjus_cv import Camera, show\nimport cv2\n\nframe = Camera(0).read()\ngray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)\n_, binary = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY)\nshow(binary, "Threshold")`,
-    imgRgb:`from zebjus_cv import load_image, draw_rgb_led, show\n\nimg = load_image()\ndraw_rgb_led(img, 90, 90, 255, 0, 0, 30)\ndraw_rgb_led(img, 170, 90, 0, 255, 0, 30)\ndraw_rgb_led(img, 250, 90, 0, 0, 255, 30)\nshow(img, "RGB LED Graphics")`,
-    imgPot:`from zebjus import Potentiometer\nfrom zebjus_cv import load_image, draw_potentiometer, show\n\npot = Potentiometer(1)\nimg = load_image()\ndraw_potentiometer(img, 120, 120, pot.read(), 42)\nshow(img, "Potentiometer Graphic")`,
-    imgDashboard:`from zebjus import Potentiometer, Ultrasonic\nfrom zebjus_cv import load_image, draw_rgb_led, draw_potentiometer, draw_ultrasonic, show\n\nimg = load_image()\npot = Potentiometer(1).read()\ndistance = Ultrasonic(1).read()\n\ndraw_rgb_led(img, 80, 80, 0, 255, 0, 28)\ndraw_potentiometer(img, 180, 80, pot, 34)\ndraw_ultrasonic(img, 260, 65, distance, 400, 180, 20)\nshow(img, "ZEBJUS Kit Dashboard")`,
-    rgb:`from zebjus import RGBLED, sleep\n\n# ESP32 safe PWM pins: Red=25, Green=26, Blue=27\nrgb = RGBLED(25, 26, 27)\n\n# Runs until End is pressed. The lab turns RGB OFF automatically on End/error.\nwhile True:\n    rgb.color("red")\n    sleep(1)\n    rgb.color("green")\n    sleep(1)\n    rgb.color("blue")\n    sleep(1)\n    rgb.write(255, 120, 0)  # Custom RGB color\n    sleep(1)`,
-    sensors:`from zebjus import Ultrasonic, Potentiometer\n\nultra = Ultrasonic(1)\npot = Potentiometer(1)\n\nprint("Distance:", ultra.read(), "cm")\nprint("Pot value:", pot.read(), "/ 255")\nprint("Pot raw:", pot.raw())`,
-    servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\nfor angle in [0, 45, 90, 135, 180, 90]:\n    servo.write(angle)\n    sleep(0.5)`,
-    project01:`# Project 01 - Hello Python
-name = "ZEBJUS Student"
-print("Hello,", name)
-print("Welcome to Python Lab")`,
-    project02:`# Project 02 - Variables and Math
-a = 10
-b = 5
-
-print("A =", a)
-print("B =", b)
-print("Total =", a + b)
-print("Product =", a * b)`,
-    project03:`# Project 03 - If / Else
-temperature = 32
-
-if temperature > 30:
-    print("It is hot")
-else:
-    print("Temperature is normal")`,
-    project04:`# Project 04 - Loop Counter
-for i in range(1, 6):
-    print("Count:", i)`,
-    project05:`# Project 05 - RGB LED Colors
 from zebjus import RGBLED
 
-rgb = RGBLED(1)
-rgb.write(255, 0, 0)
+# Output pins: Red=25, Green=26, Blue=27
+rgb = RGBLED(25, 26, 27)
 
-print("RGB LED = RED")
+while True:
+    rgb.color("red")
+    cv2.waitKey(1000)
+    rgb.color("green")
+    cv2.waitKey(1000)
+    rgb.color("blue")
+    cv2.waitKey(1000)`,
 
-# Try:
-# rgb.write(0, 255, 0)
-# rgb.write(0, 0, 255)
-# rgb.write(255, 255, 0)`,
-    project06:`# Project 06 - Potentiometer Reading
+    ledBlink:`# RGB LED Blink
+import cv2
+from zebjus import RGBLED
+
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    rgb.color("white")
+    cv2.waitKey(300)
+    rgb.off()
+    cv2.waitKey(300)`,
+
+    ledAnimation:`# RGB LED Animation
+import cv2
+from zebjus import RGBLED
+
+rgb = RGBLED(25, 26, 27)
+colors = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "white"]
+
+while True:
+    for color in colors:
+        rgb.color(color)
+        cv2.waitKey(250)
+
+    rgb.off()
+    cv2.waitKey(400)`,
+
+    ledEffects:`# RGB LED Indication + Effects Demo
+import cv2
+from zebjus import RGBLED
+
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    # Basic indication colors
+    for color in ["red", "green", "blue", "yellow", "cyan", "purple", "orange", "white"]:
+        rgb.color(color)
+        cv2.waitKey(400)
+
+    # Warning blink
+    for i in range(3):
+        rgb.color("red")
+        cv2.waitKey(180)
+        rgb.off()
+        cv2.waitKey(180)
+
+    # Success indication
+    for i in range(2):
+        rgb.color("green")
+        cv2.waitKey(150)
+        rgb.off()
+        cv2.waitKey(120)
+    rgb.color("green")
+    cv2.waitKey(700)
+
+    # Connection indication
+    for i in range(3):
+        rgb.color("blue")
+        cv2.waitKey(100)
+        rgb.off()
+        cv2.waitKey(100)
+
+    # Red / blue alternating
+    for i in range(5):
+        rgb.color("red")
+        cv2.waitKey(130)
+        rgb.color("blue")
+        cv2.waitKey(130)
+
+    # Heartbeat effect
+    rgb.color("red")
+    cv2.waitKey(100)
+    rgb.off()
+    cv2.waitKey(90)
+    rgb.color("red")
+    cv2.waitKey(220)
+    rgb.off()
+    cv2.waitKey(600)
+
+    # Custom colors
+    custom = [
+        (255, 0, 120),
+        (0, 120, 255),
+        (120, 255, 0),
+        (150, 0, 255),
+        (255, 60, 0),
+        (0, 255, 150)
+    ]
+    for r, g, b in custom:
+        rgb.write(r, g, b)
+        cv2.waitKey(300)
+
+    rgb.off()
+    cv2.waitKey(500)`,
+
+    ledFade:`# RGB LED Fade / Breathing Effects
+import cv2
+from zebjus import RGBLED
+
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    # Red fade in/out
+    for value in range(0, 256, 10):
+        rgb.write(value, 0, 0)
+        cv2.waitKey(30)
+    for value in range(255, -1, -10):
+        rgb.write(value, 0, 0)
+        cv2.waitKey(30)
+
+    # Green breathing
+    for value in range(0, 256, 10):
+        rgb.write(0, value, 0)
+        cv2.waitKey(30)
+    for value in range(255, -1, -10):
+        rgb.write(0, value, 0)
+        cv2.waitKey(30)
+
+    # Blue breathing
+    for value in range(0, 256, 10):
+        rgb.write(0, 0, value)
+        cv2.waitKey(30)
+    for value in range(255, -1, -10):
+        rgb.write(0, 0, value)
+        cv2.waitKey(30)
+
+    rgb.off()
+    cv2.waitKey(400)`,
+
+    potRead:`# Potentiometer Read
+import cv2
 from zebjus import Potentiometer
 
-pot = Potentiometer(1)
-value = pot.read()
-
-print("Potentiometer:", value)`,
-    project07:`# Project 07 - Ultrasonic Distance
-from zebjus import Ultrasonic
-
-sensor = Ultrasonic(1)
-distance = sensor.read()
-
-print("Distance:", distance, "cm")`,
-    project08:`# Project 08 - Ultrasonic Warning
-from zebjus import Ultrasonic, RGBLED
-
-sensor = Ultrasonic(1)
-rgb = RGBLED(1)
-
-distance = sensor.read()
-print("Distance:", distance, "cm")
-
-if distance < 30:
-    rgb.write(255, 0, 0)
-    print("WARNING - Object is near")
-else:
-    rgb.write(0, 255, 0)
-    print("Safe distance")`,
-    project09:`# Project 09 - Servo Angle
-from zebjus import Servo
-
-servo = Servo(1)
-servo.write(90)
-
-print("Servo angle = 90")`,
-    project10:`# Project 10 - Motor Speed
-from zebjus import Motor
-
-motor = Motor(1)
-motor.forward(50)
-
-print("Motor forward at 50%")
-
-# Try:
-# motor.backward(50)
-# motor.stop()`,
-    project11:`# Project 11 - Load and Display Image
-import cv2
-
-img = cv2.imread("uploads/test.jpg")
-
-print("Image shape:", img.shape)
-
-cv2.imshow("Uploaded Image", img)
-cv2.waitKey(1)`,
-    project12:`# Project 12 - Grayscale Image
-import cv2
-
-img = cv2.imread("uploads/test.jpg")
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-print("Converted to grayscale")
-
-cv2.imshow("Grayscale", gray)
-cv2.waitKey(1)`,
-    project13:`# Project 13 - Edge Detection
-import cv2
-
-img = cv2.imread("uploads/test.jpg")
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-edges = cv2.Canny(gray, 80, 160)
-
-print("Edge detection complete")
-
-cv2.imshow("Edges", edges)
-cv2.waitKey(1)`,
-    project14:`# Project 14 - Live Face Detection
-import cv2
-from cvzone.FaceDetectionModule import FaceDetector
-
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
+# Reliable ESP32 Wi-Fi ADC1 pins: 32, 33, 34, 35, 36, 39
+# Connection: 3.3V -> POT end, GND -> POT end, GPIO34 -> middle pin
+pot = Potentiometer(34)
 
 while True:
-    success, img = cap.read()
-    img, faces = detector.findFaces(img)
+    print("GPIO:", pot.pin, "Value:", pot.read(), "/ 255", "Raw:", pot.raw(), "/ 4095", "Percent:", pot.percent(), "%")
+    cv2.waitKey(250)`,
 
-    print("Faces:", len(faces))
-
-    cv2.imshow("Face Detection", img)
-    cv2.waitKey(1)`,
-    project15:`# Project 15 - Face Presence Status
+    potMonitor:`# Potentiometer Monitor
 import cv2
-from cvzone.FaceDetectionModule import FaceDetector
+from zebjus import Potentiometer
 
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
+pot = Potentiometer(34)
 
 while True:
-    success, img = cap.read()
-    img, faces = detector.findFaces(img)
+    value = pot.read()
 
-    if faces:
-        print("Face detected")
+    if value < 64:
+        level = "LOW"
+    elif value < 128:
+        level = "MEDIUM"
+    elif value < 192:
+        level = "HIGH"
     else:
-        print("No face")
+        level = "MAX"
 
-    cv2.imshow("Face Status", img)
-    cv2.waitKey(1)`,
-    project16:`# Project 16 - Face Position
+    print("Pot:", value, "Raw:", pot.raw(), "Level:", level)
+    cv2.waitKey(200)`,
+
+    potLedBrightness:`# Potentiometer Controls RGB Brightness
 import cv2
-from cvzone.FaceDetectionModule import FaceDetector
+from zebjus import Potentiometer, RGBLED
 
-cap = cv2.VideoCapture(0)
-detector = FaceDetector()
-
-while True:
-    success, img = cap.read()
-    img, faces = detector.findFaces(img)
-
-    if faces:
-        x, y = faces[0]["center"]
-
-        if x < 220:
-            print("LEFT")
-        elif x > 420:
-            print("RIGHT")
-        else:
-            print("CENTER")
-
-    cv2.imshow("Face Position", img)
-    cv2.waitKey(1)`,
-    project17:`# Project 17 - Hand Finger Counter
-from zebjus import sleep
-from zebjus_ai import HandDetector
-
-hand = HandDetector()
+pot = Potentiometer(34)      # Input pin
+rgb = RGBLED(25, 26, 27)    # Output pins
 
 while True:
-    result = hand.read()
+    value = pot.read()
+    rgb.write(value, 0, 255 - value)
+    print("Pot:", value, "RGB: R", value, "B", 255 - value)
+    cv2.waitKey(80)`,
 
-    print("Detected:", result.detected)
-    print("Fingers:", result.fingers)
-    print("Side:", result.side)
+    potLedEffects:`# Potentiometer Controls LED Indications
+import cv2
+from zebjus import Potentiometer, RGBLED
 
-    sleep(0.15)`,
-    project18:`# Project 18 - Finger Count to RGB Color
-from zebjus import RGBLED, sleep
-from zebjus_ai import HandDetector
-
-rgb = RGBLED(1)
-hand = HandDetector()
+pot = Potentiometer(34)
+rgb = RGBLED(25, 26, 27)
 
 while True:
-    result = hand.read()
-    fingers = result.fingers
+    value = pot.read()
 
-    if not result.detected:
+    if value < 50:
+        rgb.color("blue")
+    elif value < 100:
+        rgb.color("cyan")
+    elif value < 150:
+        rgb.color("green")
+    elif value < 200:
+        rgb.color("yellow")
+    elif value < 240:
+        rgb.color("orange")
+    else:
+        # Maximum zone warning blink
+        rgb.color("red")
+        cv2.waitKey(100)
         rgb.off()
-    elif fingers == 1:
-        rgb.write(255, 0, 0)
-    elif fingers == 2:
-        rgb.write(0, 255, 0)
-    elif fingers == 3:
-        rgb.write(0, 0, 255)
-    elif fingers == 4:
-        rgb.write(255, 255, 0)
-    elif fingers >= 5:
-        rgb.write(255, 0, 255)
-    else:
-        rgb.write(255, 255, 255)
 
-    print("Fingers:", fingers)
-    sleep(0.10)`,
-    project19:`# Project 19 - Hand Open / Closed
-from zebjus import sleep
-from zebjus_ai import HandDetector
-
-hand = HandDetector()
-
-while True:
-    result = hand.read()
-
-    if not result.detected:
-        print("No hand")
-    elif result.fingers >= 4:
-        print("HAND OPEN")
-    else:
-        print("HAND CLOSED")
-
-    sleep(0.15)`,
-    project20:`# Project 20 - Hand Gesture Controls Servo
-from zebjus import Servo, sleep
-from zebjus_ai import HandDetector
-
-servo = Servo(1)
-hand = HandDetector()
-
-while True:
-    result = hand.read()
-
-    if result.detected:
-        fingers = result.fingers
-
-        if fingers <= 1:
-            angle = 0
-        elif fingers == 2:
-            angle = 45
-        elif fingers == 3:
-            angle = 90
-        elif fingers == 4:
-            angle = 135
-        else:
-            angle = 180
-
-        servo.write(angle)
-        print("Fingers:", fingers, "Servo:", angle)
-
-    sleep(0.15)`,
+    print("Pot value:", value, "Raw:", pot.raw())
+    cv2.waitKey(100)`
   };
 
   const libraries=[
@@ -374,7 +254,7 @@ while True:
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer()","0–255 pot"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer(34)","ADC1 input pin 32/33/34/35/36/39"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
     ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
     ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
@@ -382,7 +262,7 @@ while True:
   const moduleMembers={
     zebjus:[
       ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","LED"],["Ultrasonic","class","Ultrasonic","Ultrasonic"],
-      ["Potentiometer","class","Potentiometer","Potentiometer"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
+      ["Potentiometer","class","Potentiometer","Potentiometer ADC input"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
     cvzone:[["putTextRect","function","putTextRect","Text box"],["cornerRect","function","cornerRect","Corner rectangle"],["FaceDetectionModule","module","FaceDetectionModule","Face detector module"]],
@@ -424,7 +304,7 @@ while True:
     RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"]],
-    Potentiometer:[["read()","method","read()","0–255"],["raw()","method","raw()","Raw ADC"],["value","property","value","0–255"]],
+    Potentiometer:[["read()","method","read()","Scaled 0–255"],["raw()","method","raw()","Raw ADC 0–4095"],["percent()","method","percent()","0–100 percent"],["millivolts()","method","millivolts()","ADC millivolts"],["pin","property","pin","Selected ADC GPIO"],["value","property","value","0–255"]],
     Motor:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Backward"],["stop()","method","stop()","Stop"]],
     Servo:[["write()","method","write()","Angle"]],
     HandDetector:[["read()","method","read()","Stable hand snapshot"]],
@@ -657,18 +537,20 @@ while True:
   function initEditor(){
     if(typeof CodeMirror==="undefined"){$("editorLoadError").hidden=false;return;}
     CodeMirror.registerHelper("hint","zebjusPython",hintProvider);
-    $("codeEditor").value=(prefs.autoSave?localStorage.getItem("zebjus.lab.code"):null)||examples.hello;
+    $("codeEditor").value=(prefs.autoSave?localStorage.getItem("zebjus.lab.code"):null)||examples.ledBasic;
     editor=CodeMirror.fromTextArea($("codeEditor"),{
       mode:"python",theme:"zebjus",lineNumbers:true,gutters:["CodeMirror-linenumbers","zebjus-errors"],indentUnit:4,tabSize:4,indentWithTabs:false,
       matchBrackets:true,autoCloseBrackets:true,styleActiveLine:true,
       extraKeys:{
         "Ctrl-Space":cm=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),
         "Cmd-Space":cm=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),
+        "Cmd-Z":"undo","Ctrl-Z":"undo","Cmd-Shift-Z":"redo","Ctrl-Y":"redo",
         "Tab":cm=>cm.replaceSelection("    ","end","+input")
       }
     });
     editor.getWrapperElement().style.fontSize=(prefs.fontSize||14)+"px";
     editor.on("change",(cm,ch)=>{
+      updateHistoryButtons();
       if(prefs.autoSave){clearTimeout(window.__save);$("saveState").textContent="Saving…";window.__save=setTimeout(()=>{localStorage.setItem("zebjus.lab.code",cm.getValue());$("saveState").textContent="Saved";},220);}
       if((ch.origin==="+input"||ch.origin==="paste")&&!cm.state.completionActive){
         const typed=(ch.text||[]).join("\n"),cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch);
@@ -682,10 +564,17 @@ while True:
         },500);
       }
     });
+    updateHistoryButtons();
   }
 
   function getCode(){return editor?editor.getValue():$("codeEditor").value;}
   function setCode(t){if(editor){editor.setValue(t);editor.focus();}}
+  function updateHistoryButtons(){
+    if(!editor)return;const h=editor.historySize();
+    if($("undoBtn"))$("undoBtn").disabled=!h.undo;if($("redoBtn"))$("redoBtn").disabled=!h.redo;
+  }
+  function undoEditor(){if(editor){editor.undo();editor.focus();updateHistoryButtons();}}
+  function redoEditor(){if(editor){editor.redo();editor.focus();updateHistoryButtons();}}
   function log(t){terminal.textContent+=(terminal.textContent?"\n":"")+String(t);terminal.scrollTop=terminal.scrollHeight;}
   function writeTerminalChunk(t){
     const s=String(t??"");
@@ -885,6 +774,24 @@ while True:
   }
 
   function requestedCamera(src){const m=src.match(/\bCamera\s*\(\s*(\d+)\s*\)/);return m?Number(m[1]):null;}
+  function requestedPotPin(src){
+    const m=src.match(/\bPotentiometer\s*\(\s*(\d+)?/);if(!m)return null;
+    const pin=Number(m[1]||34);return pin===1?34:pin;
+  }
+  function requestedRgbPins(src){
+    const m=src.match(/\bRGBLED\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+    return m?[Number(m[1]),Number(m[2]),Number(m[3])]:[25,26,27];
+  }
+  async function refreshPotFromKit(src,showError=false){
+    const pin=requestedPotPin(src);if(pin===null||prefs.demoMode)return true;
+    activePotPin=pin;
+    try{
+      const d=await kitClient.analog(pin);updateSensorPacket(d);return true;
+    }catch(e){
+      if(showError)log("Potentiometer read error: "+(e?.message||e));
+      return false;
+    }
+  }
 
   async function startCamera(index=null){
     const i=index!==null?index:Number(prefs.cameraIndex)||0,deviceId=cameras[i]?.deviceId||"";
@@ -1017,6 +924,9 @@ while True:
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
+    if(!prefs.demoMode&&/\bPotentiometer\s*\(/.test(liveCode)){
+      const ok=await refreshPotFromKit(liveCode,false);if(!ok){await ensureKitConnected(false);await refreshPotFromKit(liveCode,false);}
+    }
     const frame=await refreshLiveAI();
     if(!liveMode||!running)return;
     postProgramToWorker(liveCode,frame);
@@ -1043,6 +953,10 @@ while True:
       return;
     }
     const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|Ultrasonic|Potentiometer)\s*\(/.test(src);
+    const potPin=requestedPotPin(src);
+    if(potPin!==null&&/\bRGBLED\s*\(/.test(src)&&requestedRgbPins(src).includes(potPin)){
+      terminal.textContent="";log(`Pin conflict: GPIO${potPin} cannot be used for Potentiometer input and RGB output at the same time.`);badge($("pythonStatus"),"Pin conflict","warn");return;
+    }
     if(needsPhysicalKit&&!prefs.demoMode){
       const connected=await ensureKitConnected(true);
       if(!connected){badge($("pythonStatus"),"Kit not connected","warn");return;}
@@ -1055,7 +969,7 @@ while True:
 
     terminal.textContent="";
     running=true;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\bPotentiometer\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1138,7 +1052,10 @@ while True:
     }
 
     if(needsPhysicalKit&&!prefs.demoMode){
-      try{await beginHardwareRun();}
+      try{
+        await beginHardwareRun();
+        if(/\bPotentiometer\s*\(/.test(src))await refreshPotFromKit(src,true);
+      }
       catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
     }else{currentRunUsesKit=false;}
 
@@ -1153,8 +1070,13 @@ while True:
     await kitClient.beginRun();
     currentRunUsesKit=true;stopKitHeartbeat();
     kitHeartbeatTimer=setInterval(()=>{
-      if(!running||!currentRunUsesKit||!kitClient?.connected)return;
-      kitClient.pingRun().catch(()=>{});
+      if(!running||!currentRunUsesKit||kitReconnectBusy)return;
+      kitClient.pingRun().catch(async()=>{
+        if(kitReconnectBusy)return;kitReconnectBusy=true;badge($("kitStatus"),"Reconnecting kit…","warn");
+        try{await kitClient.reconnect(4);await kitClient.beginRun();badge($("kitStatus"),"Kit connected","ok");kitCommandErrorShown=false;}
+        catch(_){badge($("kitStatus"),"Kit disconnected");}
+        finally{kitReconnectBusy=false;}
+      });
     },1000);
     return true;
   }
@@ -1188,7 +1110,7 @@ while True:
   function updateSensorGraphics(){
     const d=Math.max(0,Number(sensorState.ultrasonicCm)||0),p=Math.max(0,Math.min(255,Number(sensorState.potValue)||0));
     $("ultraLabel").textContent=d.toFixed(1)+" cm";$("ultraMeter").style.width=Math.min(100,d/400*100)+"%";
-    $("potLabel").textContent=p+" / 255";$("potNeedle").style.transform=`rotate(${-135+(p/255)*270}deg)`;
+    $("potLabel").textContent=`${p} / 255 · GPIO${sensorState.potPin||34} · raw ${sensorState.potRaw||0}`;$("potNeedle").style.transform=`rotate(${-135+(p/255)*270}deg)`;
   }
 
   function updateRgb(r,g,b){
@@ -1213,6 +1135,7 @@ while True:
     if(sensor==="POT"||sensor==="POTENTIOMETER"||data.potValue!==undefined||data.value255!==undefined){
       sensorState.potValue=Math.max(0,Math.min(255,Number(data.potValue??data.value255??data.value??sensorState.potValue)));
       sensorState.potRaw=Number(data.raw??data.potRaw??Math.round(sensorState.potValue*4095/255));
+      sensorState.potPin=Number(data.pin??sensorState.potPin??34);sensorState.potPercent=Number(data.percent??Math.round(sensorState.potValue*100/255));sensorState.potMillivolts=Number(data.millivolts??sensorState.potMillivolts??0);
     }
     updateSensorGraphics();
   }
@@ -1224,7 +1147,12 @@ while True:
     if(kitClient?.connected){
       try{
         if(p.command==="RGB_LED_SET"){
-          const result=await kitClient.rgb(p);
+          let result;
+          try{result=await kitClient.rgb(p);}
+          catch(e){
+            if(running&&e?.status===409){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.rgb(p);}
+            else throw e;
+          }
           if(!result?.skipped)applyDemo(p); // Mirror only after ESP32 acknowledges: screen and kit stay synchronized.
           kitCommandErrorShown=false;
         }else if(ws?.readyState===WebSocket.OPEN){
@@ -1248,24 +1176,35 @@ while True:
 
   async function ensureKitConnected(showError=true){
     if(prefs.demoMode)return true;
-    if(kitClient?.connected)return true;
     const name=(prefs.kitName||prefs.kitId||"").trim();
-    if(name&&kitClient){
-      try{
-        badge($("kitStatus"),"Connecting kit…","warn");
-        const st=await kitClient.connect(name,prefs.kitIp||"");
-        prefs.kitName=st.name||name;prefs.kitId=prefs.kitName;prefs.kitIp=st.ip||prefs.kitIp||"";
-        localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
-        $("kitNameText").textContent=prefs.kitName;
-        badge($("kitStatus"),"Kit connected","ok");
-        return true;
-      }catch(e){
-        badge($("kitStatus"),"Kit disconnected");
-        if(showError)log("Kit connection failed: "+(e?.message||e)+" Open Settings and select the kit on the same Wi-Fi.");
+    if(!name||!kitClient){if(showError)log("No physical kit selected. Open Settings → Kit Connection.");return false;}
+    try{
+      badge($("kitStatus"),kitClient.connected?"Checking kit…":"Connecting kit…","warn");
+      let st;
+      if(kitClient.connected)st=await kitClient.ensureLive();
+      else{
+        kitClient.name=name;kitClient.ipHint=prefs.kitIp||"";
+        try{st=await kitClient.connect(name,prefs.kitIp||"");}
+        catch(_){st=await kitClient.reconnect(4);}
       }
+      prefs.kitName=st.name||name;prefs.kitId=prefs.kitName;prefs.kitIp=st.ip||prefs.kitIp||"";
+      localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
+      $("kitNameText").textContent=prefs.kitName;badge($("kitStatus"),"Kit connected","ok");kitCommandErrorShown=false;return true;
+    }catch(e){
+      badge($("kitStatus"),"Kit disconnected");
+      if(showError)log("Kit connection failed: "+(e?.message||e)+" Auto-reconnect was attempted. Check kit power and Wi-Fi.");
+      return false;
     }
-    if(showError&&!name)log("No physical kit selected. Open Settings → Kit Connection.");
-    return false;
+  }
+
+  function startKitHealthMonitor(){
+    if(kitHealthTimer)clearInterval(kitHealthTimer);
+    kitHealthTimer=setInterval(async()=>{
+      if(prefs.demoMode||running||kitReconnectBusy||!(prefs.kitName||prefs.kitId))return;
+      kitReconnectBusy=true;
+      try{await ensureKitConnected(false);}catch(_){}
+      finally{kitReconnectBusy=false;}
+    },4000);
   }
 
   function connectRealKit(){
@@ -1296,11 +1235,12 @@ while True:
     $("handDetected").textContent=aiState.detected?"Yes":"No";$("fingerCount").textContent=aiState.fingers;$("handSide").textContent=aiState.side||"—";$("faceCount").textContent=aiState.faces.length;
   });
 
-  $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.hello);
-  $("resetBtn").onclick=()=>setCode(examples.hello);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
+  $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.ledBasic);
+  $("resetBtn").onclick=()=>setCode(examples.ledBasic);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
   updateRunControls();
   $("cameraToggleBtn").onclick=()=>cameraRunning?stopCamera():startCamera();
   $("autocompleteBtn").onclick=()=>editor?.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false});
+  if($("undoBtn"))$("undoBtn").onclick=undoEditor;if($("redoBtn"))$("redoBtn").onclick=redoEditor;
   $("imageInput").onchange=e=>loadImageFiles(e.target.files).catch(err=>log("Image upload error: "+err.message));
   $("uploadedFileList").onclick=async e=>{
     const copy=e.target.closest("[data-copy-path]");
@@ -1321,5 +1261,5 @@ while True:
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
   $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
   window.addEventListener("pagehide",()=>{stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
-  updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();
+  updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
 })();

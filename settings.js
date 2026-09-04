@@ -90,7 +90,10 @@
     const name=Kit.normalizeKitName(nameOverride||$("kitName").value);
     if(name.length<3)throw new Error("Enter the kit name, for example zebjus_kit_1.");
     setConnBadge("Connecting…");setMessage("kitNameMessage","");
-    const status=await client.connect(name,$("kitIp").value.trim());
+    client.name=name;client.ipHint=$("kitIp").value.trim();
+    let status;
+    try{status=await client.connect(name,client.ipHint);}
+    catch(_){status=await client.reconnect(4);}
     $("kitName").value=status.name||name;$("kitIp").value=status.ip||"";$("newKitName").value=status.name||name;
     current.kitName=status.name||name;current.kitId=current.kitName;current.kitIp=status.ip||"";current.demoMode=false;$("demoMode").checked=false;persist();
     setConnBadge("Connected",true);renderKitInfo(status);

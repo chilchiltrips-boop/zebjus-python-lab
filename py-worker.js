@@ -20,7 +20,7 @@ from pyodide.ffi import to_js
 _ai_state={"detected":False,"fingers":0,"side":"","landmarks":[]}
 _face_state=[]
 _hand_landmarks=[]
-_sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056}
+_sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
 _current_frame=None
 _loaded_image=None
 
@@ -116,10 +116,18 @@ class Ultrasonic:
     @property
     def distance_cm(self): return self.read()
 
+SUPPORTED_ADC_PINS=(32,33,34,35,36,39)
+
 class Potentiometer:
-    def __init__(self,id=1): self.id=int(id)
+    def __init__(self,pin=34):
+        pin=int(pin)
+        if pin==1: pin=34  # backward compatibility with older Potentiometer(1) examples
+        if pin not in SUPPORTED_ADC_PINS: raise ValueError(f"Unsupported potentiometer pin {pin}. Use one of {SUPPORTED_ADC_PINS}")
+        self.pin=pin
     def read(self): return int(_sensor_state.get("pot_value",0))
     def raw(self): return int(_sensor_state.get("pot_raw",self.read()*4095//255))
+    def percent(self): return int(_sensor_state.get("pot_percent",round(self.read()*100/255)))
+    def millivolts(self): return int(_sensor_state.get("pot_mv",0))
     @property
     def value(self): return self.read()
 
@@ -429,6 +437,9 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__ultra",Number(m.sensorState?.ultrasonicCm)||0);
   pyodide.globals.set("__pot",Math.max(0,Math.min(255,Number(m.sensorState?.potValue)||0)));
   pyodide.globals.set("__pot_raw",Math.max(0,Number(m.sensorState?.potRaw)||0));
+  pyodide.globals.set("__pot_pin",Number(m.sensorState?.potPin)||34);
+  pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
+  pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -437,7 +448,7 @@ sys.stderr=_zebjus_stderr
 _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_json) else []
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
-_sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":int(__pot_raw)}
+_sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
 _current_frame=None
 _loaded_image=None
   `);
@@ -449,7 +460,7 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\bPotentiometer\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
   }

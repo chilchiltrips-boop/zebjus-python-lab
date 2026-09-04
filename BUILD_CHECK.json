@@ -1,5 +1,5 @@
 {
-  "version": "5.16",
+  "version": "5.18",
   "js_checks": {
     "config.js": {
       "returncode": 0,
@@ -30,26 +30,60 @@
       "stderr": ""
     }
   },
+  "python_example_checks": {
+    "ledBasic": "ok",
+    "ledBlink": "ok",
+    "ledAnimation": "ok",
+    "ledEffects": "ok",
+    "ledFade": "ok",
+    "potRead": "ok",
+    "potMonitor": "ok",
+    "potLedBrightness": "ok",
+    "potLedEffects": "ok"
+  },
   "critical": {
     "all_js_pass": true,
-    "settings_ids_present": true,
-    "all_20_dropdown_projects_retained": true,
-    "run_session_start_ping_end": true,
-    "firmware_heartbeat_failsafe_off": true,
-    "firmware_rgb_rejected_outside_run": true,
-    "saved_wifi_profile_list": true,
-    "saved_wifi_select_use_remove": true,
-    "passwords_not_returned_to_browser": true,
-    "rgb_preview_after_hardware_ack": true,
-    "program_finish_rgb_off": true,
-    "program_error_rgb_off": true,
-    "end_button_rgb_off": true
+    "current_example_count": true,
+    "all_example_python_parses": true,
+    "old_20_project_menu_removed": true,
+    "undo_redo_buttons": true,
+    "undo_redo_code": true,
+    "pot_adc_endpoint": true,
+    "adc1_pin_list": true,
+    "pot_python_selectable": true,
+    "pot_live_cycle": true,
+    "kit_auto_reconnect": true,
+    "run_verifies_kit": true,
+    "rgb_run_recovery": true,
+    "firmware_raw_braces_balanced": true,
+    "wifi_profiles_retained": true,
+    "outputs_off_failsafe": true,
+    "only_v12_firmware": true,
+    "current_examples_doc": true,
+    "pot_test_guide": true,
+    "firmware_wifi_auto_reconnect": true
   },
   "details": {
-    "settings_missing_ids": [],
-    "project_count": 20
+    "example_names": [
+      "ledBasic",
+      "ledBlink",
+      "ledAnimation",
+      "ledEffects",
+      "ledFade",
+      "potRead",
+      "potMonitor",
+      "potLedBrightness",
+      "potLedEffects"
+    ],
+    "firmware_braces": [
+      134,
+      134
+    ],
+    "firmware_files": [
+      "ZEBJUS_Kit_RGB_Pot_WiFi_v1_2.ino"
+    ]
   },
   "notes": {
-    "arduino_compile": "arduino-cli/core toolchain is not installed in this environment; firmware lexical structure/braces were validated. Compile/upload on ESP32-WROOM-DA is required."
+    "arduino_compile": "arduino-cli/core toolchain is not installed in this environment. Firmware source structure/API references were statically checked; compile/upload on ESP32-WROOM-DA is required."
   }
 }

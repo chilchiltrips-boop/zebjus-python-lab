@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.16</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.18</span>
       <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
     </div>
     <div class="top-actions">
@@ -34,79 +34,27 @@
         <label>
           <span>Learning example</span>
           <select id="exampleSelect">
-            <optgroup label="Python Basics">
-              <option value="hello">Hello World</option>
-                  <option value="printTest">Python Basics → print() Terminal Test</option>
-              <option value="variables">Variables</option>
-              <option value="input">Input</option>
-              <option value="ifelse">If / Else</option>
-              <option value="forloop">For Loop</option>
-              <option value="whileloop">While Loop</option>
-              <option value="function">Function</option>
-              <option value="list">List</option>
+            <optgroup label="RGB LED">
+              <option value="ledBasic">LED Basic Colors</option>
+              <option value="ledBlink">LED Blink</option>
+              <option value="ledAnimation">LED Animation</option>
+              <option value="ledEffects">LED Indication & Effects</option>
+              <option value="ledFade">LED Fade / Breathing</option>
             </optgroup>
-
-            <optgroup label="VISION AI Z — Student Projects">
-              <option value="visionBlank">Blank Student Project</option>
-              <option value="visionOpenCvImage">Test 01 — OpenCV Image</option>
-              <option value="visionOpenCvCamera">Test 02 — OpenCV Camera</option>
-              <option value="visionFaceBasic">Project 1 — Face Detection</option>
+            <optgroup label="Potentiometer">
+              <option value="potRead">Potentiometer Read</option>
+              <option value="potMonitor">Potentiometer Monitor</option>
+              <option value="potLedBrightness">Pot → RGB Brightness</option>
+              <option value="potLedEffects">Pot → LED Effects</option>
             </optgroup>
-
-            <optgroup label="MediaPipe AI">
-              <option value="hand">Hand Detection</option>
-              <option value="handRgb">5 Fingers → RGB LED</option>
-              <option value="faceCvzone">Face Detection → CVZone</option>
-            </optgroup>
-
-            <optgroup label="OpenCV Camera">
-              <option value="cvGray">Camera → Grayscale</option>
-              <option value="cvEdges">Camera → Canny Edges</option>
-              <option value="cvBlur">Gaussian Blur</option>
-              <option value="cvThreshold">Threshold</option>
-            </optgroup>
-
-            <optgroup label="OpenCV Image Graphics">
-              <option value="imgRgb">Image → RGB LED Graphic</option>
-              <option value="imgPot">Image → Potentiometer Graphic</option>
-              <option value="imgDashboard">Image → Kit Dashboard</option>
-            </optgroup>
-
-            <optgroup label="ZEBJUS Kit">
-              <option value="rgb">RGB LED 0–255</option>
-              <option value="sensors">Read Ultrasonic + Pot</option>
-              <option value="servo">Servo Sweep</option>
-              <option value="motor">Motor</option>
-            </optgroup>
-          
-                  <optgroup label="20 Student Projects">
-                    <option value="project01">01 · Hello Python</option>
-                    <option value="project02">02 · Variables & Math</option>
-                    <option value="project03">03 · If / Else</option>
-                    <option value="project04">04 · Loop Counter</option>
-                    <option value="project05">05 · RGB LED Colors</option>
-                    <option value="project06">06 · Potentiometer Reading</option>
-                    <option value="project07">07 · Ultrasonic Distance</option>
-                    <option value="project08">08 · Ultrasonic Warning</option>
-                    <option value="project09">09 · Servo Angle</option>
-                    <option value="project10">10 · Motor Speed</option>
-                    <option value="project11">11 · Load & Display Image</option>
-                    <option value="project12">12 · Grayscale Image</option>
-                    <option value="project13">13 · Edge Detection</option>
-                    <option value="project14">14 · Live Face Detection</option>
-                    <option value="project15">15 · Face Presence Status</option>
-                    <option value="project16">16 · Face Position</option>
-                    <option value="project17">17 · Hand Finger Counter</option>
-                    <option value="project18">18 · Finger Count → RGB</option>
-                    <option value="project19">19 · Hand Open / Closed</option>
-                    <option value="project20">20 · Hand Gesture → Servo</option>
-                  </optgroup>
-</select>
+          </select>
         </label>
         <button id="loadExampleBtn" class="btn">Load Example</button>
       </div>
 
       <div class="project-actions">
+        <button id="undoBtn" class="btn" title="Undo (⌘Z / Ctrl+Z)">↶ Undo</button>
+        <button id="redoBtn" class="btn" title="Redo (⌘⇧Z / Ctrl+Y)">↷ Redo</button>
         <button id="autocompleteBtn" class="btn" title="Show suggestions">⌘ Suggestions</button>
         <button id="resetBtn" class="btn">Reset</button>
         <button id="runBtn" class="btn success">▶ Run</button>
@@ -123,7 +71,7 @@
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
-        <textarea id="codeEditor" spellcheck="false">print("Hello, ZEBJUS!")</textarea>
+        <textarea id="codeEditor" spellcheck="false"># Select an RGB LED or Potentiometer example above.</textarea>
         <div id="editorIssueBar" class="editor-issue-bar" hidden></div>
       </div>
 
@@ -249,25 +197,18 @@
         <span class="muted">RGB channels use 0–255</span>
       </div>
       <div class="help-grid">
-        <code>RGBLED(25,26,27).write(255,0,0)</code>
-        <code>RGBLED(25,26,27).color("purple")</code>
-        <code>Ultrasonic(1).read()</code>
-        <code>Potentiometer(1).read()</code>
-        <code>Camera(0).read()</code>
-        <code>HandDetector().read()</code>
-        <code>import mediapipe as mp</code>
-        <code>import cvzone</code>
-        <code>from cvzone.FaceDetectionModule import FaceDetector</code>
-        <code>from SerialModule import SerialObject</code>
-        <code>import HandTrackingModule as htm</code>
-        <code>from zebjus_wifi import WifiBridge</code>
-        <code>load_image()</code>
-        <code>draw_rgb_led()</code>
-        <code>draw_potentiometer()</code>
-        <code>draw_ultrasonic()</code>
-        <code>cv2.cvtColor()</code>
-        <code>Servo(1).write(90)</code>
-        <code>Motor(1).forward(50)</code>
+        <code>RGBLED(25,26,27)</code>
+        <code>rgb.color("red")</code>
+        <code>rgb.write(255,120,0)</code>
+        <code>rgb.off()</code>
+        <code>cv2.waitKey(1000)</code>
+        <code>Potentiometer(34)</code>
+        <code>pot.read() → 0–255</code>
+        <code>pot.raw() → 0–4095</code>
+        <code>pot.percent() → 0–100</code>
+        <code>pot.millivolts()</code>
+        <code>ADC1 pins: 32,33,34,35,36,39</code>
+        <code>RGB pins: 4,13,14,16,17,18,19,21,22,23,25,26,27,32,33</code>
       </div>
     </section>
   </main>
@@ -279,9 +220,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.16"></script>
-  <script src="./kit-client.js?v=5.16"></script>
-  <script src="./ai.js?v=5.16"></script>
-  <script src="./app.js?v=5.16"></script>
+  <script src="./config.js?v=5.18"></script>
+  <script src="./kit-client.js?v=5.18"></script>
+  <script src="./ai.js?v=5.18"></script>
+  <script src="./app.js?v=5.18"></script>
 </body>
 </html>
