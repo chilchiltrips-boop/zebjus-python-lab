@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <title>ZEBJUS Python Lab Settings v5.18</title>
+  <title>ZEBJUS Python Lab Settings v5.20</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="settings-page">
@@ -147,10 +147,10 @@
           <input id="demoUltrasonic" type="range" min="2" max="400" step="1">
         </label>
         <label>
-          <span>Potentiometer: <strong id="demoPotLabel">128 / 255</strong></span>
+          <span>Analog demo value: <strong id="demoPotLabel">128 / 255</strong></span>
           <input id="demoPot" type="range" min="0" max="255" step="1">
         </label>
-        <p class="muted settings-note">These values are returned by <code>Ultrasonic(1).read()</code> and <code>Potentiometer(1).read()</code> while Demo mode is enabled.</p>
+        <p class="muted settings-note">These demo values are used for ultrasonic and analog-input examples while Demo mode is enabled. Physical Switch and RotaryEncoder values require a connected kit.</p>
       </div>
     </section>
 
@@ -194,7 +194,7 @@
       <span id="settingsSaved" class="muted"></span>
     </div>
   </main>
-  <script src="./kit-client.js?v=5.18"></script>
-  <script src="./settings.js?v=5.18"></script>
+  <script src="./kit-client.js?v=5.20"></script>
+  <script src="./settings.js?v=5.20"></script>
 </body>
 </html>

@@ -1,89 +1,71 @@
 {
-  "version": "5.18",
-  "js_checks": {
-    "config.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "ai.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "app.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "settings.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "py-worker.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "camera-bridge.js": {
-      "returncode": 0,
-      "stderr": ""
-    },
-    "kit-client.js": {
-      "returncode": 0,
-      "stderr": ""
-    }
-  },
-  "python_example_checks": {
+  "ui_version": "5.20",
+  "examples_count": 13,
+  "examples": {
     "ledBasic": "ok",
     "ledBlink": "ok",
     "ledAnimation": "ok",
     "ledEffects": "ok",
     "ledFade": "ok",
+    "analogRead": "ok",
     "potRead": "ok",
-    "potMonitor": "ok",
-    "potLedBrightness": "ok",
-    "potLedEffects": "ok"
+    "digitalRead": "ok",
+    "switchRead": "ok",
+    "switchLed": "ok",
+    "rotaryRead": "ok",
+    "rotaryLed": "ok",
+    "analogLed": "ok"
   },
-  "critical": {
-    "all_js_pass": true,
-    "current_example_count": true,
-    "all_example_python_parses": true,
-    "old_20_project_menu_removed": true,
-    "undo_redo_buttons": true,
-    "undo_redo_code": true,
-    "pot_adc_endpoint": true,
-    "adc1_pin_list": true,
-    "pot_python_selectable": true,
-    "pot_live_cycle": true,
-    "kit_auto_reconnect": true,
-    "run_verifies_kit": true,
-    "rgb_run_recovery": true,
-    "firmware_raw_braces_balanced": true,
-    "wifi_profiles_retained": true,
-    "outputs_off_failsafe": true,
-    "only_v12_firmware": true,
-    "current_examples_doc": true,
-    "pot_test_guide": true,
-    "firmware_wifi_auto_reconnect": true
+  "dropdown_missing": [],
+  "worker_python_blocks": [
+    "ok",
+    "ok",
+    "ok",
+    "ok",
+    "ok",
+    "ok"
+  ],
+  "classes": {
+    "RGBLED": true,
+    "AnalogInput": true,
+    "Potentiometer": true,
+    "DigitalInput": true,
+    "Switch": true,
+    "RotaryEncoder": true
   },
-  "details": {
-    "example_names": [
-      "ledBasic",
-      "ledBlink",
-      "ledAnimation",
-      "ledEffects",
-      "ledFade",
-      "potRead",
-      "potMonitor",
-      "potLedBrightness",
-      "potLedEffects"
-    ],
-    "firmware_braces": [
-      134,
-      134
-    ],
-    "firmware_files": [
-      "ZEBJUS_Kit_RGB_Pot_WiFi_v1_2.ino"
-    ]
+  "firmware": {
+    "file": "ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_3.ino",
+    "version": "1.3",
+    "analog_api": true,
+    "digital_api": true,
+    "rotary_api": true,
+    "rotary_continuous": true,
+    "run_failsafe": true,
+    "wifi_profiles": true
   },
-  "notes": {
-    "arduino_compile": "arduino-cli/core toolchain is not installed in this environment. Firmware source structure/API references were statically checked; compile/upload on ESP32-WROOM-DA is required."
+  "web_client": {
+    "auto_reconnect": true,
+    "analog": true,
+    "digital": true,
+    "rotary": true
+  },
+  "named_pin_parser": true,
+  "input_pin_conflict_check": true,
+  "undo_redo": true,
+  "pin_assist": {
+    "context_suggestions": true,
+    "exclude_used_pins": true,
+    "exclude_same_constructor_pins": true,
+    "invalid_pin_exact_line": true,
+    "duplicate_pin_exact_line": true,
+    "pre_run_validation": true
+  },
+  "validation": {
+    "app_js_syntax": "ok",
+    "kit_client_js_syntax": "ok",
+    "settings_js_syntax": "ok",
+    "py_worker_js_syntax": "ok",
+    "python_examples_compiled": 13,
+    "python_example_errors": 0
   }
 }

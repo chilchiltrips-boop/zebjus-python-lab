@@ -1,58 +1,77 @@
-# ZEBJUS Python Lab v5.18 — RGB + Potentiometer Stage
+# ZEBJUS Python Lab v5.20 — Pin Assist + Universal Inputs
 
-This build keeps the existing Python/OpenCV/MediaPipe engine, but the Learning Example menu is intentionally limited to the hardware features currently being developed: RGB LED and potentiometer.
+This stage keeps the RGB LED, editor, exact error-line highlighting, Undo/Redo, OpenCV/MediaPipe engine, Wi-Fi kit naming, saved Wi-Fi profiles, kit auto-reconnect, Run heartbeat and output failsafe.
 
-## Added in v5.18
+## Added in v5.20
 
-- Visible Undo and Redo buttons in the editor.
-- Keyboard undo/redo: Cmd/Ctrl+Z and Cmd+Shift+Z / Ctrl+Y.
-- More robust physical-kit verification before Run.
-- Automatic reconnect retries after a temporary ESP32 reset, power dip, stale IP, or mDNS interruption.
-- Reconnect uses the saved kit name and physical chip ID to reduce the chance of connecting to the wrong kit.
-- RGB command recovery: if the ESP32 restarted during a program, the Lab re-opens the run session and retries the RGB command.
-- ESP32 ADC1 potentiometer support with Python-selectable input pins.
-- `Potentiometer(34).read()` → 0–255.
-- `Potentiometer(34).raw()` → 0–4095.
-- `percent()`, `millivolts()` and `.pin` helpers.
-- Potentiometer values update continuously in `while True` programs.
-- Example list cleaned to the current RGB + potentiometer development stage only.
+- Context-aware GPIO suggestions inside `RGBLED(...)`, `AnalogInput(...)`, `Potentiometer(...)`, `DigitalInput(...)`, `Switch(...)`, and `RotaryEncoder(...)`.
+- Pins already used elsewhere in the same program are removed from the suggestion list.
+- Pins already entered earlier in the same constructor are not suggested again.
+- Unsupported GPIO selection is reported as `PinError` on the exact editor line before Run.
+- Reusing the same physical GPIO for two roles is reported as `PinConflictError` on the second conflicting line.
+- Pin validation runs both while editing and again before the program starts.
 
-## Firmware
+## Universal Inputs retained from v5.19
 
-Upload:
+- Generic `AnalogInput(pin)` API.
+- Backward-compatible `Potentiometer(pin)` alias.
+- Generic `DigitalInput(pin, pullup=..., active_low=...)` API.
+- `Switch(pin)` API with push-button-friendly defaults.
+- `RotaryEncoder(clk, dt, switch)` API.
+- ESP32 continuously tracks rotary encoder movement.
+- Python can process `raw`, `value`, `percent`, switch state, rotary position, delta and direction.
+- Current example list contains only RGB LED + currently implemented input projects.
+- Generic input monitor cards for analog, switch and rotary values.
 
-`esp32_firmware/ZEBJUS_Kit_RGB_Pot_WiFi_v1_2.ino`
-
-Board target: classic ESP32 DevKit / ESP32-WROOM-32 / ESP32-WROOM-DA.
-
-## RGB pins
-
-Safe output list:
-
-`4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33`
-
-Default:
+## Python input API
 
 ```python
-rgb = RGBLED(25, 26, 27)
+from zebjus import AnalogInput, Potentiometer, DigitalInput, Switch, RotaryEncoder
+
+analog = AnalogInput(34)
+pot = Potentiometer(34)
+sensor = DigitalInput(32, pullup=False, active_low=False)
+button = Switch(32)
+encoder = RotaryEncoder(32, 33, 14)
 ```
 
-## Potentiometer pins
+Analog methods:
 
-Wi-Fi-safe ADC1 list:
+- `read()` → 0–255
+- `raw()` → 0–4095
+- `percent()` → 0–100
+- `millivolts()`
+
+Digital methods:
+
+- `state()` → raw 0/1
+- `read()` / `active()` → Boolean
+- `Switch.pressed()` → Boolean
+
+Rotary methods:
+
+- `position()`
+- `delta()`
+- `direction()` → `CW`, `CCW`, `NONE`
+- `pressed()`
+- `switch_state()`
+
+## Safe analog pins while Wi-Fi is active
 
 `32, 33, 34, 35, 36, 39`
 
-Recommended:
+## Supported digital input pins
 
-```python
-pot = Potentiometer(34)
-```
+`4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39`
 
-Avoid using the same GPIO simultaneously as RGB output and potentiometer input.
+GPIO34/35/36/39 require an external pull resistor when used as switches/encoder inputs.
 
-## Kit reconnect behavior
+## ESP32 firmware
 
-The web app now verifies `/api/status` before each hardware Run. If the selected kit temporarily disappears, it retries the saved IP and `<kit-name>.local`. The saved chip ID is checked after reconnect so a different physical kit should not silently take over the session.
+Upload:
 
-The app also checks kit health periodically while idle. During an active Run, the existing heartbeat continues to keep outputs fail-safe.
+`esp32_firmware/ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_3.ino`
+
+Expected Serial header:
+
+`ZEBJUS KIT RGB + INPUT WiFi v1.3`

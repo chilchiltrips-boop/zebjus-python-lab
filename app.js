@@ -11,7 +11,7 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0};
+  let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{}}};
 
   const defaults={
     autoCamera:true,demoMode:true,kitName:"",kitId:"",kitIp:"",wsUrl:"",
@@ -30,16 +30,19 @@
 import cv2
 from zebjus import RGBLED
 
-# Output pins: Red=25, Green=26, Blue=27
 rgb = RGBLED(25, 26, 27)
 
 while True:
     rgb.color("red")
-    cv2.waitKey(1000)
+    cv2.waitKey(700)
     rgb.color("green")
-    cv2.waitKey(1000)
+    cv2.waitKey(700)
     rgb.color("blue")
-    cv2.waitKey(1000)`,
+    cv2.waitKey(700)
+    rgb.color("yellow")
+    cv2.waitKey(700)
+    rgb.color("purple")
+    cv2.waitKey(700)`,
 
     ledBlink:`# RGB LED Blink
 import cv2
@@ -48,7 +51,7 @@ from zebjus import RGBLED
 rgb = RGBLED(25, 26, 27)
 
 while True:
-    rgb.color("white")
+    rgb.color("red")
     cv2.waitKey(300)
     rgb.off()
     cv2.waitKey(300)`,
@@ -58,192 +61,181 @@ import cv2
 from zebjus import RGBLED
 
 rgb = RGBLED(25, 26, 27)
-colors = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink", "white"]
+colors = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
 while True:
     for color in colors:
         rgb.color(color)
-        cv2.waitKey(250)
+        cv2.waitKey(250)`,
 
-    rgb.off()
-    cv2.waitKey(400)`,
-
-    ledEffects:`# RGB LED Indication + Effects Demo
+    ledEffects:`# RGB LED Indication Effects
 import cv2
 from zebjus import RGBLED
 
 rgb = RGBLED(25, 26, 27)
 
 while True:
-    # Basic indication colors
-    for color in ["red", "green", "blue", "yellow", "cyan", "purple", "orange", "white"]:
-        rgb.color(color)
-        cv2.waitKey(400)
-
-    # Warning blink
+    # Warning: 3 red flashes
     for i in range(3):
         rgb.color("red")
-        cv2.waitKey(180)
-        rgb.off()
-        cv2.waitKey(180)
-
-    # Success indication
-    for i in range(2):
-        rgb.color("green")
         cv2.waitKey(150)
         rgb.off()
+        cv2.waitKey(150)
+
+    # Connected: blue double flash
+    for i in range(2):
+        rgb.color("blue")
         cv2.waitKey(120)
+        rgb.off()
+        cv2.waitKey(120)
+
+    # Success: green hold
     rgb.color("green")
     cv2.waitKey(700)
-
-    # Connection indication
-    for i in range(3):
-        rgb.color("blue")
-        cv2.waitKey(100)
-        rgb.off()
-        cv2.waitKey(100)
-
-    # Red / blue alternating
-    for i in range(5):
-        rgb.color("red")
-        cv2.waitKey(130)
-        rgb.color("blue")
-        cv2.waitKey(130)
-
-    # Heartbeat effect
-    rgb.color("red")
-    cv2.waitKey(100)
     rgb.off()
-    cv2.waitKey(90)
-    rgb.color("red")
-    cv2.waitKey(220)
-    rgb.off()
-    cv2.waitKey(600)
+    cv2.waitKey(400)`,
 
-    # Custom colors
-    custom = [
-        (255, 0, 120),
-        (0, 120, 255),
-        (120, 255, 0),
-        (150, 0, 255),
-        (255, 60, 0),
-        (0, 255, 150)
-    ]
-    for r, g, b in custom:
-        rgb.write(r, g, b)
-        cv2.waitKey(300)
-
-    rgb.off()
-    cv2.waitKey(500)`,
-
-    ledFade:`# RGB LED Fade / Breathing Effects
+    ledFade:`# RGB LED Fade / Breathing
 import cv2
 from zebjus import RGBLED
 
 rgb = RGBLED(25, 26, 27)
 
 while True:
-    # Red fade in/out
     for value in range(0, 256, 10):
-        rgb.write(value, 0, 0)
+        rgb.write(value, 0, 255 - value)
         cv2.waitKey(30)
+
     for value in range(255, -1, -10):
-        rgb.write(value, 0, 0)
-        cv2.waitKey(30)
+        rgb.write(value, 0, 255 - value)
+        cv2.waitKey(30)`,
 
-    # Green breathing
-    for value in range(0, 256, 10):
-        rgb.write(0, value, 0)
-        cv2.waitKey(30)
-    for value in range(255, -1, -10):
-        rgb.write(0, value, 0)
-        cv2.waitKey(30)
-
-    # Blue breathing
-    for value in range(0, 256, 10):
-        rgb.write(0, 0, value)
-        cv2.waitKey(30)
-    for value in range(255, -1, -10):
-        rgb.write(0, 0, value)
-        cv2.waitKey(30)
-
-    rgb.off()
-    cv2.waitKey(400)`,
-
-    potRead:`# Potentiometer Read
+    analogRead:`# Generic Analog Input Read
 import cv2
-from zebjus import Potentiometer
+from zebjus import AnalogInput
 
-# Reliable ESP32 Wi-Fi ADC1 pins: 32, 33, 34, 35, 36, 39
-# Connection: 3.3V -> POT end, GND -> POT end, GPIO34 -> middle pin
-pot = Potentiometer(34)
+# ADC1 pins while Wi-Fi is active: 32, 33, 34, 35, 36, 39
+# Works with potentiometers and other 0-3.3V analog sensors.
+analog = AnalogInput(34)
 
 while True:
-    print("GPIO:", pot.pin, "Value:", pot.read(), "/ 255", "Raw:", pot.raw(), "/ 4095", "Percent:", pot.percent(), "%")
-    cv2.waitKey(250)`,
-
-    potMonitor:`# Potentiometer Monitor
-import cv2
-from zebjus import Potentiometer
-
-pot = Potentiometer(34)
-
-while True:
-    value = pot.read()
-
-    if value < 64:
-        level = "LOW"
-    elif value < 128:
-        level = "MEDIUM"
-    elif value < 192:
-        level = "HIGH"
-    else:
-        level = "MAX"
-
-    print("Pot:", value, "Raw:", pot.raw(), "Level:", level)
+    print("GPIO:", analog.pin,
+          "Raw:", analog.raw(),
+          "Value:", analog.read(),
+          "Percent:", analog.percent(),
+          "mV:", analog.millivolts())
     cv2.waitKey(200)`,
 
-    potLedBrightness:`# Potentiometer Controls RGB Brightness
+    potRead:`# Potentiometer / Analog Knob
 import cv2
-from zebjus import Potentiometer, RGBLED
+from zebjus import Potentiometer
 
-pot = Potentiometer(34)      # Input pin
-rgb = RGBLED(25, 26, 27)    # Output pins
+# Potentiometer is an easy alias for AnalogInput.
+pot = Potentiometer(34)
 
 while True:
     value = pot.read()
-    rgb.write(value, 0, 255 - value)
-    print("Pot:", value, "RGB: R", value, "B", 255 - value)
+    print("Pot:", value, "/ 255", "Raw:", pot.raw(), "Percent:", pot.percent(), "%")
+    cv2.waitKey(200)`,
+
+    digitalRead:`# Generic Digital Input
+import cv2
+from zebjus import DigitalInput
+
+# For a digital sensor output. Configure pullup/active_low as required.
+sensor = DigitalInput(32, pullup=False, active_low=False)
+
+while True:
+    print("GPIO:", sensor.pin, "State:", sensor.state(), "Active:", sensor.read())
     cv2.waitKey(80)`,
 
-    potLedEffects:`# Potentiometer Controls LED Indications
+    switchRead:`# Push Switch Input
 import cv2
-from zebjus import Potentiometer, RGBLED
+from zebjus import Switch
 
-pot = Potentiometer(34)
+# Default wiring: GPIO32 ---- button ---- GND
+# Internal pull-up is enabled, so pressed = True when pin goes LOW.
+button = Switch(32)
+
+while True:
+    print("GPIO:", button.pin,
+          "State:", button.state(),
+          "Pressed:", button.pressed())
+    cv2.waitKey(80)`,
+
+    switchLed:`# Switch Controls RGB LED
+import cv2
+from zebjus import Switch, RGBLED
+
+button = Switch(32)
 rgb = RGBLED(25, 26, 27)
 
 while True:
-    value = pot.read()
-
-    if value < 50:
-        rgb.color("blue")
-    elif value < 100:
-        rgb.color("cyan")
-    elif value < 150:
+    if button.pressed():
         rgb.color("green")
-    elif value < 200:
-        rgb.color("yellow")
-    elif value < 240:
-        rgb.color("orange")
+        print("BUTTON PRESSED")
     else:
-        # Maximum zone warning blink
-        rgb.color("red")
-        cv2.waitKey(100)
-        rgb.off()
+        rgb.color("red", 40)
+        print("Button released")
 
-    print("Pot value:", value, "Raw:", pot.raw())
-    cv2.waitKey(100)`
+    cv2.waitKey(60)`,
+
+    rotaryRead:`# Rotary Encoder + Push Switch
+import cv2
+from zebjus import RotaryEncoder
+
+# Typical encoder module: CLK=32, DT=33, SW=14
+encoder = RotaryEncoder(32, 33, 14)
+
+while True:
+    print("Position:", encoder.position(),
+          "Delta:", encoder.delta(),
+          "Direction:", encoder.direction(),
+          "Pressed:", encoder.pressed())
+    cv2.waitKey(60)`,
+
+    rotaryLed:`# Rotary Encoder Controls RGB LED
+import cv2
+from zebjus import RotaryEncoder, RGBLED
+
+encoder = RotaryEncoder(32, 33, 14)
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    position = encoder.position()
+
+    # Keep brightness between 0 and 255.
+    brightness = position * 15
+    if brightness < 0:
+        brightness = 0
+    if brightness > 255:
+        brightness = 255
+
+    if encoder.pressed():
+        rgb.color("white")
+    elif encoder.direction() == "CW":
+        rgb.write(0, brightness, 255 - brightness)
+    elif encoder.direction() == "CCW":
+        rgb.write(brightness, 0, 255 - brightness)
+
+    print("Position:", position,
+          "Brightness:", brightness,
+          "Direction:", encoder.direction(),
+          "Switch:", encoder.pressed())
+    cv2.waitKey(60)`,
+
+    analogLed:`# Analog Input Controls RGB LED
+import cv2
+from zebjus import AnalogInput, RGBLED
+
+analog = AnalogInput(34)
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    value = analog.read()
+    rgb.write(value, 255 - value, 80)
+    print("Analog:", value, "Raw:", analog.raw())
+    cv2.waitKey(60)`
   };
 
   const libraries=[
@@ -254,7 +246,7 @@ while True:
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer(34)","ADC1 input pin 32/33/34/35/36/39"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["AnalogInput()","class","AnalogInput(34)","Generic analog ADC1 input"],["Potentiometer()","class","Potentiometer(34)","Analog knob alias"],["DigitalInput()","class","DigitalInput(32)","Generic digital sensor input"],["Switch()","class","Switch(32)","Digital push switch input"],["RotaryEncoder()","class","RotaryEncoder(32,33,14)","Rotary encoder CLK/DT/SW"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
     ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
     ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
@@ -262,7 +254,7 @@ while True:
   const moduleMembers={
     zebjus:[
       ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","LED"],["Ultrasonic","class","Ultrasonic","Ultrasonic"],
-      ["Potentiometer","class","Potentiometer","Potentiometer ADC input"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
+      ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
     cvzone:[["putTextRect","function","putTextRect","Text box"],["cornerRect","function","cornerRect","Corner rectangle"],["FaceDetectionModule","module","FaceDetectionModule","Face detector module"]],
@@ -304,7 +296,11 @@ while True:
     RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"]],
+    AnalogInput:[["read()","method","read()","Scaled 0–255"],["raw()","method","raw()","Raw ADC 0–4095"],["percent()","method","percent()","0–100 percent"],["millivolts()","method","millivolts()","ADC millivolts"],["pin","property","pin","Selected ADC GPIO"],["value","property","value","0–255"]],
     Potentiometer:[["read()","method","read()","Scaled 0–255"],["raw()","method","raw()","Raw ADC 0–4095"],["percent()","method","percent()","0–100 percent"],["millivolts()","method","millivolts()","ADC millivolts"],["pin","property","pin","Selected ADC GPIO"],["value","property","value","0–255"]],
+    DigitalInput:[["read()","method","read()","True when active"],["active()","method","active()","Same as read"],["state()","method","state()","Raw digital 0/1"],["pin","property","pin","Selected GPIO"],["value","property","value","Boolean active state"]],
+    Switch:[["read()","method","read()","True when active"],["pressed()","method","pressed()","True when switch is pressed"],["state()","method","state()","Raw digital 0/1"],["pin","property","pin","Selected GPIO"],["value","property","value","Boolean active state"]],
+    RotaryEncoder:[["position()","method","position()","Accumulated rotary position"],["delta()","method","delta()","Change since latest read"],["direction()","method","direction()","CW / CCW / NONE"],["pressed()","method","pressed()","Rotary push switch"],["switch_state()","method","switch_state()","Raw switch 0/1"],["value","property","value","Same as position"]],
     Motor:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Backward"],["stop()","method","stop()","Stop"]],
     Servo:[["write()","method","write()","Angle"]],
     HandDetector:[["read()","method","read()","Stable hand snapshot"]],
@@ -319,11 +315,11 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","Ultrasonic","Potentiometer","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*(?:HandDetector\\s*\\(\\s*\\)|\\w+)\\.read\\s*\\(").test(code))return "HandResult";
-    if(name==="rgb")return "RGBLED";if(name==="led")return "LED";if(name==="ultra")return "Ultrasonic";if(name==="pot")return "Potentiometer";
+    if(name==="rgb")return "RGBLED";if(name==="led")return "LED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
     if(name==="motor")return "Motor";if(name==="servo")return "Servo";if(name==="cam")return "Camera";if(name==="hand")return "HandDetector";if(name==="result")return "HandResult";
     if(name==="cv2")return "cv2";
     return null;
@@ -331,6 +327,88 @@ while True:
 
   function hintItem(e){const [label,type,text,info]=e;return{text:text||label,displayText:label+(info?"   — "+info:""),className:"hint-"+type};}
   function filterItems(items,prefix){return items.filter(x=>x[0].replace(/\(\)$/,"").startsWith(prefix)).map(hintItem);}
+
+  // ---------- GPIO pin assistance / validation ----------
+  const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
+  const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
+  const DIGITAL_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
+  const PIN_HINT_ORDER={
+    RGBLED:[25,26,27,32,33,4,13,14,16,17,18,19,21,22,23],
+    AnalogInput:[34,35,36,39,32,33],Potentiometer:[34,35,36,39,32,33],
+    DigitalInput:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
+    Switch:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
+    RotaryEncoder:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39]
+  };
+
+  function pinEntries(src){
+    const out=[];
+    const lines=String(src||"").split(/\r?\n/);
+    const add=(pin,line,role,kind,valid,offset=1)=>{if(Number.isFinite(pin))out.push({pin:Number(pin),line,role,kind,valid,offset});};
+    lines.forEach((text,i)=>{
+      let m;
+      const rgb=/\bRGBLED\s*\(([^)]*)\)/g;
+      while((m=rgb.exec(text))){
+        const args=m[1],hasNamed=/\b(?:red|green|blue)\s*=/.test(args);
+        const positional=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
+        // RGBLED(), RGBLED(1) use the kit default physical RGB pins.
+        if(!hasNamed&&positional.length<=1){
+          add(25,i+1,"RGB red","RGBLED",RGB_OUTPUT_PINS,m.index+1);add(26,i+1,"RGB green","RGBLED",RGB_OUTPUT_PINS,m.index+1);add(27,i+1,"RGB blue","RGBLED",RGB_OUTPUT_PINS,m.index+1);
+        }else{
+          const r=parseNumberArg(args,"red",0,null),g=parseNumberArg(args,"green",1,null),b=parseNumberArg(args,"blue",2,null);
+          if(r!==null)add(r,i+1,"RGB red","RGBLED",RGB_OUTPUT_PINS,m.index+1);
+          if(g!==null)add(g,i+1,"RGB green","RGBLED",RGB_OUTPUT_PINS,m.index+1);
+          if(b!==null)add(b,i+1,"RGB blue","RGBLED",RGB_OUTPUT_PINS,m.index+1);
+        }
+      }
+      const analog=/\b(AnalogInput|Potentiometer)\s*\(([^)]*)\)/g;
+      while((m=analog.exec(text))){const pin=parseNumberArg(m[2],"pin",0,34);add(pin,i+1,m[1]+" input",m[1],ANALOG_INPUT_PINS,m.index+1);}
+      const digital=/\b(DigitalInput|Switch)\s*\(([^)]*)\)/g;
+      while((m=digital.exec(text))){const pin=parseNumberArg(m[2],"pin",0,32);add(pin,i+1,m[1]+" input",m[1],DIGITAL_INPUT_PINS,m.index+1);}
+      const rotary=/\bRotaryEncoder\s*\(([^)]*)\)/g;
+      while((m=rotary.exec(text))){
+        const args=m[1],clk=parseNumberArg(args,"clk",0,32),dt=parseNumberArg(args,"dt",1,33),sw=parseNumberArg(args,"switch",2,-1);
+        add(clk,i+1,"Rotary CLK","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
+        add(dt,i+1,"Rotary DT","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
+        if(sw>=0)add(sw,i+1,"Rotary switch","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
+      }
+    });
+    return out;
+  }
+
+  function hardwarePinValidation(src){
+    const entries=pinEntries(src);
+    for(const e of entries){
+      if(!e.valid.includes(e.pin)){
+        const allowed=e.valid.map(p=>"GPIO"+p).join(", ");
+        return {errorType:"PinError",line:e.line,offset:e.offset,message:`GPIO${e.pin} is not valid for ${e.role}.`,suggestion:`Choose a supported pin: ${allowed}.`};
+      }
+    }
+    const used=new Map();
+    for(const e of entries){
+      if(used.has(e.pin)){
+        const first=used.get(e.pin);
+        return {errorType:"PinConflictError",line:e.line,offset:e.offset,message:`GPIO${e.pin} is already used by ${first.role} on line ${first.line}.`,suggestion:`Use a different GPIO for ${e.role}. The same physical pin cannot be assigned twice in one program.`};
+      }
+      used.set(e.pin,e);
+    }
+    return null;
+  }
+
+  function pinHintContext(cm){
+    const cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
+    const m=left.match(/\b(RGBLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(([^()]*)$/);
+    if(!m)return null;
+    const type=m[1],args=m[2];
+    const currentPart=args.split(",").pop()||"";
+    const prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];
+    if(prefix===undefined)return null;
+    const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1]));
+    const usedElsewhere=pinEntries(full).map(x=>x.pin);
+    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;
+    pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
+    const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — available ${type} pin`,className:"hint-constant"}));
+    return {list,from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
+  }
 
 
   function collectUserSymbols(code){
@@ -515,6 +593,9 @@ while True:
     const cur=cm.getCursor(),line=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
     let m,prefix="",items=[];
 
+    const pinHints=pinHintContext(cm);
+    if(pinHints)return pinHints;
+
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
@@ -554,7 +635,7 @@ while True:
       if(prefs.autoSave){clearTimeout(window.__save);$("saveState").textContent="Saving…";window.__save=setTimeout(()=>{localStorage.setItem("zebjus.lab.code",cm.getValue());$("saveState").textContent="Saved";},220);}
       if((ch.origin==="+input"||ch.origin==="paste")&&!cm.state.completionActive){
         const typed=(ch.text||[]).join("\n"),cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch);
-        if(/[A-Za-z0-9_.]$/.test(typed)||/\b(?:import|from)\s+$/.test(left))setTimeout(()=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),0);
+        if(/[A-Za-z0-9_.(,=]$/.test(typed)||/\b(?:import|from)\s+$/.test(left))setTimeout(()=>cm.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false}),0);
       }
       clearTimeout(lintTimer);
       if(!running){
@@ -657,7 +738,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.17",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.20",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -670,9 +751,15 @@ while True:
         if(waiter){
           lintWaiters.delete(m.requestId);clearTimeout(waiter.timeout);
           const result={ok:!!m.ok,errorType:m.errorType||"",message:m.message||"",line:m.line||1,offset:m.offset||1};
+          if(result.ok){
+            const pinIssue=hardwarePinValidation(waiter.code);
+            if(pinIssue)Object.assign(result,{ok:false,...pinIssue});
+          }
           if(!result.ok){
-            result.suggestion=errorSuggestion(result.errorType,result.message,waiter.code);
+            result.suggestion=result.suggestion||errorSuggestion(result.errorType,result.message,waiter.code);
             if(waiter.show)showEditorIssue(result);
+          }else if(waiter.show){
+            clearEditorIssue();
           }
           waiter.resolve(result);
         }
@@ -774,21 +861,60 @@ while True:
   }
 
   function requestedCamera(src){const m=src.match(/\bCamera\s*\(\s*(\d+)\s*\)/);return m?Number(m[1]):null;}
-  function requestedPotPin(src){
-    const m=src.match(/\bPotentiometer\s*\(\s*(\d+)?/);if(!m)return null;
-    const pin=Number(m[1]||34);return pin===1?34:pin;
+  function parseBoolToken(text,name,defaultValue=true){
+    const m=String(text||"").match(new RegExp("\\b"+name+"\\s*=\\s*(True|False|true|false|1|0)","i"));
+    if(!m)return defaultValue;
+    return /^(true|1)$/i.test(m[1]);
+  }
+  function parseNumberArg(args,name,index,defaultValue=null){
+    const named=String(args||"").match(new RegExp("\\b"+name+"\\s*=\\s*(-?\\d+)","i"));
+    if(named)return Number(named[1]);
+    const positional=String(args||"").split(",").map(x=>x.trim()).filter(x=>!x.includes("="));
+    if(index<positional.length&&/^-?\d+$/.test(positional[index]))return Number(positional[index]);
+    return defaultValue;
+  }
+  function requestedInputs(src){
+    const out={analog:[],digital:[],rotary:[]};let m;
+    const analogRe=/\b(AnalogInput|Potentiometer)\s*\(([^)]*)\)/g;
+    while((m=analogRe.exec(src))){const pin=parseNumberArg(m[2],"pin",0,34);if(pin!==null)out.analog.push({pin});}
+
+    const switchRe=/\b(DigitalInput|Switch)\s*\(([^)]*)\)/g;
+    while((m=switchRe.exec(src))){
+      const kind=m[1],args=m[2],pin=parseNumberArg(args,"pin",0,32),isSwitch=kind==="Switch";
+      out.digital.push({pin,pullup:parseBoolToken(args,"pullup",isSwitch),activeLow:parseBoolToken(args,"active_low",isSwitch)});
+    }
+
+    const rotaryRe=/\bRotaryEncoder\s*\(([^)]*)\)/g;
+    while((m=rotaryRe.exec(src))){
+      const args=m[1],clk=parseNumberArg(args,"clk",0,32),dt=parseNumberArg(args,"dt",1,33),sw=parseNumberArg(args,"switch",2,-1);
+      out.rotary.push({clk,dt,sw,pullup:parseBoolToken(args,"pullup",true)});
+    }
+    return out;
   }
   function requestedRgbPins(src){
-    const m=src.match(/\bRGBLED\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
-    return m?[Number(m[1]),Number(m[2]),Number(m[3])]:[25,26,27];
+    const m=src.match(/\bRGBLED\s*\(([^)]*)\)/);if(!m)return [25,26,27];
+    const args=m[1],hasNamed=/\b(?:red|green|blue)\s*=/.test(args);
+    const positional=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
+    if(!hasNamed&&positional.length<=1)return [25,26,27];
+    const r=parseNumberArg(args,"red",0,25),g=parseNumberArg(args,"green",1,26),b=parseNumberArg(args,"blue",2,27);
+    return [r,g,b];
   }
-  async function refreshPotFromKit(src,showError=false){
-    const pin=requestedPotPin(src);if(pin===null||prefs.demoMode)return true;
-    activePotPin=pin;
+  async function refreshInputsFromKit(src,showError=false){
+    if(prefs.demoMode)return true;
+    const specs=requestedInputs(src);
     try{
-      const d=await kitClient.analog(pin);updateSensorPacket(d);return true;
+      for(const a of specs.analog){
+        const d=await kitClient.analog(a.pin);updateSensorPacket(d);
+      }
+      for(const sw of specs.digital){
+        const d=await kitClient.digital(sw.pin,{pullup:sw.pullup,activeLow:sw.activeLow});updateSensorPacket(d);
+      }
+      for(const r of specs.rotary){
+        const d=await kitClient.rotary(r.clk,r.dt,r.sw,{pullup:r.pullup});updateSensorPacket(d);
+      }
+      return true;
     }catch(e){
-      if(showError)log("Potentiometer read error: "+(e?.message||e));
+      if(showError)log("Input read error: "+(e?.message||e));
       return false;
     }
   }
@@ -924,8 +1050,8 @@ while True:
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
-    if(!prefs.demoMode&&/\bPotentiometer\s*\(/.test(liveCode)){
-      const ok=await refreshPotFromKit(liveCode,false);if(!ok){await ensureKitConnected(false);await refreshPotFromKit(liveCode,false);}
+    if(!prefs.demoMode&&/\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(liveCode)){
+      const ok=await refreshInputsFromKit(liveCode,false);if(!ok){await ensureKitConnected(false);await refreshInputsFromKit(liveCode,false);}
     }
     const frame=await refreshLiveAI();
     if(!liveMode||!running)return;
@@ -952,11 +1078,13 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|Ultrasonic|Potentiometer)\s*\(/.test(src);
-    const potPin=requestedPotPin(src);
-    if(potPin!==null&&/\bRGBLED\s*\(/.test(src)&&requestedRgbPins(src).includes(potPin)){
-      terminal.textContent="";log(`Pin conflict: GPIO${potPin} cannot be used for Potentiometer input and RGB output at the same time.`);badge($("pythonStatus"),"Pin conflict","warn");return;
-    }
+    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
+    const inputSpecs=requestedInputs(src),rgbPins=/\bRGBLED\s*\(/.test(src)?requestedRgbPins(src):[];
+    const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])])];
+    const conflict=inputPins.find(pin=>rgbPins.includes(pin));
+    if(conflict!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${conflict} is selected for both an input and RGB output.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
+    const seenPins=new Set(),duplicateInput=inputPins.find(pin=>seenPins.has(pin)?true:(seenPins.add(pin),false));
+    if(duplicateInput!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${duplicateInput} is assigned to more than one input device.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
     if(needsPhysicalKit&&!prefs.demoMode){
       const connected=await ensureKitConnected(true);
       if(!connected){badge($("pythonStatus"),"Kit not connected","warn");return;}
@@ -969,7 +1097,7 @@ while True:
 
     terminal.textContent="";
     running=true;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\bPotentiometer\s*\(/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1054,7 +1182,7 @@ while True:
     if(needsPhysicalKit&&!prefs.demoMode){
       try{
         await beginHardwareRun();
-        if(/\bPotentiometer\s*\(/.test(src))await refreshPotFromKit(src,true);
+        if(/\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src))await refreshInputsFromKit(src,true);
       }
       catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
     }else{currentRunUsesKit=false;}
@@ -1129,13 +1257,24 @@ while True:
 
   function updateSensorPacket(data){
     const sensor=String(data.sensor||data.name||"").toUpperCase();
+    sensorState.inputs=sensorState.inputs||{analog:{},digital:{},rotary:{}};
     if(sensor==="ULTRASONIC"||data.distanceCm!==undefined||data.ultrasonicCm!==undefined){
       sensorState.ultrasonicCm=Number(data.distanceCm??data.ultrasonicCm??sensorState.ultrasonicCm);
     }
-    if(sensor==="POT"||sensor==="POTENTIOMETER"||data.potValue!==undefined||data.value255!==undefined){
+    if(sensor==="ANALOG"||sensor==="POT"||sensor==="POTENTIOMETER"||data.value255!==undefined){
+      const pin=Number(data.pin??34),d={...data,pin};sensorState.inputs.analog[String(pin)]=d;
       sensorState.potValue=Math.max(0,Math.min(255,Number(data.potValue??data.value255??data.value??sensorState.potValue)));
       sensorState.potRaw=Number(data.raw??data.potRaw??Math.round(sensorState.potValue*4095/255));
-      sensorState.potPin=Number(data.pin??sensorState.potPin??34);sensorState.potPercent=Number(data.percent??Math.round(sensorState.potValue*100/255));sensorState.potMillivolts=Number(data.millivolts??sensorState.potMillivolts??0);
+      sensorState.potPin=pin;sensorState.potPercent=Number(data.percent??Math.round(sensorState.potValue*100/255));sensorState.potMillivolts=Number(data.millivolts??sensorState.potMillivolts??0);
+      if($("potTitle"))$("potTitle").textContent="Analog Input";
+    }
+    if(sensor==="DIGITAL"){
+      const pin=Number(data.pin);sensorState.inputs.digital[String(pin)]={...data,pin};
+      if($("switchLabel"))$("switchLabel").textContent=`GPIO${pin} · ${data.active?"ACTIVE / PRESSED":"released"} · state ${data.state}`;
+    }
+    if(sensor==="ROTARY"){
+      const key=`${Number(data.clk)},${Number(data.dt)},${Number(data.sw??-1)}`;sensorState.inputs.rotary[key]={...data};
+      if($("rotaryLabel"))$("rotaryLabel").textContent=`Pos ${data.position} · ${data.direction||"NONE"} · Δ${data.delta||0} · SW ${data.pressed?"pressed":"released"}`;
     }
     updateSensorGraphics();
   }

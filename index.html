@@ -17,8 +17,8 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.18</span>
-      <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.20</span>
+      <p>Python • OpenCV • MediaPipe • RGB LED • Analog • Switch • Rotary</p>
     </div>
     <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
@@ -41,11 +41,15 @@
               <option value="ledEffects">LED Indication & Effects</option>
               <option value="ledFade">LED Fade / Breathing</option>
             </optgroup>
-            <optgroup label="Potentiometer">
-              <option value="potRead">Potentiometer Read</option>
-              <option value="potMonitor">Potentiometer Monitor</option>
-              <option value="potLedBrightness">Pot → RGB Brightness</option>
-              <option value="potLedEffects">Pot → LED Effects</option>
+            <optgroup label="Inputs">
+              <option value="analogRead">Generic Analog Input</option>
+              <option value="potRead">Potentiometer / Analog Knob</option>
+              <option value="digitalRead">Generic Digital Input</option>
+              <option value="switchRead">Push Switch Input</option>
+              <option value="switchLed">Switch → RGB LED</option>
+              <option value="rotaryRead">Rotary Encoder + Switch</option>
+              <option value="rotaryLed">Rotary → RGB LED</option>
+              <option value="analogLed">Analog → RGB LED</option>
             </optgroup>
           </select>
         </label>
@@ -71,7 +75,7 @@
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
-        <textarea id="codeEditor" spellcheck="false"># Select an RGB LED or Potentiometer example above.</textarea>
+        <textarea id="codeEditor" spellcheck="false"># Select an RGB LED or Input example above.</textarea>
         <div id="editorIssueBar" class="editor-issue-bar" hidden></div>
       </div>
 
@@ -126,8 +130,24 @@
             <div class="demo-card">
               <div class="pot-knob" id="potKnob"><div id="potNeedle" class="pot-needle"></div></div>
               <div class="demo-grow">
-                <strong>Potentiometer</strong>
+                <strong id="potTitle">Analog Input</strong>
                 <span id="potLabel">128 / 255</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="motor-icon">SW</div>
+              <div class="demo-grow">
+                <strong>Digital Switch</strong>
+                <span id="switchLabel">No switch read yet</span>
+              </div>
+            </div>
+
+            <div class="demo-card">
+              <div class="motor-icon">↻</div>
+              <div class="demo-grow">
+                <strong>Rotary Encoder</strong>
+                <span id="rotaryLabel">No rotary read yet</span>
               </div>
             </div>
 
@@ -202,13 +222,18 @@
         <code>rgb.write(255,120,0)</code>
         <code>rgb.off()</code>
         <code>cv2.waitKey(1000)</code>
+        <code>AnalogInput(34)</code>
         <code>Potentiometer(34)</code>
-        <code>pot.read() → 0–255</code>
-        <code>pot.raw() → 0–4095</code>
-        <code>pot.percent() → 0–100</code>
-        <code>pot.millivolts()</code>
-        <code>ADC1 pins: 32,33,34,35,36,39</code>
-        <code>RGB pins: 4,13,14,16,17,18,19,21,22,23,25,26,27,32,33</code>
+        <code>DigitalInput(32)</code>
+        <code>Switch(32)</code>
+        <code>RotaryEncoder(32,33,14)</code>
+        <code>analog.raw() → 0–4095</code>
+        <code>button.pressed() → True/False</code>
+        <code>encoder.position()</code>
+        <code>encoder.direction() → CW/CCW/NONE</code>
+        <code>ADC1: 32,33,34,35,36,39</code>
+        <code>Digital input: 4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39</code>
+        <code>GPIO34–39 need external pull resistor for switches</code>
       </div>
     </section>
   </main>
@@ -220,9 +245,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.18"></script>
-  <script src="./kit-client.js?v=5.18"></script>
-  <script src="./ai.js?v=5.18"></script>
-  <script src="./app.js?v=5.18"></script>
+  <script src="./config.js?v=5.20"></script>
+  <script src="./kit-client.js?v=5.20"></script>
+  <script src="./ai.js?v=5.20"></script>
+  <script src="./app.js?v=5.20"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ _ai_state={"detected":False,"fingers":0,"side":"","landmarks":[]}
 _face_state=[]
 _hand_landmarks=[]
 _sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
+_input_state={"analog":{},"digital":{},"rotary":{}}
 _current_frame=None
 _loaded_image=None
 
@@ -117,19 +118,63 @@ class Ultrasonic:
     def distance_cm(self): return self.read()
 
 SUPPORTED_ADC_PINS=(32,33,34,35,36,39)
+SUPPORTED_DIGITAL_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39)
 
-class Potentiometer:
+def _analog_data(pin): return _input_state.get("analog",{}).get(str(int(pin)),{})
+def _digital_data(pin): return _input_state.get("digital",{}).get(str(int(pin)),{})
+def _rotary_key(clk,dt,sw): return f"{int(clk)},{int(dt)},{int(sw)}"
+def _rotary_data(clk,dt,sw): return _input_state.get("rotary",{}).get(_rotary_key(clk,dt,sw),{})
+
+class AnalogInput:
     def __init__(self,pin=34):
         pin=int(pin)
-        if pin==1: pin=34  # backward compatibility with older Potentiometer(1) examples
-        if pin not in SUPPORTED_ADC_PINS: raise ValueError(f"Unsupported potentiometer pin {pin}. Use one of {SUPPORTED_ADC_PINS}")
+        if pin not in SUPPORTED_ADC_PINS: raise ValueError(f"Unsupported analog input pin {pin}. Use one of {SUPPORTED_ADC_PINS}")
         self.pin=pin
-    def read(self): return int(_sensor_state.get("pot_value",0))
-    def raw(self): return int(_sensor_state.get("pot_raw",self.read()*4095//255))
-    def percent(self): return int(_sensor_state.get("pot_percent",round(self.read()*100/255)))
-    def millivolts(self): return int(_sensor_state.get("pot_mv",0))
+    def read(self):
+        d=_analog_data(self.pin); return int(d.get("value255",d.get("value",_sensor_state.get("pot_value",0))))
+    def raw(self):
+        d=_analog_data(self.pin); return int(d.get("raw",_sensor_state.get("pot_raw",self.read()*4095//255)))
+    def percent(self):
+        d=_analog_data(self.pin); return int(d.get("percent",round(self.read()*100/255)))
+    def millivolts(self):
+        d=_analog_data(self.pin); return int(d.get("millivolts",d.get("mv",_sensor_state.get("pot_mv",0))))
     @property
     def value(self): return self.read()
+
+class Potentiometer(AnalogInput):
+    def __init__(self,pin=34):
+        pin=int(pin)
+        if pin==1: pin=34
+        super().__init__(pin)
+
+class DigitalInput:
+    def __init__(self,pin=32,pullup=False,active_low=False):
+        pin=int(pin)
+        if pin not in SUPPORTED_DIGITAL_PINS: raise ValueError(f"Unsupported digital input pin {pin}. Use one of {SUPPORTED_DIGITAL_PINS}")
+        self.pin=pin; self.pullup=bool(pullup); self.active_low=bool(active_low)
+    def state(self): return int(_digital_data(self.pin).get("state",1 if self.pullup else 0))
+    def read(self): return bool(_digital_data(self.pin).get("active", self.state()==(0 if self.active_low else 1)))
+    def active(self): return self.read()
+    @property
+    def value(self): return self.read()
+
+class Switch(DigitalInput):
+    def __init__(self,pin=32,pullup=True,active_low=True): super().__init__(pin,pullup,active_low)
+    def pressed(self): return self.read()
+
+class RotaryEncoder:
+    def __init__(self,clk=32,dt=33,switch=None,pullup=True):
+        clk,dt=int(clk),int(dt); sw=-1 if switch is None else int(switch)
+        if clk not in SUPPORTED_DIGITAL_PINS or dt not in SUPPORTED_DIGITAL_PINS or clk==dt: raise ValueError("Invalid rotary CLK/DT pins")
+        if sw>=0 and (sw not in SUPPORTED_DIGITAL_PINS or sw in (clk,dt)): raise ValueError("Invalid rotary switch pin")
+        self.clk=clk; self.dt=dt; self.switch=None if sw<0 else sw; self.pullup=bool(pullup); self._sw=sw
+    def position(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("position",0))
+    def delta(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("delta",0))
+    def direction(self): return str(_rotary_data(self.clk,self.dt,self._sw).get("direction","NONE"))
+    def pressed(self): return bool(_rotary_data(self.clk,self.dt,self._sw).get("pressed",False))
+    def switch_state(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("switchState",1))
+    @property
+    def value(self): return self.position()
 
 def sleep(seconds): time.sleep(float(seconds))
 
@@ -328,9 +373,9 @@ sys.modules["HandTrackingModule"]=htm_mod;sys.modules["zebjus_wifi"]=wifi_mod
 z=types.ModuleType("zebjus")
 for k,v in {
     "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,
-    "Ultrasonic":Ultrasonic,"Potentiometer":Potentiometer,"sleep":sleep
+    "Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
 }.items(): setattr(z,k,v)
-z.__all__=["RGBLED","LED","Motor","Servo","Ultrasonic","Potentiometer","sleep"]
+z.__all__=["RGBLED","LED","Motor","Servo","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
@@ -440,6 +485,7 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__pot_pin",Number(m.sensorState?.potPin)||34);
   pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
   pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
+  pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{}}));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -449,6 +495,7 @@ _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_j
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
 _sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
+_input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{}}
 _current_frame=None
 _loaded_image=None
   `);
@@ -460,7 +507,7 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\bPotentiometer\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
   }

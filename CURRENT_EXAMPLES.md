@@ -1,31 +1,44 @@
-# ZEBJUS Python Lab v5.18 — Current Examples
+# ZEBJUS Python Lab v5.20 — Current Examples
 
-Only the hardware examples currently being developed are shown in the Learning Example menu.
+The Learning Example menu is intentionally limited to the hardware features currently developed and tested.
 
 1. RGB LED — Basic Colors
 2. RGB LED — Blink
 3. RGB LED — Animation
 4. RGB LED — Indication & Effects
 5. RGB LED — Fade / Breathing
-6. Potentiometer — Read
-7. Potentiometer — Monitor
-8. Potentiometer → RGB Brightness
-9. Potentiometer → LED Effects
+6. Generic Analog Input
+7. Potentiometer / Analog Knob
+8. Generic Digital Input
+9. Push Switch Input
+10. Switch → RGB LED
+11. Rotary Encoder + Push Switch
+12. Rotary Encoder → RGB LED
+13. Analog Input → RGB LED
 
-Future examples should be added only when the corresponding hardware/software feature is implemented and tested.
+## Analog input pins
 
-## RGB output pins
-Safe selectable outputs in the current firmware:
+With ESP32 Wi-Fi active, use ADC1 pins:
 
-`4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33`
+`GPIO32, GPIO33, GPIO34, GPIO35, GPIO36, GPIO39`
 
-Default: `RGBLED(25, 26, 27)`.
+Use `AnalogInput(pin)` for generic analog sensors. `Potentiometer(pin)` is a convenience alias.
 
-## Potentiometer input pins
-Use ESP32 ADC1 pins while Wi-Fi is active:
+## Digital input pins
 
-`32, 33, 34, 35, 36, 39`
+Supported input pins:
 
-Recommended default: `Potentiometer(34)`.
+`GPIO4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39`
 
-GPIO34/35/36/39 are input-only, so they are especially suitable for potentiometer/sensor inputs.
+GPIO34/35/36/39 do not have internal pull-up resistors. Use an external resistor when a switch or encoder requires a pull-up.
+
+## Rotary encoder
+
+Typical example:
+
+```python
+from zebjus import RotaryEncoder
+encoder = RotaryEncoder(32, 33, 14)  # CLK, DT, SW
+```
+
+The ESP32 continuously tracks rotation so steps are not dependent only on browser polling.

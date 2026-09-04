@@ -4,6 +4,7 @@
   const KNOWN_KEY="zebjus.lab.knownKits";
   const SAFE_RGB_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const SAFE_ADC_PINS=[32,33,34,35,36,39];
+  const SAFE_DIGITAL_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
 
   function normalizeKitName(value){
     let s=String(value||"").trim().toLowerCase();
@@ -213,8 +214,24 @@
       this._commandChain=this._commandChain.then(task,task);return this._commandChain;
     }
     async analog(pin=34){
-      pin=Number(pin);if(!SAFE_ADC_PINS.includes(pin))throw new Error("Potentiometer pin must be one of: "+SAFE_ADC_PINS.join(", "));
-      return this._request(`/api/analog?pin=${encodeURIComponent(pin)}`,{timeout:1400});
+      pin=Number(pin);if(!SAFE_ADC_PINS.includes(pin))throw new Error("Analog input pin must be one of: "+SAFE_ADC_PINS.join(", "));
+      return this._request(`/api/input/analog?pin=${encodeURIComponent(pin)}`,{timeout:1400});
+    }
+    async digital(pin=32,{pullup=true,activeLow=true}={}){
+      pin=Number(pin);if(!SAFE_DIGITAL_PINS.includes(pin))throw new Error("Digital input pin must be one of: "+SAFE_DIGITAL_PINS.join(", "));
+      const q=`pin=${encodeURIComponent(pin)}&pullup=${pullup?1:0}&activeLow=${activeLow?1:0}`;
+      return this._request(`/api/input/digital?${q}`,{timeout:1400});
+    }
+    async rotary(clk=32,dt=33,sw=-1,{pullup=true}={}){
+      clk=Number(clk);dt=Number(dt);sw=sw===null||sw===undefined?-1:Number(sw);
+      if(!SAFE_DIGITAL_PINS.includes(clk)||!SAFE_DIGITAL_PINS.includes(dt)||clk===dt)throw new Error("Invalid rotary CLK/DT pins.");
+      if(sw>=0&&(!SAFE_DIGITAL_PINS.includes(sw)||sw===clk||sw===dt))throw new Error("Invalid rotary switch pin.");
+      const q=`clk=${encodeURIComponent(clk)}&dt=${encodeURIComponent(dt)}&sw=${encodeURIComponent(sw)}&pullup=${pullup?1:0}`;
+      return this._request(`/api/input/rotary?${q}`,{timeout:1400});
+    }
+    async resetRotary(clk=32,dt=33,sw=-1){
+      const data={clk:Number(clk),dt:Number(dt),sw:sw===null||sw===undefined?-1:Number(sw)};
+      return this._request("/api/input/rotary/reset",{method:"POST",data,timeout:1400});
     }
     async rename(name){
       if(!this.base)await this.reconnect(4);const clean=normalizeKitName(name);if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");
@@ -230,6 +247,6 @@
   }
 
   global.ZebjusKit={
-    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS,SAFE_ADC_PINS
+    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS,SAFE_ADC_PINS,SAFE_DIGITAL_PINS
   };
 })(window);
