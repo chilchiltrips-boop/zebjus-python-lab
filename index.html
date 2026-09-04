@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.14</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.15</span>
       <p>Python • OpenCV • MediaPipe • RGB LED • Ultrasonic • Potentiometer</p>
     </div>
     <div class="top-actions">
@@ -249,7 +249,8 @@
         <span class="muted">RGB channels use 0–255</span>
       </div>
       <div class="help-grid">
-        <code>RGBLED(1).write(255,0,0)</code>
+        <code>RGBLED(25,26,27).write(255,0,0)</code>
+        <code>RGBLED(25,26,27).color("purple")</code>
         <code>Ultrasonic(1).read()</code>
         <code>Potentiometer(1).read()</code>
         <code>Camera(0).read()</code>
@@ -278,8 +279,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.14"></script>
-  <script src="./ai.js?v=5.14"></script>
-  <script src="./app.js?v=5.14"></script>
+  <script src="./config.js?v=5.15"></script>
+  <script src="./kit-client.js?v=5.15"></script>
+  <script src="./ai.js?v=5.15"></script>
+  <script src="./app.js?v=5.15"></script>
 </body>
 </html>

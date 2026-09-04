@@ -2,6 +2,8 @@
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
+  const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
+  let kitCommandErrorShown=false;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -12,12 +14,13 @@
   let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056};
 
   const defaults={
-    autoCamera:true,demoMode:true,kitId:"ZB-000123",wsUrl:"",
+    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitIp:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",
     demoUltrasonic:45,demoPot:128
   };
   function getSettings(){let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(e){}return {...defaults,...s};}
   let prefs=getSettings();
+  if(!prefs.kitName&&prefs.kitId&&!/^ZB-/i.test(prefs.kitId))prefs.kitName=prefs.kitId;
   sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
   sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
   sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
@@ -104,7 +107,7 @@ while True:
     imgRgb:`from zebjus_cv import load_image, draw_rgb_led, show\n\nimg = load_image()\ndraw_rgb_led(img, 90, 90, 255, 0, 0, 30)\ndraw_rgb_led(img, 170, 90, 0, 255, 0, 30)\ndraw_rgb_led(img, 250, 90, 0, 0, 255, 30)\nshow(img, "RGB LED Graphics")`,
     imgPot:`from zebjus import Potentiometer\nfrom zebjus_cv import load_image, draw_potentiometer, show\n\npot = Potentiometer(1)\nimg = load_image()\ndraw_potentiometer(img, 120, 120, pot.read(), 42)\nshow(img, "Potentiometer Graphic")`,
     imgDashboard:`from zebjus import Potentiometer, Ultrasonic\nfrom zebjus_cv import load_image, draw_rgb_led, draw_potentiometer, draw_ultrasonic, show\n\nimg = load_image()\npot = Potentiometer(1).read()\ndistance = Ultrasonic(1).read()\n\ndraw_rgb_led(img, 80, 80, 0, 255, 0, 28)\ndraw_potentiometer(img, 180, 80, pot, 34)\ndraw_ultrasonic(img, 260, 65, distance, 400, 180, 20)\nshow(img, "ZEBJUS Kit Dashboard")`,
-    rgb:`from zebjus import RGBLED, sleep\n\nrgb = RGBLED(1)\n\nrgb.write(255, 0, 0)   # Red\nsleep(1)\nrgb.write(0, 255, 0)   # Green\nsleep(1)\nrgb.write(0, 0, 255)   # Blue\nsleep(1)\nrgb.write(255, 120, 0) # Orange\nsleep(1)\nrgb.off()`,
+    rgb:`from zebjus import RGBLED, sleep\n\n# ESP32 safe PWM pins: Red=25, Green=26, Blue=27\nrgb = RGBLED(25, 26, 27)\n\nrgb.color("red")\nsleep(1)\nrgb.color("green")\nsleep(1)\nrgb.color("blue")\nsleep(1)\nrgb.write(255, 120, 0)  # Custom RGB color\nsleep(1)\nrgb.off()`,
     sensors:`from zebjus import Ultrasonic, Potentiometer\n\nultra = Ultrasonic(1)\npot = Potentiometer(1)\n\nprint("Distance:", ultra.read(), "cm")\nprint("Pot value:", pot.read(), "/ 255")\nprint("Pot raw:", pot.raw())`,
     servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\nfor angle in [0, 45, 90, 135, 180, 90]:\n    servo.write(angle)\n    sleep(0.5)`,
     project01:`# Project 01 - Hello Python
@@ -371,14 +374,14 @@ while True:
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED()","RGB LED 0–255"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer()","0–255 pot"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["Ultrasonic()","class","Ultrasonic()","Distance cm"],["Potentiometer()","class","Potentiometer()","0–255 pot"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
     ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
     ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
 
   const moduleMembers={
     zebjus:[
-      ["RGBLED","class","RGBLED","RGB LED"],["LED","class","LED","LED"],["Ultrasonic","class","Ultrasonic","Ultrasonic"],
+      ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","LED"],["Ultrasonic","class","Ultrasonic","Ultrasonic"],
       ["Potentiometer","class","Potentiometer","Potentiometer"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
@@ -395,7 +398,7 @@ while True:
 
   const members={
     cv2:[["cvtColor()","function","cvtColor()","Color conversion"],["Canny()","function","Canny()","Edges"],["threshold()","function","threshold()","Threshold"],["resize()","function","resize()","Resize"],["GaussianBlur()","function","GaussianBlur()","Blur"],["rectangle()","function","rectangle()","Rectangle"],["circle()","function","circle()","Circle"],["putText()","function","putText()","Text"],["COLOR_BGR2GRAY","constant","COLOR_BGR2GRAY","Gray"],["THRESH_BINARY","constant","THRESH_BINARY","Binary"]],
-    RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
+    RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"]],
     Potentiometer:[["read()","method","read()","0–255"],["raw()","method","raw()","Raw ADC"],["value","property","value","0–255"]],
@@ -740,7 +743,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.14",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.15",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1012,6 +1015,11 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
+    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|Ultrasonic|Potentiometer)\s*\(/.test(src);
+    if(needsPhysicalKit&&!prefs.demoMode){
+      const connected=await ensureKitConnected(true);
+      if(!connected){badge($("pythonStatus"),"Kit not connected","warn");return;}
+    }
     const needsHand=/\bzebjus_ai\b|\bHandDetector\b|\bHandTrackingModule\b|\bhandDetector\s*\(/.test(src);
     const needsFace=/\bFaceDetector\b|\bFaceDetectionModule\b|\bface_detection\b|\bmp\.solutions\.face_detection\b/.test(src);
     const needsCamera=needsHand||needsFace||/\bCamera\s*\(|\bcv2\.VideoCapture\s*\(/.test(src);
@@ -1113,7 +1121,8 @@ while True:
     running=false;
     closeAllCvWindows();
     stopCamera();
-    applyDemo({command:"RGB_LED_SET",id:1,r:0,g:0,b:0});
+    const stopRgb={command:"RGB_LED_SET",id:1,r:0,g:0,b:0};
+    applyDemo(stopRgb);if(!prefs.demoMode&&kitClient?.connected)kitClient.rgb(stopRgb).catch(()=>{});
     applyDemo({command:"MOTOR_SET",id:1,speed:0});
     updateRunControls();
     createWorker();
@@ -1152,28 +1161,65 @@ while True:
     updateSensorGraphics();
   }
 
-  function handleKit(p){
+  async function handleKit(p){
     if(!p)return;
-    if(prefs.demoMode){applyDemo(p);}
-    else if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:"command",kitId:prefs.kitId,...p}));
-    else { /* physical kit not connected: keep student terminal clean */ }
+    applyDemo(p); // Always mirror hardware output on the screen.
+    if(prefs.demoMode)return;
+
+    if(kitClient?.connected){
+      try{
+        if(p.command==="RGB_LED_SET"){
+          await kitClient.rgb(p);
+          kitCommandErrorShown=false;
+        }else if(ws?.readyState===WebSocket.OPEN){
+          ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
+        }
+      }catch(e){
+        badge($("kitStatus"),"Kit error");
+        if(!kitCommandErrorShown){log("Kit command error: "+(e?.message||e));kitCommandErrorShown=true;}
+      }
+      return;
+    }
+
+    if(ws?.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
+    }
+  }
+
+  async function ensureKitConnected(showError=true){
+    if(prefs.demoMode)return true;
+    if(kitClient?.connected)return true;
+    const name=(prefs.kitName||prefs.kitId||"").trim();
+    if(name&&kitClient){
+      try{
+        badge($("kitStatus"),"Connecting kit…","warn");
+        const st=await kitClient.connect(name,prefs.kitIp||"");
+        prefs.kitName=st.name||name;prefs.kitId=prefs.kitName;prefs.kitIp=st.ip||prefs.kitIp||"";
+        localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
+        $("kitNameText").textContent=prefs.kitName;
+        badge($("kitStatus"),"Kit connected","ok");
+        return true;
+      }catch(e){
+        badge($("kitStatus"),"Kit disconnected");
+        if(showError)log("Kit connection failed: "+(e?.message||e)+" Open Settings and select the kit on the same Wi-Fi.");
+      }
+    }
+    if(showError&&!name)log("No physical kit selected. Open Settings → Kit Connection.");
+    return false;
   }
 
   function connectRealKit(){
     if(prefs.demoMode)return;
-    if(!prefs.wsUrl?.startsWith("wss://")){log("Set WebSocket URL in Settings.");return;}
-    try{
-      ws=new WebSocket(prefs.wsUrl);
-      ws.onopen=()=>{ws.send(JSON.stringify({type:"hello",kitId:prefs.kitId}));badge($("kitStatus"),"Kit connected","ok");};
-      ws.onmessage=e=>{
-        try{
-          const d=JSON.parse(e.data);
-          if(d.type==="sensor"||d.type==="sensors")updateSensorPacket(d);
-          else log("KIT → "+e.data);
-        }catch(_){log("KIT → "+e.data);}
-      };
-      ws.onerror=()=>log("WebSocket error.");ws.onclose=()=>badge($("kitStatus"),"Kit disconnected");
-    }catch(e){log("Kit connection error: "+e.message);}
+    ensureKitConnected(false).then(ok=>{
+      if(ok)return;
+      if(!prefs.wsUrl?.startsWith("wss://"))return;
+      try{
+        ws=new WebSocket(prefs.wsUrl);
+        ws.onopen=()=>{ws.send(JSON.stringify({type:"hello",kitId:prefs.kitName||prefs.kitId}));badge($("kitStatus"),"Kit connected","ok");};
+        ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==="sensor"||d.type==="sensors")updateSensorPacket(d);}catch(_){}};
+        ws.onclose=()=>badge($("kitStatus"),"Kit disconnected");
+      }catch(_){/* optional legacy connection */}
+    });
   }
 
   function showImage(url){
@@ -1213,6 +1259,6 @@ while True:
   document.querySelectorAll(".output-tab").forEach(b=>b.onclick=()=>switchOutput(b.dataset.view));
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
-  $("kitNameText").textContent=prefs.kitId||"ZB-000123";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
+  $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
   updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();
 })();

@@ -1,5 +1,5 @@
 {
-  "version": "5.14",
+  "version": "5.15",
   "js_checks": {
     "config.js": {
       "returncode": 0,
@@ -24,20 +24,32 @@
     "camera-bridge.js": {
       "returncode": 0,
       "stderr": ""
+    },
+    "kit-client.js": {
+      "returncode": 0,
+      "stderr": ""
     }
   },
-  "python_files": [],
   "critical": {
     "all_js_pass": true,
     "no_python_example_files": true,
     "no_examples_folder": true,
     "all_20_dropdown_projects_retained": true,
     "student_virtual_filename_main_py": true,
-    "traceback_filters_main_py": true,
-    "structured_runtime_line": true,
-    "editor_red_marker_retained": true,
     "editor_diagnostics_retained": true,
     "camera_panel_imshow_retained": true,
-    "live_face_retained": true
+    "kit_client_added": true,
+    "kit_settings_added": true,
+    "physical_rgb_direct_pins": true,
+    "rgb_pin_validation": true,
+    "firmware_added": true,
+    "firmware_unique_name_mdns": true,
+    "firmware_duplicate_name_409": true,
+    "firmware_wifi_profiles": true,
+    "firmware_rgb_api": true,
+    "firmware_no_reserved_setup_button": true
+  },
+  "notes": {
+    "arduino_compile": "arduino-cli/core toolchain not installed in sandbox; firmware was source-reviewed and API choices match Arduino-ESP32 3.x current LEDC/mDNS APIs."
   }
 }

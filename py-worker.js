@@ -47,12 +47,44 @@ def _send(command,**kwargs):
         dict_converter=js.Object.fromEntries
     ))
 
+SUPPORTED_RGB_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33)
+_RGB_COLORS={
+    "red":(255,0,0),"green":(0,255,0),"blue":(0,0,255),"white":(255,255,255),
+    "yellow":(255,255,0),"cyan":(0,255,255),"purple":(128,0,255),"magenta":(255,0,255),
+    "orange":(255,120,0),"pink":(255,40,120),"off":(0,0,0),"black":(0,0,0)
+}
+
 class RGBLED:
-    def __init__(self,id=1): self.id=int(id)
+    def __init__(self,*args,red=None,green=None,blue=None,common_anode=False):
+        self.id=1;self.pins=None;self.common_anode=bool(common_anode)
+        named=(red is not None or green is not None or blue is not None)
+        if named:
+            if red is None or green is None or blue is None: raise ValueError("RGBLED named pins require red=, green= and blue= together")
+            if args: raise ValueError("Use either RGBLED(25,26,27) or named red=/green=/blue= pins, not both")
+            self.pins=(int(red),int(green),int(blue))
+        elif len(args)==0:
+            self.id=1
+        elif len(args)==1:
+            self.id=int(args[0])
+        elif len(args)==3:
+            self.pins=tuple(int(x) for x in args)
+        else:
+            raise ValueError("RGBLED expects RGBLED(1) or RGBLED(redPin, greenPin, bluePin)")
+        if self.pins is not None:
+            if len(set(self.pins))!=3: raise ValueError("RGB LED red, green and blue pins must be different")
+            bad=[p for p in self.pins if p not in SUPPORTED_RGB_PINS]
+            if bad: raise ValueError(f"Unsupported RGB pin(s): {bad}. Use one of {SUPPORTED_RGB_PINS}")
     def write(self,r=0,g=0,b=0):
         r,g,b=_clamp255(r),_clamp255(g),_clamp255(b)
-        _send("RGB_LED_SET",id=self.id,r=r,g=g,b=b)
+        data={"id":self.id,"r":r,"g":g,"b":b,"commonAnode":self.common_anode}
+        if self.pins is not None: data.update({"rPin":self.pins[0],"gPin":self.pins[1],"bPin":self.pins[2]})
+        _send("RGB_LED_SET",**data)
     def set(self,r=0,g=0,b=0): self.write(r,g,b)
+    def color(self,name,brightness=255):
+        key=str(name).strip().lower()
+        if key not in _RGB_COLORS: raise ValueError("Unknown RGB color: "+str(name))
+        level=_clamp255(brightness)/255.0;r,g,b=_RGB_COLORS[key]
+        self.write(round(r*level),round(g*level),round(b*level))
     def red(self,value=255): self.write(value,0,0)
     def green(self,value=255): self.write(0,value,0)
     def blue(self,value=255): self.write(0,0,value)

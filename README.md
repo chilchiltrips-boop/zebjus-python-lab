@@ -542,3 +542,43 @@ Expected:
 - `NameError · line 23`
 - red `●` on editor line 23
 - red underline/highlight on line 23
+
+## v5.15 — Multi-kit Wi-Fi + unique names + physical RGB LED
+
+Added first physical ESP32 kit integration while preserving Demo mode and the existing Python/OpenCV/MediaPipe workflow.
+
+### Kit connection
+- New `kit-client.js` local-network client.
+- Settings can connect by unique kit name, remember the last kit and IP, and scan default `zebjus_kit_N` names.
+- Main Run flow auto-connects the selected physical kit before running hardware code.
+- On-screen RGB output still mirrors physical RGB commands.
+
+### Unique names on one Wi-Fi
+The new firmware advertises a `_zebjus._tcp` mDNS service and chooses the first unused name:
+
+`zebjus_kit_1`, `zebjus_kit_2`, `zebjus_kit_3`, ...
+
+Rename requests are checked against the current Wi-Fi network. Duplicate names return HTTP 409 with:
+
+`Another person is using this name on this Wi-Fi network.`
+
+`Reset Auto Name` clears the name and chooses the next free default name after restart.
+
+### Wi-Fi management
+- Up to 5 saved Wi-Fi profiles.
+- New network can be scanned, saved, and marked preferred from Settings.
+- If no saved network works, firmware returns to `ZEBJUS-SETUP-<ID>` AP mode.
+
+### Physical RGB LED
+New direct-pin Python API:
+
+```python
+from zebjus import RGBLED
+rgb = RGBLED(25, 26, 27)
+rgb.color("purple")
+rgb.write(255, 120, 0)
+```
+
+Safe output pins are validated in Python and again in ESP32 firmware. Old `RGBLED(1)` code remains supported and maps to default physical pins R25/G26/B27.
+
+See `KIT_RGB_WIFI_GUIDE.md` and `esp32_firmware/ZEBJUS_Kit_RGB_WiFi_v1.ino`.
