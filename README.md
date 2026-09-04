@@ -581,4 +581,20 @@ rgb.write(255, 120, 0)
 
 Safe output pins are validated in Python and again in ESP32 firmware. Old `RGBLED(1)` code remains supported and maps to default physical pins R25/G26/B27.
 
-See `KIT_RGB_WIFI_GUIDE.md` and `esp32_firmware/ZEBJUS_Kit_RGB_WiFi_v1.ino`.
+See `KIT_RGB_WIFI_GUIDE.md` and `esp32_firmware/ZEBJUS_Kit_RGB_WiFi_v1_1.ino`.
+
+
+## v5.16 — Run-synchronized RGB + automatic OFF + per-kit Wi-Fi profiles
+
+### Run-only hardware output
+- The browser opens `/api/run/start` immediately before student hardware code starts.
+- A 1-second heartbeat keeps the ESP32 run session active.
+- `/api/run/end` is sent on normal finish, Python error or End.
+- ESP32 independently forces RGB OFF after 3.5 seconds without heartbeat.
+- RGB color commands are rejected outside an active run session.
+
+### Software/physical timing
+In physical-kit mode the on-screen RGB graphic is now updated **after the ESP32 acknowledges `/api/rgb`**, rather than before the network request. This removes the visible software-ahead-of-kit blink mismatch.
+
+### Per-kit Wi-Fi storage
+Each ESP32 keeps its own five SSID/password profiles in NVS. Settings can list saved SSIDs, select a previously saved network, remove one profile, or clear all profiles. Password values are never returned to the browser. Browser storage remembers kit identity/name/IP separately by chip ID.

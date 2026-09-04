@@ -93,7 +93,9 @@
     const status=await client.connect(name,$("kitIp").value.trim());
     $("kitName").value=status.name||name;$("kitIp").value=status.ip||"";$("newKitName").value=status.name||name;
     current.kitName=status.name||name;current.kitId=current.kitName;current.kitIp=status.ip||"";current.demoMode=false;$("demoMode").checked=false;persist();
-    setConnBadge("Connected",true);renderKitInfo(status);return status;
+    setConnBadge("Connected",true);renderKitInfo(status);
+    refreshSavedWifi().catch(()=>{});
+    return status;
   }
 
   async function scanKits(){
@@ -144,9 +146,38 @@
     const ssid=$("wifiSelect").value,password=$("wifiPassword").value;
     if(!ssid){setMessage("wifiMessage","Select a Wi-Fi network first.","error-text");return;}
     try{
-      const r=await client.setWifi(ssid,password);setMessage("wifiMessage",r.message||`Saved ${ssid}. Kit is restarting and will try this network first.`,"ok-text");
+      const r=await client.setWifi(ssid,password);$("wifiPassword").value="";setMessage("wifiMessage",r.message||`Saved ${ssid}. Kit is restarting and will try this network first.`,"ok-text");
       client.disconnect();setConnBadge("Switching Wi-Fi…");
     }catch(e){setMessage("wifiMessage","Wi-Fi change failed: "+e.message,"error-text");}
+  }
+
+  async function refreshSavedWifi(){
+    const sel=$("savedWifiSelect");
+    if(!sel)return;
+    if(!client?.connected){sel.innerHTML="<option value=''>Connect kit first</option>";return;}
+    try{
+      const r=await client.savedWifi();sel.innerHTML="";
+      (r.profiles||[]).forEach(n=>{
+        const op=document.createElement("option");op.value=n.ssid;
+        const flags=[n.current?"current":"",n.preferred?"preferred":""].filter(Boolean).join(", ");
+        op.textContent=n.ssid+(flags?` — ${flags}`:"")+(n.passwordSaved?" 🔒":"");sel.appendChild(op);
+      });
+      if(!sel.options.length)sel.innerHTML="<option value=''>No saved networks</option>";
+    }catch(e){sel.innerHTML="<option value=''>Could not read saved networks</option>";throw e;}
+  }
+
+  async function useSavedWifi(){
+    const ssid=$("savedWifiSelect").value;if(!ssid){setMessage("wifiMessage","Select a saved Wi-Fi network first.","error-text");return;}
+    try{
+      const r=await client.useWifi(ssid);setMessage("wifiMessage",r.message||`Switching to saved network ${ssid}.`,"ok-text");
+      client.disconnect();setConnBadge("Switching Wi-Fi…");
+    }catch(e){setMessage("wifiMessage","Could not use saved Wi-Fi: "+e.message,"error-text");}
+  }
+
+  async function forgetSavedWifi(){
+    const ssid=$("savedWifiSelect").value;if(!ssid){setMessage("wifiMessage","Select a saved Wi-Fi network first.","error-text");return;}
+    try{const r=await client.forgetWifi(ssid);setMessage("wifiMessage",r.message||`Forgot ${ssid}.`,"ok-text");await refreshSavedWifi();}
+    catch(e){setMessage("wifiMessage","Could not forget saved Wi-Fi: "+e.message,"error-text");}
   }
 
   async function resetWifi(){
@@ -164,6 +195,8 @@
   $("disconnectKitBtn").onclick=()=>{client?.disconnect();setConnBadge("Not connected");renderKitInfo(null);};
   $("kitSelect").onchange=e=>{const op=e.target.selectedOptions[0];if(!op?.value)return;$("kitName").value=op.value;$("kitIp").value=op.dataset.ip||"";connectKit(op.value).catch(err=>setMessage("kitNameMessage","Connection failed: "+err.message,"error-text"));};
   $("renameKitBtn").onclick=renameKit;$("resetKitNameBtn").onclick=resetKitName;$("scanWifiBtn").onclick=scanWifi;$("saveWifiBtn").onclick=saveWifi;$("resetWifiBtn").onclick=resetWifi;
+  $("refreshSavedWifiBtn").onclick=()=>refreshSavedWifi().catch(e=>setMessage("wifiMessage","Saved Wi-Fi read failed: "+e.message,"error-text"));
+  $("useSavedWifiBtn").onclick=useSavedWifi;$("forgetSavedWifiBtn").onclick=forgetSavedWifi;
 
   $("resetSettingsBtn").onclick=()=>{current={...defaults};fill();listCameras();persist();setMessage("settingsSaved","Defaults restored.");};
 

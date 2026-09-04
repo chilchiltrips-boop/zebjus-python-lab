@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <title>ZEBJUS Python Lab Settings v5.15</title>
+  <title>ZEBJUS Python Lab Settings v5.16</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="settings-page">
@@ -106,6 +106,20 @@
             <input id="wifiPassword" type="password" placeholder="Password">
           </label>
           <button id="saveWifiBtn" class="btn primary">Save & Connect to This Wi-Fi</button>
+
+          <div class="saved-wifi-box">
+            <strong>Saved Wi-Fi profiles on this kit</strong>
+            <p class="muted settings-note">SSID + password are saved separately inside this ESP32 kit (NVS). Passwords are never shown back to the browser.</p>
+            <label>
+              <span>Saved network</span>
+              <select id="savedWifiSelect"><option value="">Connect kit first</option></select>
+            </label>
+            <div class="settings-inline">
+              <button id="refreshSavedWifiBtn" class="btn">Refresh Saved</button>
+              <button id="useSavedWifiBtn" class="btn">Use Selected</button>
+              <button id="forgetSavedWifiBtn" class="btn">Forget Selected</button>
+            </div>
+          </div>
           <span id="wifiMessage" class="muted"></span>
         </div>
 
@@ -179,7 +193,7 @@
       <span id="settingsSaved" class="muted"></span>
     </div>
   </main>
-  <script src="./kit-client.js?v=5.15"></script>
-  <script src="./settings.js?v=5.15"></script>
+  <script src="./kit-client.js?v=5.16"></script>
+  <script src="./settings.js?v=5.16"></script>
 </body>
 </html>

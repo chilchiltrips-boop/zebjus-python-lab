@@ -1,10 +1,10 @@
-# ZEBJUS Python Lab v5.15 — ESP32 Kit + RGB LED Guide
+# ZEBJUS Python Lab v5.16 — ESP32 Kit + RGB LED Guide
 
 ## 1. Firmware
 
 Upload:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_WiFi_v1.ino`
+`esp32_firmware/ZEBJUS_Kit_RGB_WiFi_v1_1.ino`
 
 Target: classic ESP32 DevKit / ESP32-WROOM-32 / ESP32-WROOM-DA.
 
@@ -58,15 +58,16 @@ Direct physical pins:
 from zebjus import RGBLED, sleep
 
 rgb = RGBLED(25, 26, 27)
-rgb.color("red")
-sleep(1)
-rgb.color("green")
-sleep(1)
-rgb.color("blue")
-sleep(1)
-rgb.write(255, 120, 0)
-sleep(1)
-rgb.off()
+
+while True:
+    rgb.color("red")
+    sleep(1)
+    rgb.color("green")
+    sleep(1)
+    rgb.color("blue")
+    sleep(1)
+    rgb.write(255, 120, 0)
+    sleep(1)
 ```
 
 Named-pin form:
@@ -144,3 +145,34 @@ Up to five Wi-Fi profiles are retained. If the preferred network is unavailable 
 ## 10. Browser note
 
 The Lab is an HTTPS web app while the ESP32 serves local HTTP. A modern browser can request local-network permission. Allow local-network access when prompted. If a Wix iframe blocks local access, test the GitHub Pages app directly first.
+
+
+## 11. v5.16 Run-only output safety and timing sync
+
+Physical RGB output is now controlled by a run session:
+
+- Press **Run** -> web software starts a kit run session.
+- While the program is running -> a heartbeat is sent to the ESP32 every second.
+- RGB screen preview updates only after the ESP32 acknowledges the hardware command, so the software LED and real LED change together.
+- Normal program finish -> RGB OFF.
+- Python error -> RGB OFF.
+- **End** -> RGB OFF.
+- Browser/page disappears or connection breaks -> after about 3.5 seconds without heartbeat, ESP32 automatically forces RGB OFF.
+- `/api/rgb` rejects ON/color commands when no run session is active.
+
+This means a student LED should not remain ON after the program has ended.
+
+## 12. Kit ID + Wi-Fi profiles are kept separate
+
+Every physical ESP32 has an immutable 6-digit Kit ID from its chip MAC (for example `D6CDC0`). The browser remembers the kit name/IP/Kit ID as a device profile.
+
+SSID/password profiles are stored in that **specific ESP32 kit's NVS**, up to five networks. Passwords are intentionally not sent back to the browser. Settings can:
+
+- view saved SSID names,
+- see which one is current/preferred,
+- select a previously saved network without re-entering its password,
+- forget one saved network,
+- forget all networks,
+- scan/add another SSID + password.
+
+Changing or resetting the kit's unique name does not erase its saved Wi-Fi profiles. Forgetting Wi-Fi does not erase the kit name.

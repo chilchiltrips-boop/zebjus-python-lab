@@ -1,5 +1,5 @@
 {
-  "version": "5.15",
+  "version": "5.16",
   "js_checks": {
     "config.js": {
       "returncode": 0,
@@ -32,24 +32,24 @@
   },
   "critical": {
     "all_js_pass": true,
-    "no_python_example_files": true,
-    "no_examples_folder": true,
+    "settings_ids_present": true,
     "all_20_dropdown_projects_retained": true,
-    "student_virtual_filename_main_py": true,
-    "editor_diagnostics_retained": true,
-    "camera_panel_imshow_retained": true,
-    "kit_client_added": true,
-    "kit_settings_added": true,
-    "physical_rgb_direct_pins": true,
-    "rgb_pin_validation": true,
-    "firmware_added": true,
-    "firmware_unique_name_mdns": true,
-    "firmware_duplicate_name_409": true,
-    "firmware_wifi_profiles": true,
-    "firmware_rgb_api": true,
-    "firmware_no_reserved_setup_button": true
+    "run_session_start_ping_end": true,
+    "firmware_heartbeat_failsafe_off": true,
+    "firmware_rgb_rejected_outside_run": true,
+    "saved_wifi_profile_list": true,
+    "saved_wifi_select_use_remove": true,
+    "passwords_not_returned_to_browser": true,
+    "rgb_preview_after_hardware_ack": true,
+    "program_finish_rgb_off": true,
+    "program_error_rgb_off": true,
+    "end_button_rgb_off": true
+  },
+  "details": {
+    "settings_missing_ids": [],
+    "project_count": 20
   },
   "notes": {
-    "arduino_compile": "arduino-cli/core toolchain not installed in sandbox; firmware was source-reviewed and API choices match Arduino-ESP32 3.x current LEDC/mDNS APIs."
+    "arduino_compile": "arduino-cli/core toolchain is not installed in this environment; firmware lexical structure/braces were validated. Compile/upload on ESP32-WROOM-DA is required."
   }
 }

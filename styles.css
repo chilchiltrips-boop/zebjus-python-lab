@@ -195,7 +195,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c9d
 }
 .opencv-float-window{display:none!important}
 
-/* v5.15 kit connection / RGB hardware */
+/* v5.16 kit connection / RGB hardware */
 .kit-settings-card .panel-title{align-items:center}
 .kit-grid-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
 .kit-info-box{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;border:1px solid var(--line);border-radius:8px;background:#0b1220;padding:9px;font-size:10px;color:var(--muted)}
@@ -204,3 +204,5 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#c9d
 .kit-subsection{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:2px}.kit-subsection>strong{font-size:12px}
 .ok-text{color:#73d897!important}.error-text{color:#ff8791!important}
 @media(max-width:650px){.kit-grid-two{grid-template-columns:1fr}.kit-info-box{grid-template-columns:1fr}.kit-info-box>div{border-bottom:1px solid #1b2940!important}.kit-info-box>div:last-child{border-bottom:0!important}}
+
+.saved-wifi-box{display:grid;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:#0b1220}.saved-wifi-box>strong{font-size:11px}

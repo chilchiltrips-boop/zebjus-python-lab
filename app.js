@@ -3,7 +3,7 @@
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
-  let kitCommandErrorShown=false;
+  let kitCommandErrorShown=false,kitHeartbeatTimer=null,currentRunUsesKit=false;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -107,7 +107,7 @@ while True:
     imgRgb:`from zebjus_cv import load_image, draw_rgb_led, show\n\nimg = load_image()\ndraw_rgb_led(img, 90, 90, 255, 0, 0, 30)\ndraw_rgb_led(img, 170, 90, 0, 255, 0, 30)\ndraw_rgb_led(img, 250, 90, 0, 0, 255, 30)\nshow(img, "RGB LED Graphics")`,
     imgPot:`from zebjus import Potentiometer\nfrom zebjus_cv import load_image, draw_potentiometer, show\n\npot = Potentiometer(1)\nimg = load_image()\ndraw_potentiometer(img, 120, 120, pot.read(), 42)\nshow(img, "Potentiometer Graphic")`,
     imgDashboard:`from zebjus import Potentiometer, Ultrasonic\nfrom zebjus_cv import load_image, draw_rgb_led, draw_potentiometer, draw_ultrasonic, show\n\nimg = load_image()\npot = Potentiometer(1).read()\ndistance = Ultrasonic(1).read()\n\ndraw_rgb_led(img, 80, 80, 0, 255, 0, 28)\ndraw_potentiometer(img, 180, 80, pot, 34)\ndraw_ultrasonic(img, 260, 65, distance, 400, 180, 20)\nshow(img, "ZEBJUS Kit Dashboard")`,
-    rgb:`from zebjus import RGBLED, sleep\n\n# ESP32 safe PWM pins: Red=25, Green=26, Blue=27\nrgb = RGBLED(25, 26, 27)\n\nrgb.color("red")\nsleep(1)\nrgb.color("green")\nsleep(1)\nrgb.color("blue")\nsleep(1)\nrgb.write(255, 120, 0)  # Custom RGB color\nsleep(1)\nrgb.off()`,
+    rgb:`from zebjus import RGBLED, sleep\n\n# ESP32 safe PWM pins: Red=25, Green=26, Blue=27\nrgb = RGBLED(25, 26, 27)\n\n# Runs until End is pressed. The lab turns RGB OFF automatically on End/error.\nwhile True:\n    rgb.color("red")\n    sleep(1)\n    rgb.color("green")\n    sleep(1)\n    rgb.color("blue")\n    sleep(1)\n    rgb.write(255, 120, 0)  # Custom RGB color\n    sleep(1)`,
     sensors:`from zebjus import Ultrasonic, Potentiometer\n\nultra = Ultrasonic(1)\npot = Potentiometer(1)\n\nprint("Distance:", ultra.read(), "cm")\nprint("Pot value:", pot.read(), "/ 255")\nprint("Pot raw:", pot.raw())`,
     servo:`from zebjus import Servo, sleep\n\nservo = Servo(1)\nfor angle in [0, 45, 90, 135, 180, 90]:\n    servo.write(angle)\n    sleep(0.5)`,
     project01:`# Project 01 - Hello Python
@@ -743,7 +743,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.15",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.16",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -770,7 +770,7 @@ while True:
       else if(m.type==="close-images")closeAllCvWindows();
       else if(m.type==="error"){
         liveMode=false;if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
-        running=false;updateRunControls();
+        running=false;updateRunControls();endHardwareRun().catch(()=>{});
         const issue={
           errorType:m.errorType||"PythonError",
           message:m.message||m.text||"Unknown error",
@@ -786,10 +786,12 @@ while True:
       else if(m.type==="done"){
         if(liveMode&&running){
           liveTimer=setTimeout(()=>runLiveCycle().catch(err=>{
-            liveMode=false;running=false;updateRunControls();log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
+            liveMode=false;running=false;updateRunControls();endHardwareRun().catch(()=>{});log("Live loop error: "+(err?.message||err));badge($("pythonStatus"),"Python ready","ok");
           }),70);
         }else{
-          running=false;updateRunControls();clearEditorIssue();log("Program finished.");badge($("pythonStatus"),"Python ready","ok");
+          running=false;updateRunControls();clearEditorIssue();
+          endHardwareRun().finally(()=>log("Program finished. Kit outputs OFF."));
+          badge($("pythonStatus"),"Python ready","ok");
         }
       }
       else if(m.type==="kit-command")handleKit(m.payload);
@@ -798,7 +800,7 @@ while True:
         showCameraProcessedImage(m.dataUrl,m.title||"OpenCV Output");
       }
     };
-    worker.onerror=e=>{running=false;updateRunControls();log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
+    worker.onerror=e=>{running=false;updateRunControls();endHardwareRun().catch(()=>{});log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
   }
 
   function setupCameraBridge(){
@@ -1110,23 +1112,52 @@ while True:
       updateSensorGraphics();
     }
 
+    if(needsPhysicalKit&&!prefs.demoMode){
+      try{await beginHardwareRun();}
+      catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
+    }else{currentRunUsesKit=false;}
+
     badge($("pythonStatus"),liveMode?"Live running…":"Running…","warn");
     postProgramToWorker(src,runFrame);
   }
 
-  function stopProgram(){
+  function stopKitHeartbeat(){if(kitHeartbeatTimer){clearInterval(kitHeartbeatTimer);kitHeartbeatTimer=null;}}
+
+  async function beginHardwareRun(){
+    if(prefs.demoMode||!kitClient?.connected){currentRunUsesKit=false;return true;}
+    await kitClient.beginRun();
+    currentRunUsesKit=true;stopKitHeartbeat();
+    kitHeartbeatTimer=setInterval(()=>{
+      if(!running||!currentRunUsesKit||!kitClient?.connected)return;
+      kitClient.pingRun().catch(()=>{});
+    },1000);
+    return true;
+  }
+
+  async function endHardwareRun(){
+    stopKitHeartbeat();
+    const used=currentRunUsesKit;currentRunUsesKit=false;
+    const stopRgb={command:"RGB_LED_SET",id:1,r:0,g:0,b:0};
+    if(used&&!prefs.demoMode&&kitClient?.connected){
+      try{await kitClient.endRun();kitCommandErrorShown=false;}
+      catch(e){if(!kitCommandErrorShown){log("Kit OFF error: "+(e?.message||e));kitCommandErrorShown=true;}}
+    }
+    applyDemo(stopRgb);
+    applyDemo({command:"MOTOR_SET",id:1,speed:0});
+  }
+
+  async function stopProgram(){
     liveMode=false;liveCode="";
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     clearTimeout(lintTimer);
     running=false;
     closeAllCvWindows();
     stopCamera();
-    const stopRgb={command:"RGB_LED_SET",id:1,r:0,g:0,b:0};
-    applyDemo(stopRgb);if(!prefs.demoMode&&kitClient?.connected)kitClient.rgb(stopRgb).catch(()=>{});
-    applyDemo({command:"MOTOR_SET",id:1,speed:0});
+    if(worker){worker.terminate();worker=null;}
     updateRunControls();
+    await endHardwareRun();
     createWorker();
-    log("Stopped.");
+    log("Stopped. Kit outputs OFF.");
   }
 
   function updateSensorGraphics(){
@@ -1163,16 +1194,19 @@ while True:
 
   async function handleKit(p){
     if(!p)return;
-    applyDemo(p); // Always mirror hardware output on the screen.
-    if(prefs.demoMode)return;
+    if(prefs.demoMode){applyDemo(p);return;}
 
     if(kitClient?.connected){
       try{
         if(p.command==="RGB_LED_SET"){
-          await kitClient.rgb(p);
+          const result=await kitClient.rgb(p);
+          if(!result?.skipped)applyDemo(p); // Mirror only after ESP32 acknowledges: screen and kit stay synchronized.
           kitCommandErrorShown=false;
         }else if(ws?.readyState===WebSocket.OPEN){
           ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
+          applyDemo(p);
+        }else{
+          applyDemo(p);
         }
       }catch(e){
         badge($("kitStatus"),"Kit error");
@@ -1183,6 +1217,7 @@ while True:
 
     if(ws?.readyState===WebSocket.OPEN){
       ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
+      applyDemo(p);
     }
   }
 
@@ -1260,5 +1295,6 @@ while True:
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
   $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
+  window.addEventListener("pagehide",()=>{stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
   updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();
 })();
