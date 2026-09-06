@@ -5,6 +5,7 @@
   const SAFE_RGB_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const SAFE_ADC_PINS=[32,33,34,35,36,39];
   const SAFE_DIGITAL_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
+  const SAFE_ULTRASONIC_ECHO_PINS=[12,...SAFE_DIGITAL_PINS];
 
   function normalizeKitName(value){
     let s=String(value||"").trim().toLowerCase();
@@ -129,7 +130,7 @@
     constructor(){
       this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";
       this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
-      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";
+      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";this._dhtCache=new Map();
     }
     get connected(){return !!this.base&&!!this.status;}
     _accept(status,base){
@@ -186,7 +187,7 @@
       }
     }
     async beginRun(){
-      await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();this._oledInitialized=false;
+      await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();this._oledInitialized=false;this._dhtCache.clear();
       return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
     }
     async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900});}
@@ -236,9 +237,18 @@
     async ultrasonic(trig=18,echo=19,{maxCm=400}={}){
       trig=Number(trig);echo=Number(echo);maxCm=Math.max(2,Math.min(600,Number(maxCm)||400));
       if(!SAFE_RGB_PINS.includes(trig))throw new Error("Ultrasonic TRIG must use an output-capable pin: "+SAFE_RGB_PINS.join(", "));
-      if(!SAFE_DIGITAL_PINS.includes(echo)||trig===echo)throw new Error("Invalid ultrasonic ECHO pin.");
+      if(!SAFE_ULTRASONIC_ECHO_PINS.includes(echo)||trig===echo)throw new Error("Invalid ultrasonic ECHO pin.");
       const q=`trig=${encodeURIComponent(trig)}&echo=${encodeURIComponent(echo)}&maxCm=${encodeURIComponent(maxCm)}`;
       return this._request(`/api/input/ultrasonic?${q}`,{timeout:1800});
+    }
+    async dht11(pin=13){
+      pin=Number(pin);if(!SAFE_RGB_PINS.includes(pin))throw new Error("DHT11 DATA must use an output-capable pin: "+SAFE_RGB_PINS.join(", "));
+      const now=Date.now(),cached=this._dhtCache.get(pin);
+      if(cached&&now-cached.at<1000)return {...cached.data,cached:true};
+      const data=await this._request(`/api/input/dht11?pin=${encodeURIComponent(pin)}`,{timeout:1800});
+      if(data?.valid!==false)this._dhtCache.set(pin,{at:Date.now(),data});
+      else if(cached)return {...cached.data,valid:false,stale:true,message:data?.message||"DHT11 read missed; using previous value."};
+      return data;
     }
     async oled(p={}){
       const action=String(p.action||p.command||"").replace(/^OLED_/,"").toLowerCase();

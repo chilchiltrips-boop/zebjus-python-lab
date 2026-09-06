@@ -14,18 +14,20 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{}}};
+  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}}};
+  const plotter={series:new Map(),maxPoints:180,seq:0};
 
   const defaults={
     autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",
-    demoUltrasonic:45,demoPot:128
+    demoUltrasonic:45,demoPot:128,demoDhtTemp:28,demoDhtHumidity:65
   };
   function getSettings(){let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(e){}return {...defaults,...s};}
   let prefs=getSettings();
   if(!prefs.kitName&&prefs.kitId&&!/^ZB-/i.test(prefs.kitId))prefs.kitName=prefs.kitId;
   if(kitClient){kitClient.name=prefs.kitName||"";kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=String(prefs.kitChipId||"");}
   sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
+  sensorState.dhtTemperature=Number(prefs.demoDhtTemp)||28; sensorState.dhtHumidity=Number(prefs.demoDhtHumidity)||65;
   sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
   sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
 
@@ -253,6 +255,104 @@ while True:
     print("Distance:", round(distance, 1), "cm")
     sleep(0.2)`,
 
+    dht11Read:`# DHT11 Temperature + Humidity — legacy get_values() style
+from zebjus import DHT11, sleep
+
+# DATA -> GPIO13
+b = DHT11(13)
+
+print("Listening for humidity/temp...")
+while True:
+    vals = b.get_values()
+    if len(vals) >= 2:
+        humidity = vals[0] / 10.0
+        temperature = vals[1] / 10.0
+        print(f"Humidity: {humidity:.1f}% | Temp: {temperature:.1f} °C")
+    sleep(1)`,
+
+    dht11Plotter:`# DHT11 Live Serial Plotter
+from zebjus import DHT11, plot, sleep
+
+dht = DHT11(13)
+
+while True:
+    temperature = dht.temperature()
+    humidity = dht.humidity()
+    print(f"Temp: {temperature:.1f} °C | Humidity: {humidity:.1f} %")
+    plot(Temperature=temperature, Humidity=humidity)
+    sleep(1)`,
+
+    dht11Oled:`# DHT11 Temperature + Humidity on OLED
+from zebjus import DHT11, OLED, sleep
+
+dht = DHT11(13)
+oled = OLED(21, 22, 0x3C)
+
+while True:
+    t = dht.temperature()
+    h = dht.humidity()
+    oled.display_text("TEMP  %.1f C\\nHUM   %.1f %%" % (t, h), 8, 14, 1)
+    sleep(1)`,
+
+    dht11Rgb:`# DHT11 Temperature Alert with RGB LED
+from zebjus import DHT11, RGBLED, sleep
+
+dht = DHT11(13)
+rgb = RGBLED(25, 26, 27)
+
+while True:
+    t = dht.temperature()
+    h = dht.humidity()
+    if t >= 32:
+        rgb.color("red")
+    elif t >= 28:
+        rgb.color("yellow")
+    else:
+        rgb.color("green")
+    print(f"{t:.1f} °C | {h:.1f} %RH")
+    sleep(1)`,
+
+    dht11Dashboard:`# DHT11 OpenCV Gauge Dashboard
+import cv2
+import numpy as np
+from zebjus import DHT11, plot, sleep
+
+dht = DHT11(13)
+
+def draw_temp(img, value):
+    cx, cy, radius = 210, 205, 95
+    cv2.circle(img, (cx, cy), radius, (90, 90, 90), 5, cv2.LINE_AA)
+    angle = max(0, min(360, int(360 * value / 50.0)))
+    cv2.ellipse(img, (cx, cy), (radius, radius), -90, 0, angle,
+                (255, 200, 255), 16, cv2.LINE_AA)
+    cv2.putText(img, f"{value:.1f} C", (cx-62, cy+12),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 220, 255), 2, cv2.LINE_AA)
+
+def draw_hum(img, value):
+    x, y, w, h = 465, 100, 90, 220
+    filled = int(h * max(0, min(100, value)) / 100.0)
+    cv2.rectangle(img, (x, y), (x+w, y+h), (90, 90, 90), 4)
+    cv2.rectangle(img, (x, y+h-filled), (x+w, y+h), (100, 200, 255), -1)
+    cv2.putText(img, f"{value:.1f} %", (x-5, y-18),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (150, 220, 255), 2, cv2.LINE_AA)
+
+current_hum, current_temp = 0.0, 0.0
+alpha = 0.12
+
+while True:
+    img = np.zeros((400, 700, 3), dtype=np.uint8)
+    target_hum = dht.humidity()
+    target_temp = dht.temperature()
+    current_hum += alpha * (target_hum - current_hum)
+    current_temp += alpha * (target_temp - current_temp)
+    cv2.putText(img, "DHT11 ENVIRONMENT DASHBOARD", (105, 45),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (230, 230, 230), 2, cv2.LINE_AA)
+    draw_temp(img, current_temp)
+    draw_hum(img, current_hum)
+    cv2.imshow("DHT11 Dashboard", img)
+    plot(Temperature=target_temp, Humidity=target_hum)
+    sleep(0.15)`,
+
     oledText:`# OLED Text Display
 from zebjus import OLED
 
@@ -331,14 +431,14 @@ while True:
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["LED()","class","LED()","White compatibility LED"],["OLED()","class","OLED(21,22,0x3C)","SSD1306 128x64 I2C display"],["Ultrasonic()","class","Ultrasonic(18,19)","HC-SR04 distance cm"],["AnalogInput()","class","AnalogInput(34)","Generic analog ADC1 input"],["Potentiometer()","class","Potentiometer(34)","Analog knob alias"],["DigitalInput()","class","DigitalInput(32)","Generic digital sensor input"],["Switch()","class","Switch(32)","Digital push switch input"],["RotaryEncoder()","class","RotaryEncoder(32,33,14)","Rotary encoder CLK/DT/SW"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["DHT11()","class","DHT11(13)","Temperature + humidity sensor"],["SerialPlotter()","class","SerialPlotter()","Live graph helper"],["plot()","function","plot(Temperature=t)","Send values to Serial Plotter"],["LED()","class","LED()","White compatibility LED"],["OLED()","class","OLED(21,22,0x3C)","SSD1306 128x64 I2C display"],["Ultrasonic()","class","Ultrasonic(18,19)","HC-SR04 distance cm"],["AnalogInput()","class","AnalogInput(34)","Generic analog ADC1 input"],["Potentiometer()","class","Potentiometer(34)","Analog knob alias"],["DigitalInput()","class","DigitalInput(32)","Generic digital sensor input"],["Switch()","class","Switch(32)","Digital push switch input"],["RotaryEncoder()","class","RotaryEncoder(32,33,14)","Rotary encoder CLK/DT/SW"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
     ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
     ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
 
   const moduleMembers={
     zebjus:[
-      ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","LED"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
+      ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","LED"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
       ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],["Motor","class","Motor","Motor"],["Servo","class","Servo","Servo"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
@@ -382,6 +482,8 @@ while True:
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     OLED:[["clear()","method","clear()","Clear OLED buffer"],["show()","method","show()","Display buffered drawing"],["text()","method","text()","Draw text"],["display_text()","method","display_text()","Clear + show text"],["line()","method","line()","Draw line"],["rect()","method","rect()","Draw rectangle"],["circle()","method","circle()","Draw circle"],["pixel()","method","pixel()","Draw pixel"],["scroll_text()","method","scroll_text()","Scrolling text animation"],["distance_bar()","method","distance_bar()","Distance gauge"],["radar()","method","radar()","Ultrasonic radar frame"],["invert()","method","invert()","Invert display"],["contrast()","method","contrast()","Set contrast"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["centimeters()","method","centimeters()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"],["trig","property","trig","TRIG GPIO"],["echo","property","echo","ECHO GPIO"]],
+    DHT11:[["read()","method","read()","Return temperature/humidity object"],["temperature()","method","temperature()","Temperature °C"],["humidity()","method","humidity()","Relative humidity %"],["get_values()","method","get_values()","Legacy [humidity×10,temp×10]"],["pin","property","pin","DATA GPIO"]],
+    SerialPlotter:[["plot()","method","plot()","Plot named values"],["clear()","method","clear()","Clear graph"]],
     AnalogInput:[["read()","method","read()","Scaled 0–255"],["raw()","method","raw()","Raw ADC 0–4095"],["percent()","method","percent()","0–100 percent"],["millivolts()","method","millivolts()","ADC millivolts"],["pin","property","pin","Selected ADC GPIO"],["value","property","value","0–255"]],
     Potentiometer:[["read()","method","read()","Scaled 0–255"],["raw()","method","raw()","Raw ADC 0–4095"],["percent()","method","percent()","0–100 percent"],["millivolts()","method","millivolts()","ADC millivolts"],["pin","property","pin","Selected ADC GPIO"],["value","property","value","0–255"]],
     DigitalInput:[["read()","method","read()","True when active"],["active()","method","active()","Same as read"],["state()","method","state()","Raw digital 0/1"],["pin","property","pin","Selected GPIO"],["value","property","value","Boolean active state"]],
@@ -401,11 +503,11 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*(?:HandDetector\\s*\\(\\s*\\)|\\w+)\\.read\\s*\\(").test(code))return "HandResult";
-    if(name==="rgb")return "RGBLED";if(name==="led")return "LED";if(name==="oled"||name==="display")return "OLED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
+    if(name==="rgb")return "RGBLED";if(name==="dht"||name==="dht11")return "DHT11";if(name==="plotter")return "SerialPlotter";if(name==="led")return "LED";if(name==="oled"||name==="display")return "OLED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
     if(name==="motor")return "Motor";if(name==="servo")return "Servo";if(name==="cam")return "Camera";if(name==="hand")return "HandDetector";if(name==="result")return "HandResult";
     if(name==="cv2")return "cv2";
     return null;
@@ -418,6 +520,7 @@ while True:
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
   const DIGITAL_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
+  const ULTRASONIC_ECHO_PINS=[12,...DIGITAL_INPUT_PINS];
   const PIN_HINT_ORDER={
     RGBLED:[25,26,27,32,33,4,13,14,16,17,18,19,21,22,23],
     AnalogInput:[34,35,36,39,32,33],Potentiometer:[34,35,36,39,32,33],
@@ -425,6 +528,7 @@ while True:
     Switch:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
     RotaryEncoder:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
     Ultrasonic:[18,19,16,17,21,22,23,25,26,27,32,33,4,13,14],
+    DHT11:[13,14,16,17,18,19,21,22,23,25,26,27,32,33,4],
     OLED:[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14]
   };
 
@@ -465,8 +569,10 @@ while True:
         let trig=parseNumberArg(args,"trig",0,18),echo=parseNumberArg(args,"echo",1,19);
         if(pos.length===1&&!/\b(?:trig|echo)\s*=/.test(args)){trig=18;echo=19;}
         add(trig,i+1,"Ultrasonic TRIG","Ultrasonic",RGB_OUTPUT_PINS,m.index+1);
-        add(echo,i+1,"Ultrasonic ECHO","Ultrasonic",DIGITAL_INPUT_PINS,m.index+1);
+        add(echo,i+1,"Ultrasonic ECHO","Ultrasonic",ULTRASONIC_ECHO_PINS,m.index+1);
       }
+      const dht=/\bDHT11\s*\(([^)]*)\)/g;
+      while((m=dht.exec(text))){const pin=parseNumberArg(m[1],"pin",0,13);add(pin,i+1,"DHT11 DATA","DHT11",RGB_OUTPUT_PINS,m.index+1);}
       const oled=/\bOLED\s*\(([^)]*)\)/g;
       while((m=oled.exec(text))){
         const args=m[1],sda=parseNumberArg(args,"sda",0,21),scl=parseNumberArg(args,"scl",1,22);
@@ -498,20 +604,20 @@ while True:
 
   function pinHintContext(cm){
     const cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
-    const m=left.match(/\b(RGBLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED)\s*\(([^()]*)$/);
+    const m=left.match(/\b(RGBLED|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED)\s*\(([^()]*)$/);
     if(!m)return null;
     const type=m[1],args=m[2],parts=args.split(","),argIndex=Math.max(0,parts.length-1);
     // OLED third argument is I2C address; Ultrasonic third argument is max_cm — neither is a GPIO.
-    if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;
+    if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;
     const currentPart=parts[parts.length-1]||"";
     const prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];
     if(prefix===undefined)return null;
     const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1]));
     const usedElsewhere=pinEntries(full).map(x=>x.pin);
     let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;
-    if(type==="Ultrasonic"&&argIndex===1)pins=DIGITAL_INPUT_PINS;
+    if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;
     if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;
-    if(type==="OLED")pins=RGB_OUTPUT_PINS;
+    if(type==="OLED"||type==="DHT11")pins=RGB_OUTPUT_PINS;
     pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
     const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — available ${type} pin`,className:"hint-constant"}));
     return {list,from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
@@ -852,7 +958,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.22",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.23",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -910,9 +1016,11 @@ while True:
         }
       }
       else if(m.type==="kit-command")handleKit(m.payload);
+      else if(m.type==="plot")handlePlotPacket(m);
+      else if(m.type==="plot-clear")clearPlotter();
       else if(m.type==="image"){
+        // Keep Camera / MediaPipe as the live camera panel. cv2.imshow()/show() belongs in the dedicated output panel below Terminal.
         showImage(m.dataUrl);
-        showCameraProcessedImage(m.dataUrl,m.title||"OpenCV Output");
       }
     };
     worker.onerror=e=>{running=false;updateRunControls();endHardwareRun().catch(()=>{});log("Worker error: "+e.message);badge($("pythonStatus"),"Python error");};
@@ -988,7 +1096,7 @@ while True:
     return defaultValue;
   }
   function requestedInputs(src){
-    const out={analog:[],digital:[],rotary:[],ultrasonic:[]};let m;
+    const out={analog:[],digital:[],rotary:[],ultrasonic:[],dht11:[]};let m;
     const analogRe=/\b(AnalogInput|Potentiometer)\s*\(([^)]*)\)/g;
     while((m=analogRe.exec(src))){const pin=parseNumberArg(m[2],"pin",0,34);if(pin!==null)out.analog.push({pin});}
 
@@ -1003,6 +1111,8 @@ while True:
       const args=m[1],clk=parseNumberArg(args,"clk",0,32),dt=parseNumberArg(args,"dt",1,33),sw=parseNumberArg(args,"switch",2,-1);
       out.rotary.push({clk,dt,sw,pullup:parseBoolToken(args,"pullup",true)});
     }
+    const dhtRe=/\bDHT11\s*\(([^)]*)\)/g;
+    while((m=dhtRe.exec(src))){const pin=parseNumberArg(m[1],"pin",0,13);out.dht11.push({pin});}
     const ultraRe=/\bUltrasonic\s*\(([^)]*)\)/g;
     while((m=ultraRe.exec(src))){
       const args=m[1],pos=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
@@ -1035,6 +1145,9 @@ while True:
       }
       for(const u of specs.ultrasonic){
         const d=await kitClient.ultrasonic(u.trig,u.echo,{maxCm:u.maxCm});updateSensorPacket(d);
+      }
+      for(const dht of specs.dht11){
+        const d=await kitClient.dht11(dht.pin);updateSensorPacket(d);
       }
       markKitSuccess(kitClient.status);
       return true;
@@ -1171,11 +1284,12 @@ while True:
     if(!liveMode||!running)return;
     if(prefs.demoMode){
       sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
+      sensorState.dhtTemperature=Number(prefs.demoDhtTemp)||28;sensorState.dhtHumidity=Number(prefs.demoDhtHumidity)||65;
       sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
-    if(!prefs.demoMode&&/\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(liveCode)){
+    if(!prefs.demoMode&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(liveCode)){
       const ok=await refreshInputsFromKit(liveCode,false);if(!ok)scheduleSilentReconnect();
     }
     const frame=await refreshLiveAI();
@@ -1203,9 +1317,9 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|OLED|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
+    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
     const inputSpecs=requestedInputs(src),rgbPins=/\bRGBLED\s*\(/.test(src)?requestedRgbPins(src):[];
-    const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo])];
+    const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo]),...inputSpecs.dht11.map(x=>x.pin)];
     const conflict=inputPins.find(pin=>rgbPins.includes(pin));
     if(conflict!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${conflict} is selected for both an input and RGB output.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
     const seenPins=new Set(),duplicateInput=inputPins.find(pin=>seenPins.has(pin)?true:(seenPins.add(pin),false));
@@ -1220,9 +1334,9 @@ while True:
     const idx=requestedCamera(src);
     const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
 
-    terminal.textContent="";
+    terminal.textContent="";clearPlotter();
     running=true;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1299,6 +1413,7 @@ while True:
 
     if(prefs.demoMode){
       sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
+      sensorState.dhtTemperature=Number(prefs.demoDhtTemp)||28;sensorState.dhtHumidity=Number(prefs.demoDhtHumidity)||65;
       sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
@@ -1307,7 +1422,7 @@ while True:
     if(needsPhysicalKit&&!prefs.demoMode){
       try{
         await beginHardwareRun();
-        if(/\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src))await refreshInputsFromKit(src,true);
+        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src))await refreshInputsFromKit(src,true);
       }
       catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
     }else{currentRunUsesKit=false;}
@@ -1336,7 +1451,7 @@ while True:
   function markKitFailure(reason=""){
     kitFailureCount=Math.min(KIT_FAILURE_LIMIT,kitFailureCount+1);
     if(kitEverConnected&&kitFailureCount<KIT_FAILURE_LIMIT){
-      // v5.22 no-blink rule: 1–4 misses keep the visible state Connected.
+      // v5.23 no-blink rule: 1–4 misses keep the visible state Connected.
       return false;
     }
     badge($("kitStatus"),"Kit disconnected");
@@ -1425,6 +1540,37 @@ while True:
     const d=Math.max(0,Number(sensorState.ultrasonicCm)||0),p=Math.max(0,Math.min(255,Number(sensorState.potValue)||0));
     $("ultraLabel").textContent=d.toFixed(1)+" cm";$("ultraMeter").style.width=Math.min(100,d/400*100)+"%";
     $("potLabel").textContent=`${p} / 255 · GPIO${sensorState.potPin||34} · raw ${sensorState.potRaw||0}`;$("potNeedle").style.transform=`rotate(${-135+(p/255)*270}deg)`;
+    if($("dhtTempLabel"))$("dhtTempLabel").textContent=`${Number(sensorState.dhtTemperature||0).toFixed(1)} °C`;
+    if($("dhtHumLabel"))$("dhtHumLabel").textContent=`${Number(sensorState.dhtHumidity||0).toFixed(1)} %RH`;
+    if($("dhtPinLabel"))$("dhtPinLabel").textContent=`DATA GPIO${sensorState.dhtPin||13}`;
+  }
+
+  function clearPlotter(){
+    plotter.series.clear();plotter.seq=0;drawSerialPlotter();
+  }
+  function handlePlotPacket(m){
+    let values={};try{values=m.json?JSON.parse(m.json):(m.values||{});}catch(_){values={};}
+    const numeric=Object.entries(values).filter(([,v])=>Number.isFinite(Number(v)));
+    if(!numeric.length)return;
+    plotter.seq++;
+    for(const [name,val] of numeric){
+      if(!plotter.series.has(name))plotter.series.set(name,[]);
+      const arr=plotter.series.get(name);arr.push({x:plotter.seq,y:Number(val)});if(arr.length>plotter.maxPoints)arr.splice(0,arr.length-plotter.maxPoints);
+    }
+    drawSerialPlotter();
+  }
+  function drawSerialPlotter(){
+    const c=$("serialPlotterCanvas"),legend=$("serialPlotterLegend");if(!c||!legend)return;
+    const ctx=c.getContext("2d"),w=c.width,h=c.height,padL=54,padR=16,padT=14,padB=30;
+    ctx.clearRect(0,0,w,h);ctx.fillStyle="#070c15";ctx.fillRect(0,0,w,h);
+    const series=[...plotter.series.entries()].filter(([,a])=>a.length);
+    ctx.strokeStyle="#1d2a40";ctx.lineWidth=1;for(let i=0;i<=5;i++){const y=padT+(h-padT-padB)*i/5;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(w-padR,y);ctx.stroke();}
+    if(!series.length){ctx.fillStyle="#75839d";ctx.font="24px system-ui";ctx.textAlign="center";ctx.fillText("plot(Temperature=t, Humidity=h)",w/2,h/2);legend.innerHTML="<span>No plot data yet</span>";return;}
+    let ys=[];series.forEach(([,a])=>a.forEach(p=>ys.push(p.y)));let min=Math.min(...ys),max=Math.max(...ys);if(min===max){min-=1;max+=1;}const margin=(max-min)*.08;min-=margin;max+=margin;
+    const colors=["#59a5ff","#ffb65c","#65d98b","#d58cff","#ff7082","#5de1da","#d9d35f","#a7b4cc"];
+    ctx.fillStyle="#8290a9";ctx.font="18px ui-monospace,monospace";ctx.textAlign="right";for(let i=0;i<=5;i++){const y=padT+(h-padT-padB)*i/5,val=max-(max-min)*i/5;ctx.fillText(val.toFixed(Math.abs(max-min)<10?1:0),padL-8,y+6);}
+    series.forEach(([name,a],idx)=>{const color=colors[idx%colors.length],n=Math.max(2,plotter.maxPoints);ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();a.forEach((p,i)=>{const x=padL+(w-padL-padR)*(i/(n-1)),y=padT+(h-padT-padB)*(1-(p.y-min)/(max-min));if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();});
+    legend.innerHTML=series.map(([name,a],idx)=>`<span class="plot-key" style="color:${colors[idx%colors.length]}"><i class="plot-dot"></i>${escapeHtml(name)} <span class="plot-value">${a[a.length-1].y.toFixed(2)}</span></span>`).join("");
   }
 
   function updateRgb(r,g,b){
@@ -1500,10 +1646,15 @@ while True:
 
   function updateSensorPacket(data){
     const sensor=String(data.sensor||data.name||"").toUpperCase();
-    sensorState.inputs=sensorState.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{}};
+    sensorState.inputs=sensorState.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}};
     if(sensor==="ULTRASONIC"||data.distanceCm!==undefined||data.ultrasonicCm!==undefined){
       sensorState.ultrasonicCm=Number(data.distanceCm??data.ultrasonicCm??sensorState.ultrasonicCm);
       const key=`${Number(data.trig??18)},${Number(data.echo??19)}`;sensorState.inputs.ultrasonic[key]={...data};
+    }
+    if(sensor==="DHT11"||data.temperature!==undefined||data.humidity!==undefined){
+      const pin=Number(data.pin??13);sensorState.dhtPin=pin;
+      sensorState.dhtTemperature=Number(data.temperature??sensorState.dhtTemperature);sensorState.dhtHumidity=Number(data.humidity??sensorState.dhtHumidity);
+      sensorState.inputs.dht11[String(pin)]={...data,pin};
     }
     if(sensor==="ANALOG"||sensor==="POT"||sensor==="POTENTIOMETER"||data.value255!==undefined){
       const pin=Number(data.pin??34),d={...data,pin};sensorState.inputs.analog[String(pin)]=d;
@@ -1655,11 +1806,11 @@ while True:
     const row=e.target.closest("[data-upload-index]");
     if(row)setActiveUpload(uploadedImages[Number(row.dataset.uploadIndex)]);
   };
-  $("clearImageBtn").onclick=clearLoadedImage;
+  $("clearImageBtn").onclick=clearLoadedImage;if($("clearPlotterBtn"))$("clearPlotterBtn").onclick=clearPlotter;
   document.querySelectorAll(".output-tab").forEach(b=>b.onclick=()=>switchOutput(b.dataset.view));
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
   $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";initOledPreview();
   window.addEventListener("pagehide",()=>{stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
-  updateRgb(0,0,0);updateSensorGraphics();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
+  updateRgb(0,0,0);updateSensorGraphics();drawSerialPlotter();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
 })();

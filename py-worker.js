@@ -20,8 +20,8 @@ from pyodide.ffi import to_js
 _ai_state={"detected":False,"fingers":0,"side":"","landmarks":[]}
 _face_state=[]
 _hand_landmarks=[]
-_sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
-_input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{}}
+_sensor_state={"ultrasonic_cm":45.0,"dht_temperature":28.0,"dht_humidity":65.0,"dht_pin":13,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
+_input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
 _current_frame=None
 _loaded_image=None
 
@@ -114,6 +114,7 @@ class Servo:
 SUPPORTED_OUTPUT_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33)
 SUPPORTED_ADC_PINS=(32,33,34,35,36,39)
 SUPPORTED_DIGITAL_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39)
+SUPPORTED_ULTRASONIC_ECHO_PINS=(12,)+SUPPORTED_DIGITAL_PINS
 
 def _analog_data(pin): return _input_state.get("analog",{}).get(str(int(pin)),{})
 def _digital_data(pin): return _input_state.get("digital",{}).get(str(int(pin)),{})
@@ -121,6 +122,7 @@ def _rotary_key(clk,dt,sw): return f"{int(clk)},{int(dt)},{int(sw)}"
 def _rotary_data(clk,dt,sw): return _input_state.get("rotary",{}).get(_rotary_key(clk,dt,sw),{})
 def _ultrasonic_key(trig,echo): return f"{int(trig)},{int(echo)}"
 def _ultrasonic_data(trig,echo): return _input_state.get("ultrasonic",{}).get(_ultrasonic_key(trig,echo),{})
+def _dht_data(pin): return _input_state.get("dht11",{}).get(str(int(pin)),{})
 
 class Ultrasonic:
     def __init__(self,*args,trig=18,echo=19,max_cm=400):
@@ -135,7 +137,7 @@ class Ultrasonic:
             raise ValueError("Ultrasonic expects Ultrasonic(), Ultrasonic(18,19), or named trig=/echo= pins")
         self.trig=int(trig);self.echo=int(echo);self.max_cm=max(2,int(max_cm))
         if self.trig not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"Unsupported ultrasonic TRIG pin {self.trig}. Use one of {SUPPORTED_OUTPUT_PINS}")
-        if self.echo not in SUPPORTED_DIGITAL_PINS: raise ValueError(f"Unsupported ultrasonic ECHO pin {self.echo}. Use one of {SUPPORTED_DIGITAL_PINS}")
+        if self.echo not in SUPPORTED_ULTRASONIC_ECHO_PINS: raise ValueError(f"Unsupported ultrasonic ECHO pin {self.echo}. Use one of {SUPPORTED_ULTRASONIC_ECHO_PINS}")
         if self.trig==self.echo: raise ValueError("Ultrasonic TRIG and ECHO pins must be different")
     def read(self):
         d=_ultrasonic_data(self.trig,self.echo)
@@ -143,6 +145,50 @@ class Ultrasonic:
     def centimeters(self): return self.read()
     @property
     def distance_cm(self): return self.read()
+
+class DHT11:
+    """DHT11 temperature/humidity sensor. Values are direct °C and %RH."""
+    def __init__(self,pin=13):
+        self.pin=int(pin)
+        if self.pin not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"DHT11 DATA pin {self.pin} must be output-capable. Use one of {SUPPORTED_OUTPUT_PINS}")
+    def read(self):
+        d=_dht_data(self.pin)
+        return {
+            "temperature":float(d.get("temperature",_sensor_state.get("dht_temperature",0.0))),
+            "humidity":float(d.get("humidity",_sensor_state.get("dht_humidity",0.0))),
+            "valid":bool(d.get("valid",True)),"pin":self.pin
+        }
+    def temperature(self): return float(self.read()["temperature"])
+    def humidity(self): return float(self.read()["humidity"])
+    def get_values(self):
+        # Legacy project compatibility: [653,287] -> 65.3 %RH, 28.7 °C after /10.
+        d=self.read(); return [int(round(d["humidity"]*10)),int(round(d["temperature"]*10))]
+    @property
+    def temperature_c(self): return self.temperature()
+    @property
+    def humidity_percent(self): return self.humidity()
+
+def plot(*values,**series):
+    data={}
+    if len(values)==1 and isinstance(values[0],dict): data.update(values[0])
+    elif values:
+        for i,v in enumerate(values,1): data[f"Value{i}"]=v
+    data.update(series)
+    numeric={}
+    for k,v in data.items():
+        try: numeric[str(k)]=float(v)
+        except Exception: pass
+    if numeric:
+        postMessage(to_js({"type":"plot","json":json.dumps(numeric)},dict_converter=js.Object.fromEntries))
+    return numeric
+
+def clear_plot():
+    postMessage(to_js({"type":"plot-clear"},dict_converter=js.Object.fromEntries))
+
+class SerialPlotter:
+    def __init__(self,*args,**kwargs): pass
+    def plot(self,*values,**series): return plot(*values,**series)
+    def clear(self): clear_plot()
 
 class OLED:
     """SSD1306 128x64 I2C display. Commands mirror to the Lab OLED preview and the physical kit."""
@@ -421,10 +467,10 @@ sys.modules["HandTrackingModule"]=htm_mod;sys.modules["zebjus_wifi"]=wifi_mod
 
 z=types.ModuleType("zebjus")
 for k,v in {
-    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,
-    "Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
+    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
+    "plot":plot,"clear_plot":clear_plot,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
 }.items(): setattr(z,k,v)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
@@ -529,12 +575,15 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__faces_json",JSON.stringify(m.aiState?.faces||[]));
   pyodide.globals.set("__hand_landmarks_json",JSON.stringify(m.aiState?.landmarks||[]));
   pyodide.globals.set("__ultra",Number(m.sensorState?.ultrasonicCm)||0);
+  pyodide.globals.set("__dht_t",Number(m.sensorState?.dhtTemperature)||0);
+  pyodide.globals.set("__dht_h",Number(m.sensorState?.dhtHumidity)||0);
+  pyodide.globals.set("__dht_pin",Number(m.sensorState?.dhtPin)||13);
   pyodide.globals.set("__pot",Math.max(0,Math.min(255,Number(m.sensorState?.potValue)||0)));
   pyodide.globals.set("__pot_raw",Math.max(0,Number(m.sensorState?.potRaw)||0));
   pyodide.globals.set("__pot_pin",Number(m.sensorState?.potPin)||34);
   pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
   pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
-  pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{}}));
+  pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}}));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -543,8 +592,8 @@ sys.stderr=_zebjus_stderr
 _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_json) else []
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
-_sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
-_input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{},"ultrasonic":{}}
+_sensor_state={"ultrasonic_cm":float(__ultra),"dht_temperature":float(__dht_t),"dht_humidity":float(__dht_h),"dht_pin":int(__dht_pin),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
+_input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
 _current_frame=None
 _loaded_image=None
   `);
@@ -556,7 +605,7 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:DHT11|Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
   }

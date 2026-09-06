@@ -1,12 +1,12 @@
-# ZEBJUS Python Lab v5.22 — OLED + Ultrasonic Test
+# ZEBJUS Python Lab v5.23 — OLED + Ultrasonic Test
 
 ## 1. Firmware
 
-Upload `esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_WiFi_v1_5.ino` after installing Adafruit SSD1306, Adafruit GFX Library and Adafruit BusIO.
+Upload `esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino` after installing Adafruit SSD1306, Adafruit GFX Library and Adafruit BusIO.
 
 Expected Serial header:
 
-`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC WiFi v1.5`
+`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC + DHT11 WiFi v1.6`
 
 ## 2. OLED wiring test
 

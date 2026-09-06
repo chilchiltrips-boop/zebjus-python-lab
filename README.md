@@ -1,81 +1,110 @@
-# ZEBJUS Python Lab v5.22 — OLED + Ultrasonic + Stable Kit Connection
+# ZEBJUS Python Lab v5.23 — DHT11 + Serial Plotter + Compact Layout
 
-v5.22 keeps the complete v5.21 stable-connection architecture and adds a real HC-SR04 ultrasonic input API plus an extensible SSD1306 128×64 OLED drawing interface controlled directly from student Python.
+v5.23 keeps the v5.21 stable kit connection architecture and the v5.22 OLED/Ultrasonic features, then adds physical DHT11 support, a generic Python-driven Serial Plotter, and a compact full-width learning layout.
 
-## Retained from v5.21
+## Stable kit connection retained
 
-- Cached IP primary → mDNS fallback.
-- Physical Kit ID verification before accepting a cached address.
-- 5 consecutive failures required before UI becomes Disconnected.
+- Cached IP primary → physical Kit ID verification → mDNS fallback.
+- 5 consecutive failures are required before the UI becomes Disconnected.
 - Failures 1–4 keep the visible state Connected.
-- Silent background reconnect; no routine `Connecting ↔ Connected` blinking.
-- Successful status/API/heartbeat resets the failure counter.
-- New DHCP IP updates the cached IP.
+- Silent background reconnect; no routine Connecting ↔ Connected blinking.
+- Successful reconnect/API/heartbeat resets the failure counter.
+- New DHCP IP automatically updates the cached IP.
 - Run heartbeat every 1 second.
 - ESP output failsafe after 10 seconds without heartbeat.
-- Temporary Wi-Fi/API miss does not immediately stop Python.
-- `+ New Project` opens a blank editor.
-- Custom project draft autosave/restore, Undo/Redo, exact error line, Pin Assist, camera/OpenCV/MediaPipe and existing input APIs retained.
+- Temporary Wi-Fi/API misses do not immediately stop the Python program.
+- `+ New Project` opens a blank editor; custom draft auto-save/restore is retained.
 
-## Added in v5.22
+## v5.23 additions
 
-- Physical `Ultrasonic(trig, echo, max_cm=...)` support using `/api/input/ultrasonic`.
-- Default HC-SR04 pins: TRIG GPIO18, ECHO GPIO19.
-- Extensible `OLED` Python class for SSD1306 128×64 I2C displays.
-- Default OLED: SDA GPIO21, SCL GPIO22, address `0x3C`.
-- Browser OLED 128×64 preview mirrors Python OLED commands.
-- OLED primitives: clear, show, text, pixel, line, rectangle, circle, invert and contrast.
-- OLED convenience screens: text display, scrolling text, distance bar and ultrasonic radar frame.
-- OLED and Ultrasonic are integrated into autocomplete, Pin Assist, duplicate-pin checks and exact-line validation.
-- Learning Example menu expanded from 13 to **20 examples**.
-- Camera/JS cache references aligned to v5.22.
+- Physical `DHT11(pin=13)` API using `/api/input/dht11`.
+- Direct temperature °C and humidity %RH methods.
+- Legacy `get_values()` compatibility returns `[humidity×10, temperature×10]` so old projects that divide by 10 continue to work.
+- DHT11 card in **Kit Output / Sensors**.
+- Generic Python Serial Plotter: `plot(Temperature=t, Humidity=h)`.
+- `SerialPlotter().plot(...)` and `clear_plot()` helpers.
+- Serial Plotter works with future sensors too: ultrasonic, analog, light, gas, IMU values, etc.
+- 5 DHT11 examples added; current Learning Example menu has **25 examples**.
+- GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
 
-## Python examples
+## Compact UI order
+
+1. Python code editor
+2. Kit Output / Sensors
+3. Camera / MediaPipe
+4. Output / Terminal
+5. OpenCV / `imshow` Output
+6. Serial Plotter
+7. Image Upload
+
+Panels use full page width and reduced padding/heights so the browser space is used efficiently. Quick Reference is collapsed inside the editor panel.
+
+## DHT11 Python API
 
 ```python
-from zebjus import Ultrasonic, OLED, sleep
+from zebjus import DHT11, sleep
 
-ultra = Ultrasonic(18, 19)
-oled = OLED(21, 22, 0x3C)
+dht = DHT11(13)
 
 while True:
-    cm = ultra.read()
-    oled.distance_bar(cm, max_cm=400, title="ULTRASONIC")
-    sleep(0.12)
+    print(dht.temperature(), "C", dht.humidity(), "%")
+    sleep(1)
 ```
 
-Generic custom OLED screens can be built from primitives:
+Legacy project style:
 
 ```python
-from zebjus import OLED
+from zebjus import DHT11, sleep
 
-oled = OLED()
-oled.clear()
-oled.rect(0, 0, 128, 64)
-oled.line(0, 0, 127, 63)
-oled.circle(64, 32, 18)
-oled.text("Z", 61, 28)
-oled.show()
+b = DHT11(13)
+
+while True:
+    vals = b.get_values()
+    humidity = vals[0] / 10.0
+    temperature = vals[1] / 10.0
+    print(f"Humidity: {humidity:.1f}% | Temp: {temperature:.1f} °C")
+    sleep(1)
 ```
 
-## Hardware safety
+Serial Plotter:
 
-HC-SR04 ECHO is normally a 5V signal. ESP32 GPIO is 3.3V logic, so use a voltage divider or level shifter on ECHO. Do not wire HC-SR04 ECHO directly to GPIO19.
+```python
+from zebjus import DHT11, plot, sleep
+
+dht = DHT11(13)
+
+while True:
+    t = dht.temperature()
+    h = dht.humidity()
+    plot(Temperature=t, Humidity=h)
+    sleep(1)
+```
+
+## Recommended wiring
+
+- RGB LED: GPIO25 / GPIO26 / GPIO27
+- DHT11 DATA: GPIO13
+- Ultrasonic: TRIG GPIO14 / ECHO GPIO12 is supported for the current user setup; TRIG GPIO18 / ECHO GPIO19 remains a safer general default.
+- OLED: SDA GPIO21 / SCL GPIO22 / address `0x3C`
+
+### DHT11 electrical note
+
+Prefer powering a DHT11 module from **3.3V** when its DATA pull-up is tied to VCC. If a module is powered from 5V and its DATA line is pulled up to 5V, do not feed that directly into ESP32 GPIO; use a 3.3V pull-up or suitable level shifting.
+
+### HC-SR04 electrical note
+
+HC-SR04 ECHO is normally 5V. Use a voltage divider or level shifter before the ESP32 ECHO GPIO.
 
 ## Firmware
 
 Upload:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_WiFi_v1_5.ino`
+`esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino`
 
-Required Arduino libraries:
+Required Arduino libraries for OLED:
 
 - Adafruit SSD1306
 - Adafruit GFX Library
 - Adafruit BusIO
 
-Expected Serial header:
-
-`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC WiFi v1.5`
-
-For wiring and the complete display API see `OLED_ULTRASONIC_GUIDE.md`.
+DHT11 support is implemented directly in the firmware, so no additional DHT library is required.
