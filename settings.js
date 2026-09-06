@@ -194,7 +194,7 @@
   $("allowCameraBtn").onclick=allowCamera;$("refreshCameraBtn").onclick=listCameras;
   $("demoUltrasonic").oninput=updateDemoLabels;$("demoPot").oninput=updateDemoLabels;
   $("saveSettingsBtn").onclick=save;
-  $("connectKitBtn").onclick=()=>connectKit().catch(e=>{setConnBadge("Not connected");setMessage("kitNameMessage","Connection failed: "+e.message,"error-text");});
+  $("connectKitBtn").onclick=()=>connectKit().catch(e=>{setConnBadge("Not connected");let msg="Connection failed: "+e.message;try{if(window.self!==window.top)msg+=" If Wix/browser blocks Local Network Access in the embedded page, open the Python Lab in a new tab and allow Local Network Access.";}catch(_){msg+=" Try opening the Python Lab in a new tab and allow Local Network Access.";}setMessage("kitNameMessage",msg,"error-text");});
   $("scanKitsBtn").onclick=()=>scanKits().catch(e=>setMessage("kitNameMessage","Scan failed: "+e.message,"error-text"));
   $("disconnectKitBtn").onclick=()=>{client?.disconnect();setConnBadge("Not connected");renderKitInfo(null);};
   $("kitSelect").onchange=e=>{const op=e.target.selectedOptions[0];if(!op?.value)return;$("kitName").value=op.value;$("kitIp").value=op.dataset.ip||"";current.kitName=op.value;current.kitChipId=op.dataset.chip||"";connectKit(op.value).catch(err=>setMessage("kitNameMessage","Connection failed: "+err.message,"error-text"));};

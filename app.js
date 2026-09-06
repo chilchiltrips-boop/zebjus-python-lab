@@ -1,7 +1,7 @@
 (function(){
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
-  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
+  let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,liveSessionId=0,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
   let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,kitReconnectBusy=false,kitHeartbeatPingBusy=false,activePotPin=34;
   const KIT_FAILURE_LIMIT=5;
@@ -703,13 +703,14 @@ while True:
   function filterItems(items,prefix){const p=String(prefix||"").toLowerCase();return items.filter(x=>x[0].replace(/\(\)$/,"").toLowerCase().startsWith(p)).map(hintItem);}
 
   // ---------- GPIO pin assistance / validation ----------
-  // v6.0 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
+  // v6.1 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
   // Classic ESP32 DevKit: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
   const DIGITAL_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
   const INPUT_ONLY_PINS=[34,35,36,39];
-  const ULTRASONIC_ECHO_PINS=[12,...DIGITAL_INPUT_PINS];
+  const ULTRASONIC_ECHO_PINS=[...DIGITAL_INPUT_PINS,12]; // GPIO12 allowed only when explicitly chosen; boot-strapping sensitive.
+  const COUNTER_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35];
   const MAX_PWM_CHANNELS=15; // this project intentionally exposes at most the 15 safe output pins.
 
   const COMPONENT_CATALOG=[
@@ -723,8 +724,8 @@ while True:
     {className:"Switch",label:"Switch",group:"Inputs",interface:"Digital IN",max:19,prefix:"sw",status:"ready",pinCost:{input:1}},
     {className:"DigitalInput",label:"Digital Input",group:"Inputs",interface:"Digital IN",max:19,prefix:"din",status:"ready",pinCost:{input:1}},
     {className:"RotaryEncoder",label:"Rotary Encoder",group:"Inputs",interface:"2–3 × Digital IN",max:4,prefix:"encoder",status:"ready",pinCost:{input:3}},
-    {className:"Servo",label:"Servo",group:"Future / bridge",interface:"PWM OUT",max:0,prefix:"servo",status:"planned",note:"Direct ESP firmware servo route not enabled yet"},
-    {className:"Motor",label:"Motor Driver",group:"Future / bridge",interface:"PWM + DIR",max:0,prefix:"motor",status:"planned",note:"Direct ESP firmware motor-driver route not enabled yet"},
+    {className:"Servo",label:"Servo (legacy simulator)",group:"Legacy",interface:"Demo/WebSocket only",max:0,prefix:"servo",status:"planned",note:"For a physical kit use PWMServo(pin)."},
+    {className:"Motor",label:"Motor (legacy simulator)",group:"Legacy",interface:"Demo/WebSocket only",max:0,prefix:"motor",status:"planned",note:"For a physical kit use MotorDriver(in1, in2, pwm_pin)."},
     {className:"PWMInput",label:"PWM Signal Sensor",group:"Future / bridge",interface:"Pulse / Digital IN",max:0,prefix:"pwm",status:"planned",note:"Use PulseInput in v6"},
     {className:"DigitalOutput",label:"Digital Output / LED / Relay",group:"Universal Bridge",interface:"1 × Digital OUT",max:15,prefix:"out",status:"ready",pinCost:{out:1}},
     {className:"Relay",label:"Relay",group:"Universal Bridge",interface:"1 × Digital OUT",max:15,prefix:"relay",status:"ready",pinCost:{out:1}},
@@ -826,15 +827,26 @@ while True:
   function allPinEntries(src){
     const base=pinEntries(src),out=[...base],lines=String(src||"").split(/\r?\n/);
     const add=(pin,line,role,kind,valid,offset=1,shareKey="",shareChannel="")=>{if(Number.isFinite(pin))out.push({pin:Number(pin),line,role,kind,valid,offset,shareKey,shareChannel});};
-    // Mark OLED as shareable I2C bus 0.
-    const oledByLine=new Map();for(const e of out.filter(x=>x.kind==="OLED")){if(!oledByLine.has(e.line))oledByLine.set(e.line,[]);oledByLine.get(e.line).push(e);}for(const arr of oledByLine.values()){const sda=arr.find(x=>/SDA/.test(x.role)),scl=arr.find(x=>/SCL/.test(x.role));if(sda&&scl){const key=`i2c:0:${sda.pin}:${scl.pin}`;sda.shareKey=scl.shareKey=key;sda.shareChannel="sda";scl.shareChannel="scl";}}
-    lines.forEach((text,i)=>{const clean=text.replace(/#.*$/,""),line=i+1;let m;
+    const i2cConfigured=new Map();
+    const argProvided=(args,name,pos)=>{if(new RegExp(`\\b${name}\\s*=`).test(args))return true;const positional=String(args||"").split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));return positional.length>pos;};
+    const i2cPins=(args,bus,sdaPos,sclPos)=>{
+      const known=i2cConfigured.get(bus)||{sda:bus===1?25:21,scl:bus===1?26:22};
+      const sda=parseNumberArg(args,"sda",sdaPos,argProvided(args,"sda",sdaPos)?(bus===1?25:21):known.sda);
+      const scl=parseNumberArg(args,"scl",sclPos,argProvided(args,"scl",sclPos)?(bus===1?26:22):known.scl);
+      return {sda,scl};
+    };
+    lines.forEach((text,i)=>{
+      const clean=text.replace(/#.*$/,"").trimEnd(),line=i+1;let m;
+      // OLED owns/shares hardware I2C bus 0. A later generic I2C object with omitted pins inherits this pair.
+      const oled=/\bOLED\s*\(([^)]*)\)/g;while((m=oled.exec(clean))){const a=m[1],sda=parseNumberArg(a,"sda",0,21),scl=parseNumberArg(a,"scl",1,22),key=`i2c:0:${sda}:${scl}`;for(const e of out.filter(x=>x.kind==="OLED"&&x.line===line)){e.shareKey=key;e.shareChannel=/SDA/.test(e.role)?"sda":"scl";}if(!i2cConfigured.has(0))i2cConfigured.set(0,{sda,scl,line});}
+
       const dout=/\b(DigitalOutput|Relay|PWM|PWMServo|PulseOutput)\s*\(([^)]*)\)/g;while((m=dout.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" output",m[1],RGB_OUTPUT_PINS,m.index+1);}
       const adc=/\b(ADC|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^)]*)\)/g;while((m=adc.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" ADC",m[1],ANALOG_INPUT_PINS,m.index+1);}
-      const gin=/\b(GPIOInput|PulseInput|CounterInput)\s*\(([^)]*)\)/g;while((m=gin.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" input",m[1],ULTRASONIC_ECHO_PINS,m.index+1);}
+      const gin=/\b(GPIOInput|PulseInput|CounterInput)\s*\(([^)]*)\)/g;while((m=gin.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null),valid=m[1]==="CounterInput"?COUNTER_INPUT_PINS:ULTRASONIC_ECHO_PINS;if(pin!==null)add(pin,line,m[1]+" input",m[1],valid,m.index+1);}
       const motor=/\bMotorDriver\s*\(([^)]*)\)/g;while((m=motor.exec(clean))){const a=m[1],p1=parseNumberArg(a,"in1",0,null),p2=parseNumberArg(a,"in2",1,null),pwm=parseNumberArg(a,"pwm_pin",2,null);if(p1!==null)add(p1,line,"Motor IN1","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(p2!==null)add(p2,line,"Motor IN2","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(pwm!==null)add(pwm,line,"Motor PWM","MotorDriver",RGB_OUTPUT_PINS,m.index+1);}
-      const i2c=/\b(I2C|MPU6050)\s*\(([^)]*)\)/g;while((m=i2c.exec(clean))){const a=m[2],isImu=m[1]==="MPU6050",sda=parseNumberArg(a,"sda",0,21),scl=parseNumberArg(a,"scl",1,22),bus=parseNumberArg(a,"bus",isImu?3:3,0);const key=`i2c:${bus}:${sda}:${scl}`;add(sda,line,m[1]+" SDA",m[1],RGB_OUTPUT_PINS,m.index+1,key,"sda");add(scl,line,m[1]+" SCL",m[1],RGB_OUTPUT_PINS,m.index+1,key,"scl");}
-      const i2cd=/\bI2CDevice\s*\(([^)]*)\)/g;while((m=i2cd.exec(clean))){const a=m[1],sda=parseNumberArg(a,"sda",1,21),scl=parseNumberArg(a,"scl",2,22),bus=parseNumberArg(a,"bus",4,0),key=`i2c:${bus}:${sda}:${scl}`;add(sda,line,"I2CDevice SDA","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"sda");add(scl,line,"I2CDevice SCL","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"scl");}
+
+      const i2c=/\b(I2C|MPU6050)\s*\(([^)]*)\)/g;while((m=i2c.exec(clean))){const a=m[2],bus=parseNumberArg(a,"bus",3,0)===1?1:0,pins=i2cPins(a,bus,0,1),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,m[1]+" SDA",m[1],RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,m[1]+" SCL",m[1],RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
+      const i2cd=/\bI2CDevice\s*\(([^)]*)\)/g;while((m=i2cd.exec(clean))){const a=m[1],bus=parseNumberArg(a,"bus",4,0)===1?1:0,pins=i2cPins(a,bus,1,2),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,"I2CDevice SDA","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,"I2CDevice SCL","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
       const uart=/\b(UART|GPS)\s*\(([^)]*)\)/g;while((m=uart.exec(clean))){const a=m[2],rx=parseNumberArg(a,"rx",0,16),tx=parseNumberArg(a,"tx",1,17);add(rx,line,m[1]+" RX",m[1],ULTRASONIC_ECHO_PINS,m.index+1);add(tx,line,m[1]+" TX",m[1],RGB_OUTPUT_PINS,m.index+1);}
       const spi=/\bSPI\s*\(([^)]*)\)/g;while((m=spi.exec(clean))){const a=m[1],sck=parseNumberArg(a,"sck",0,18),miso=parseNumberArg(a,"miso",1,19),mosi=parseNumberArg(a,"mosi",2,23),cs=parseNumberArg(a,"cs",3,4),bus=parseNumberArg(a,"bus",6,1),key=`spi:${bus}:${sck}:${miso}:${mosi}`;add(sck,line,"SPI SCK","SPI",RGB_OUTPUT_PINS,m.index+1,key,"sck");add(miso,line,"SPI MISO","SPI",ULTRASONIC_ECHO_PINS,m.index+1,key,"miso");add(mosi,line,"SPI MOSI","SPI",RGB_OUTPUT_PINS,m.index+1,key,"mosi");add(cs,line,"SPI CS","SPI",RGB_OUTPUT_PINS,m.index+1);}
     });
@@ -857,8 +869,14 @@ while True:
         if(!shared)return {errorType:"PinConflictError",line:e.line,offset:e.offset,message:`GPIO${e.pin} is already used by ${first.role} on line ${first.line}.`,suggestion:`Use a different GPIO for ${e.role}. I²C/SPI bus lines may be shared only when the bus and signal match.`};
       }else used.set(e.pin,e);
     }
-    const busSeen=new Map();
-    for(const e of entries.filter(x=>x.shareKey)){const family=String(e.shareKey).split(":")[0],bus=String(e.shareKey).split(":")[1],k=`${family}:${bus}`,cfg=e.shareKey;if(busSeen.has(k)&&busSeen.get(k).cfg!==cfg){const first=busSeen.get(k);return {errorType:"InterfaceConflictError",line:e.line,offset:e.offset,message:`${family.toUpperCase()} bus ${bus} is already configured with different pins on line ${first.line}.`,suggestion:`Reuse the same ${family.toUpperCase()} bus pins for multiple devices, or select the other hardware bus.`};}if(!busSeen.has(k))busSeen.set(k,{cfg,line:e.line});}
+    const busSeen=new Map(),busDeclSeen=new Set();
+    for(const e of entries.filter(x=>x.shareKey)){
+      const parts=String(e.shareKey).split(":"),family=parts[0],bus=parts[1],k=`${family}:${bus}`,decl=`${e.line}:${e.shareKey}`;
+      if(busDeclSeen.has(decl))continue;busDeclSeen.add(decl);
+      const cfg=e.shareKey;
+      if(busSeen.has(k)&&busSeen.get(k).cfg!==cfg){const first=busSeen.get(k),pins=parts.slice(2).join("/")||"different pins",firstPins=String(first.cfg).split(":").slice(2).join("/");return {errorType:"InterfaceConflictError",line:e.line,offset:e.offset,message:`${family.toUpperCase()} bus ${bus} uses ${firstPins} on line ${first.line}, but this device requests ${pins}.`,suggestion:`Devices may share ${family.toUpperCase()} bus ${bus} when the bus pins match. Reuse the first pin pair or select the other hardware bus.`};}
+      if(!busSeen.has(k))busSeen.set(k,{cfg,line:e.line});
+    }
     const uartSeen=new Map(),lines=String(src||"").split(/\r?\n/);
     lines.forEach((text,i)=>{let m;const re=/\b(UART|GPS)\s*\(([^)]*)\)/g,clean=text.replace(/#.*$/,"");while((m=re.exec(clean))){const a=m[2],rx=parseNumberArg(a,"rx",0,16),tx=parseNumberArg(a,"tx",1,17),port=parseNumberArg(a,"port",3,1),cfg=`${rx}:${tx}`;if(uartSeen.has(port)&&uartSeen.get(port).cfg!==cfg)uartSeen.set(`conflict:${i+1}`,{port,first:uartSeen.get(port),line:i+1,offset:m.index+1});else if(!uartSeen.has(port))uartSeen.set(port,{cfg,line:i+1});}});
     for(const [k,v] of uartSeen)if(String(k).startsWith("conflict:"))return {errorType:"InterfaceConflictError",line:v.line,offset:v.offset,message:`UART port ${v.port} is already assigned to different RX/TX pins on line ${v.first.line}.`,suggestion:"Use UART port 1 and 2 for two independent serial modules, or share one UART object when devices use the same connection."};
@@ -872,7 +890,7 @@ while True:
     if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;if(["DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","PulseInput","PulseOutput","CounterInput","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(type)&&argIndex>0)return null;
     const currentPart=parts[parts.length-1]||"",prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];if(prefix===undefined)return null;
     const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1])),usedElsewhere=allPinEntries(full).map(x=>x.pin);
-    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
+    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="CounterInput")pins=COUNTER_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
     pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
     const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — free ${type} pin · ${pins.length} compatible free`,className:"hint-constant"}));
     return {list,from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
@@ -1067,7 +1085,7 @@ while True:
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    // v6.0: import-member completion also works after commas and with partial names.
+    // v6.1: import-member completion also works after commas and with partial names.
     m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cv2|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s*(.*)$/);
     if(m){
       const moduleName=m[1],tail=m[2]||"",segment=(tail.split(",").pop()||"").replace(/^\s*\(?\s*/,"");
@@ -1224,7 +1242,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.0",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.1",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1405,7 +1423,7 @@ while True:
     if(item.className==="RGBLED"){const pref=PIN_HINT_ORDER.RGBLED.filter(p=>!used.has(p));return pref.length>=3?`${pref[0]}, ${pref[1]}, ${pref[2]}`:null;}
     if(item.className==="OLED"){const pref=PIN_HINT_ORDER.OLED.filter(p=>!used.has(p));return pref.length>=2?`${pref[0]}, ${pref[1]}, 0x3C`:null;}
     if(item.className==="DHT11"){const p=firstFree(PIN_HINT_ORDER.DHT11,used);return p==null?null:String(p);}
-    if(item.className==="Ultrasonic"){const trig=firstFree(PIN_HINT_ORDER.Ultrasonic,used);if(trig==null)return null;const used2=new Set(used);used2.add(trig);const echo=firstFree([12,34,35,36,39,19,18,17,16,33,32,27,26,25,23,22,21,14,13,4],used2);return echo==null?null:`${trig}, ${echo}`;}
+    if(item.className==="Ultrasonic"){const trig=firstFree(PIN_HINT_ORDER.Ultrasonic,used);if(trig==null)return null;const used2=new Set(used);used2.add(trig);const echo=firstFree([34,35,36,39,19,18,17,16,33,32,27,26,25,23,22,21,14,13,4,12],used2);return echo==null?null:`${trig}, ${echo}`;}
     if(item.className==="AnalogInput"||item.className==="Potentiometer"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="Switch"||item.className==="DigitalInput"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="RotaryEncoder"){const free=PIN_HINT_ORDER.RotaryEncoder.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
@@ -1445,9 +1463,9 @@ while True:
   }
 
 
-  // v6.0: Build the Kit Output / Sensors dashboard
+  // v6.1: Build the Kit Output / Sensors dashboard
 
-  // v6.0: Build the Kit Output / Sensors dashboard from the student's source code.
+  // v6.1: Build the Kit Output / Sensors dashboard from the student's source code.
   // Import order controls card order. Multiple constructor instances become separate cards.
   const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo"]);
   const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder"];
@@ -1705,6 +1723,7 @@ while True:
     worker.postMessage({
       type:"run",
       code,
+      liveSessionId,
       stdin:prefs.stdin||"",
       aiState,
       sensorState,
@@ -1794,7 +1813,7 @@ while True:
     const requestedIdx=idx!==null?idx:(Number(prefs.cameraIndex)||0);
 
     terminal.textContent="";clearPlotter();
-    running=true;updateRunControls();
+    running=true;liveSessionId++;updateRunControls();
     liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
@@ -2221,9 +2240,9 @@ while True:
   async function handleUniversalBridge(p){
     const key=String(p.key||p.command||"bridge");let r=null,group="gpio";
     if(p.command==="BRIDGE_GPIO_READ"){group="gpio";r=await kitClient.gpioRead(p.pin,{mode:p.mode||"input"});}
-    else if(p.command==="BRIDGE_GPIO_WRITE"){group="gpio";r=await kitClient.gpioWrite(p.pin,p.value);}
+    else if(p.command==="BRIDGE_GPIO_WRITE"){group="gpio";r=await kitClient.gpioWrite(p.pin,p.value,{safeValue:p.safeValue??0});}
     else if(p.command==="BRIDGE_ADC_READ"){group="adc";r=await kitClient.adc(p.pin);}
-    else if(p.command==="BRIDGE_PWM_SET"){group="pwm";r=await kitClient.pwm(p.pin,p.duty,{frequency:p.frequency,resolution:p.resolution});}
+    else if(p.command==="BRIDGE_PWM_SET"){group="pwm";r=await kitClient.pwm(p.pin,p.duty,{frequency:p.frequency,resolution:p.resolution,safeDuty:p.safeDuty??0});}
     else if(p.command==="BRIDGE_I2C"){group="i2c";r=await kitClient.i2c(p);}
     else if(p.command==="BRIDGE_UART"){group="uart";r=await kitClient.uart(p);}
     else if(p.command==="BRIDGE_SPI"){group="spi";r=await kitClient.spi(p);}
@@ -2297,7 +2316,10 @@ while True:
     }catch(e){
       markKitFailure("health");scheduleSilentReconnect();
       if(!kitEverConnected)badge($("kitStatus"),"Kit disconnected");
-      if(showError)log("Kit connection failed: "+(e?.message||e)+" Background reconnect will continue. Check kit power and Wi-Fi.");
+      if(showError){
+        log("Kit connection failed: "+(e?.message||e)+" Background reconnect will continue. Check kit power and Wi-Fi.");
+        if(isEmbedded)log("Browser/Wix note: if Local Network Access is blocked inside the embedded page, open this Python Lab page in a new tab and allow Local Network Access for the site.");
+      }
       return false;
     }
   }

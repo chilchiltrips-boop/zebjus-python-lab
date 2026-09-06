@@ -1,6 +1,7 @@
 import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs";
 
 let pyodide=null,readyPromise=null,opencvReady=false,importLoadCache=new Set();
+let activeLiveSession="",preparedRunSession="",livePrefixDone=false,livePrefixCode="",liveCycleCode="";
 
 async function initialize(){
   if(pyodide)return pyodide;
@@ -23,6 +24,8 @@ _hand_landmarks=[]
 _sensor_state={"ultrasonic_cm":45.0,"dht_temperature":28.0,"dht_humidity":65.0,"dht_pin":13,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
 _input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
 _bridge_state={"gpio":{},"adc":{},"pwm":{},"i2c":{},"uart":{},"spi":{},"pulse":{},"counter":{},"transaction":{}}
+_i2c_bus_defaults={0:(21,22),1:(25,26)}
+_i2c_bus_claimed={}
 _gps_state={}
 _current_frame=None
 _loaded_image=None
@@ -144,6 +147,7 @@ SUPPORTED_OUTPUT_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33)
 SUPPORTED_ADC_PINS=(32,33,34,35,36,39)
 SUPPORTED_DIGITAL_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39)
 SUPPORTED_ULTRASONIC_ECHO_PINS=(12,)+SUPPORTED_DIGITAL_PINS
+SUPPORTED_COUNTER_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35)
 
 def _analog_data(pin): return _input_state.get("analog",{}).get(str(int(pin)),{})
 def _digital_data(pin): return _input_state.get("digital",{}).get(str(int(pin)),{})
@@ -226,6 +230,9 @@ class OLED:
         if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"OLED SDA/SCL must use output-capable pins: {SUPPORTED_OUTPUT_PINS}")
         if self.sda==self.scl: raise ValueError("OLED SDA and SCL pins must be different")
         if self.width!=128 or self.height!=64: raise ValueError("This firmware currently supports SSD1306 128x64 OLED displays")
+        known=_i2c_bus_claimed.get(0)
+        if known is not None and tuple(known)!=(self.sda,self.scl): raise ValueError(f"I2C bus 0 already uses SDA{known[0]}/SCL{known[1]}; OLED requested SDA{self.sda}/SCL{self.scl}")
+        if 0 not in _i2c_bus_claimed: _i2c_bus_claimed[0]=(self.sda,self.scl)
         _send("OLED_INIT",sda=self.sda,scl=self.scl,address=self.address,width=self.width,height=self.height)
     def _cmd(self,command,**kwargs): _send(command,sda=self.sda,scl=self.scl,address=self.address,width=self.width,height=self.height,**kwargs)
     def clear(self,show=False): self._cmd("OLED_CLEAR",show=bool(show))
@@ -331,12 +338,13 @@ class DigitalOutput:
         self.write(initial)
     def write(self,value):
         logical=bool(value);physical=logical if self.active_high else not logical
-        _bridge_cmd("BRIDGE_GPIO_WRITE",f"gpio:{self.pin}",pin=self.pin,value=1 if physical else 0)
+        safe_physical=0 if self.active_high else 1
+        _bridge_cmd("BRIDGE_GPIO_WRITE",f"gpio:{self.pin}",pin=self.pin,value=1 if physical else 0,safeValue=safe_physical)
         return logical
     def on(self): return self.write(True)
     def off(self): return self.write(False)
     def toggle(self):
-        d=_bridge_get("gpio",f"gpio:{self.pin}",{}) or {};return self.write(not bool(d.get("value",0)))
+        d=_bridge_get("gpio",f"gpio:{self.pin}",{}) or {};physical=bool(d.get("value",0));logical=physical if self.active_high else not physical;return self.write(not logical)
 
 class Relay(DigitalOutput): pass
 
@@ -376,7 +384,7 @@ class PWM:
     @property
     def max_duty(self): return (1<<self.resolution)-1
     def write(self,duty):
-        duty=max(0,min(self.max_duty,int(duty)));_bridge_cmd("BRIDGE_PWM_SET",f"pwm:{self.pin}",pin=self.pin,duty=duty,frequency=self.frequency,resolution=self.resolution);return duty
+        duty=max(0,min(self.max_duty,int(duty)));_bridge_cmd("BRIDGE_PWM_SET",f"pwm:{self.pin}",pin=self.pin,duty=duty,frequency=self.frequency,resolution=self.resolution,safeDuty=0);return duty
     def duty(self,value): return self.write(value)
     def percent(self,value): return self.write(round(self.max_duty*max(0,min(100,float(value)))/100.0))
     def off(self): return self.write(0)
@@ -403,9 +411,13 @@ class MotorDriver:
 
 class I2C:
     __zebjus_ui__={"type":"i2c"}
-    def __init__(self,sda=21,scl=22,frequency=400000,bus=0):
-        self.sda=int(sda);self.scl=int(scl);self.frequency=int(frequency);self.bus=1 if int(bus)==1 else 0
+    def __init__(self,sda=None,scl=None,frequency=400000,bus=0):
+        self.bus=1 if int(bus)==1 else 0;known=_i2c_bus_claimed.get(self.bus,_i2c_bus_defaults[self.bus])
+        self.sda=int(known[0] if sda is None else sda);self.scl=int(known[1] if scl is None else scl);self.frequency=int(frequency)
         if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS or self.sda==self.scl: raise ValueError("I2C SDA/SCL must be different safe GPIO pins")
+        claimed=_i2c_bus_claimed.get(self.bus)
+        if claimed is not None and tuple(claimed)!=(self.sda,self.scl): raise ValueError(f"I2C bus {self.bus} already uses SDA{claimed[0]}/SCL{claimed[1]}; requested SDA{self.sda}/SCL{self.scl}")
+        if self.bus not in _i2c_bus_claimed: _i2c_bus_claimed[self.bus]=(self.sda,self.scl)
     def _key(self,op,address=0,reg=-1,length=0): return f"i2c:{self.bus}:{self.sda}:{self.scl}:{op}:{int(address)}:{int(reg)}:{int(length)}"
     def scan(self):
         key=self._key("scan");_bridge_cmd("BRIDGE_I2C",key,op="scan",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency);d=_bridge_get("i2c",key,{}) or {};return list(d.get("addresses",[]))
@@ -419,7 +431,7 @@ class I2C:
         key=self._key("readreg",address,register,length);_bridge_cmd("BRIDGE_I2C",key,op="readreg",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency,address=int(address),reg=int(register),regWidth=int(reg_width),length=int(length));d=_bridge_get("i2c",key,{}) or {};return [int(x)&255 for x in d.get("data",[])]
 
 class I2CDevice:
-    def __init__(self,address,sda=21,scl=22,frequency=400000,bus=0): self.address=int(address);self.bus=I2C(sda,scl,frequency,bus)
+    def __init__(self,address,sda=None,scl=None,frequency=400000,bus=0): self.address=int(address);self.bus=I2C(sda,scl,frequency,bus)
     def read(self,length): return self.bus.readfrom(self.address,length)
     def write(self,data): return self.bus.writeto(self.address,data)
     def read_registers(self,register,length,reg_width=1): return self.bus.read_registers(self.address,register,length,reg_width)
@@ -459,14 +471,19 @@ class PulseInput:
     def frequency(self): _bridge_cmd("BRIDGE_PULSE",self.key,op="frequency",pin=self.pin,state=self.state,timeoutUs=self.timeout_us);return float((_bridge_get("pulse",self.key,{}) or {}).get("hz",0.0))
 
 class PulseOutput:
-    def __init__(self,pin): self.pin=int(pin)
-    def pulse_us(self,width_us,state=1): _bridge_cmd("BRIDGE_PULSE",f"pulseout:{self.pin}",op="out",pin=self.pin,state=1 if state else 0,widthUs=int(width_us));return True
+    def __init__(self,pin,idle=0):
+        self.pin=int(pin);self.idle=1 if idle else 0
+        if self.pin not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"PulseOutput pin {self.pin} must be one of {SUPPORTED_OUTPUT_PINS}")
+    def pulse_us(self,width_us,state=1): _bridge_cmd("BRIDGE_PULSE",f"pulseout:{self.pin}",op="out",pin=self.pin,state=1 if state else 0,widthUs=int(width_us),safeValue=self.idle);return True
 
 class CounterInput:
     """Interrupt-backed pulse counter for flow, Hall/RPM, reed and frequency-output sensors."""
     __zebjus_ui__={"type":"counter_input"}
     def __init__(self,pin,edge="rising",pullup=False):
-        self.pin=int(pin);self.edge=str(edge).lower();self.pullup=bool(pullup);self.key=f"counter:{self.pin}:{self.edge}";self._last_request=0.0
+        self.pin=int(pin);self.edge=str(edge).lower();self.pullup=bool(pullup)
+        if self.pin not in SUPPORTED_COUNTER_PINS: raise ValueError(f"CounterInput pin {self.pin} must be one of {SUPPORTED_COUNTER_PINS}")
+        if self.edge not in ("rising","falling","change"): raise ValueError("CounterInput edge must be 'rising', 'falling', or 'change'")
+        self.key=f"counter:{self.pin}:{self.edge}";self._last_request=0.0
     def _sample(self):
         now=time.time()
         if now-self._last_request>0.03:
@@ -480,7 +497,7 @@ class CounterInput:
     def reset(self): _bridge_cmd("BRIDGE_COUNTER",self.key,op="reset",pin=self.pin,edge=self.edge,pullup=self.pullup);self._last_request=0.0;return True
 
 class HardwareTransaction:
-    """Run compact GPIO/pulse timing operations locally on ESP32. Results arrive on the next live cycle."""
+    """Run compact GPIO/pulse timing operations locally on ESP32. WRITE accepts optional safeValue as the fourth field."""
     def __init__(self,key="custom"): self.key=str(key)
     def run(self,ops):
         if isinstance(ops,(list,tuple)): ops=";".join(",".join(str(x) for x in row) if isinstance(row,(list,tuple)) else str(row) for row in ops)
@@ -517,7 +534,7 @@ class GPS:
 class MPU6050:
     """Common MPU6050 I2C IMU driver using the universal I2C bridge."""
     __zebjus_ui__={"type":"imu"}
-    def __init__(self,sda=21,scl=22,address=0x68,bus=0): self.dev=I2CDevice(address,sda,scl,400000,bus);self.dev.write_register(0x6B,0)
+    def __init__(self,sda=None,scl=None,address=0x68,bus=0): self.dev=I2CDevice(address,sda,scl,400000,bus);self.dev.write_register(0x6B,0)
     @staticmethod
     def _s16(a,b):
         v=(int(a)<<8)|int(b);return v-65536 if v&0x8000 else v
@@ -847,7 +864,7 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
   pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
   pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}}));
-  pyodide.globals.set("__bridge_json",JSON.stringify(m.sensorState?.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},transaction:{}}));
+  pyodide.globals.set("__bridge_json",JSON.stringify(m.sensorState?.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}}));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -869,13 +886,34 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
     await frameToPython(m.imageFrame,"loaded");
   }
 
-  let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:DHT11|Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(code);
-  if(legacyLoop){
-    execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
-  }
-  return execCode;
+  return code;
 }
+
+function buildPersistentLiveParts(code){
+  const lines=String(code||"").split(/\r?\n/);
+  let start=-1;
+  for(let i=0;i<lines.length;i++){
+    if(/^while\s+True\s*:\s*(?:#.*)?$/.test(lines[i])){start=i;break;}
+  }
+  if(start<0)return null;
+  let end=lines.length;
+  for(let i=start+1;i<lines.length;i++){
+    const line=lines[i];
+    if(!line.trim()||/^\s*#/.test(line))continue;
+    const indent=(line.match(/^[ \t]*/)||[""])[0].length;
+    if(indent===0){end=i;break;}
+  }
+  const prefix=lines.map((line,i)=>i<start?line:"").join("\n");
+  const cycle=lines.map((line,i)=>{
+    if(i<start||i>=end)return "";
+    if(i===start)return "for __zebjus_browser_cycle in range(1):";
+    return line;
+  }).join("\n");
+  return {prefix,cycle};
+}
+
+function resetPersistentLive(){activeLiveSession="";livePrefixDone=false;livePrefixCode="";liveCycleCode="";}
+
 
 function parsePythonError(err,code=""){
   const text=String(err?.message||err||"Python error");
@@ -963,14 +1001,25 @@ self.onmessage=async e=>{
 
   try{
     await initialize();
+    const session=String(m.liveSessionId||"default");
+    if(preparedRunSession!==session){preparedRunSession=session;await pyodide.runPythonAsync(`_i2c_bus_claimed={};_gps_state={}`);}
     const execCode=await prepareRun(m);
-    const result=await executeStudentCode(execCode);
-
-    if(result.ok){
-      postMessage({type:"done"});
+    const liveParts=buildPersistentLiveParts(execCode);
+    let result={ok:true};
+    if(liveParts){
+      if(activeLiveSession!==session){activeLiveSession=session;livePrefixDone=false;livePrefixCode=liveParts.prefix;liveCycleCode=liveParts.cycle;}
+      if(!livePrefixDone){
+        result=await executeStudentCode(livePrefixCode);
+        if(result.ok)livePrefixDone=true;
+      }
+      if(result.ok)result=await executeStudentCode(liveCycleCode);
     }else{
-      postMessage({type:"error",...result});
+      resetPersistentLive();
+      result=await executeStudentCode(execCode);
     }
+
+    if(result.ok)postMessage({type:"done"});
+    else{resetPersistentLive();postMessage({type:"error",...result});}
   }catch(err){
     const info=parsePythonError(err,m.code||"");
     postMessage({type:"error",...info});

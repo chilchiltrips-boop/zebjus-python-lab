@@ -1,9 +1,25 @@
 {
-  "release": "ZEBJUS Python Lab v6.0 FINAL",
-  "ui_version": "6.0",
-  "firmware": "2.0",
+  "release": "ZEBJUS Python Lab v6.1 Safety + Runtime Bridge FIXED",
+  "ui_version": "6.1",
+  "firmware": "2.1",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 38,
+  "fixes": {
+    "active_low_digital_failsafe": true,
+    "transaction_write_pulseout_safe_registry": true,
+    "gpio_pwm_slot_failure_handling": true,
+    "active_low_toggle_logic": true,
+    "persistent_top_level_while_true_state": true,
+    "source_line_preservation_in_live_loop": true,
+    "i2c_same_bus_same_pins_sharing": true,
+    "i2c_omitted_pins_inherit_claimed_bus": true,
+    "firmware_central_resource_manager": true,
+    "counter_pin_editor_firmware_alignment": true,
+    "gpio12_removed_from_normal_auto_priority": true,
+    "legacy_motor_servo_ui_labeling": true,
+    "mdns_status_firmware_version_alignment": true,
+    "embedded_local_network_fallback_message": true
+  },
   "universal_interfaces": {
     "digital_gpio": true,
     "adc1": true,
@@ -19,29 +35,28 @@
     ],
     "pulse_input_output": true,
     "interrupt_counter_slots": 8,
-    "hardware_transaction_vm": true
+    "hardware_transaction_vm": true,
+    "resource_manager": true,
+    "safe_output_registry": true
   },
-  "ready_python_drivers": [
-    "LED/RGBLED",
-    "AnalogInput/Potentiometer",
-    "DigitalInput/Switch",
-    "RotaryEncoder",
-    "Ultrasonic",
-    "DHT11",
-    "OLED SSD1306",
-    "DigitalOutput/GPIOInput/ADC/PWM",
-    "I2C/I2CDevice",
-    "UART",
-    "SPI",
-    "PulseInput/PulseOutput",
-    "CounterInput",
-    "HardwareTransaction",
-    "PWMServo",
-    "MotorDriver",
-    "GPS/NMEA",
-    "MPU6050",
-    "dashboard",
-    "plot"
+  "counter_pins": [
+    4,
+    13,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    25,
+    26,
+    27,
+    32,
+    33,
+    34,
+    35
   ],
   "connection_safety": {
     "cached_ip_primary": true,
@@ -53,20 +68,28 @@
     "new_ip_updates_cache": true,
     "run_heartbeat_ms": 1000,
     "esp_failsafe_ms": 10000,
-    "outputs_safe_off_on_timeout": true
+    "registered_outputs_apply_safe_state_on_timeout": true
+  },
+  "runtime_model": {
+    "top_level_while_true_initialization_once_per_run": true,
+    "loop_state_persists_between_live_cycles": true,
+    "generic_bridge_reads": "non-blocking cached response by design"
   },
   "validation": {
-    "javascript_syntax": "pass",
+    "javascript_syntax": "7/7 pass",
     "python_examples": "38/38 pass",
-    "example_dropdown_mapping": "pass",
-    "py_worker_init_python": "pass",
+    "py_worker_python_blocks": "7/7 pass",
+    "i2c_regressions": "7/7 pass (share, explicit conflict, second bus, counter pin alignment)",
+    "persistent_live_state": "pass (counter 1,2,3 across 3 cycles)",
     "html_duplicate_ids": "pass",
     "local_asset_refs": "pass",
     "firmware_lexical_delimiters": "pass",
-    "firmware_bridge_routes": 15,
+    "firmware_bridge_route_declarations": 15,
+    "firmware_bridge_unique_routes": 10,
     "heartbeat_1000ms_static_check": "pass",
     "five_failure_static_check": "pass",
     "failsafe_10000ms_static_check": "pass",
-    "arduino_ide_compile": "not run in this environment; compile/upload on target ESP32 required"
+    "current_arduino_esp32_api_signature_review": "pass for LEDC/I2C/UART/SPI calls",
+    "arduino_cli_compile": "not run: compiler was not installed in the runtime and network/DNS access for installing it was unavailable"
   }
 }

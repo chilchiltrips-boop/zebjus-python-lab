@@ -1,10 +1,10 @@
-# ZEBJUS Python Lab v6.0 — Universal Hardware Bridge
+# ZEBJUS Python Lab v6.1 — Universal Hardware Bridge
 
-v6.0 changes the kit from a fixed list of sensor APIs into a **universal hardware-interface platform**. Existing RGB, LED, OLED, DHT11, Ultrasonic, AnalogInput, Switch, RotaryEncoder, Camera/MediaPipe, OpenCV, Serial Plotter, reconnect/heartbeat and dynamic sensor dashboard features are retained.
+v6.1 is the **Safety + Runtime** update to the Universal Hardware Bridge introduced in v6.0. It keeps the universal hardware-interface platform and fixes live-loop state, failsafe and bus/resource conflicts. Existing RGB, LED, OLED, DHT11, Ultrasonic, AnalogInput, Switch, RotaryEncoder, Camera/MediaPipe, OpenCV, Serial Plotter, reconnect/heartbeat and dynamic sensor dashboard features are retained.
 
 ## Main architecture
 
-The ESP32 firmware v2.0 exposes reusable low-level interfaces instead of requiring a new firmware route for every sensor:
+The ESP32 firmware v2.1 exposes reusable low-level interfaces instead of requiring a new firmware route for every sensor:
 
 - Digital GPIO input/output
 - ADC1 analog input
@@ -97,7 +97,7 @@ Safe classic ESP32 DevKit pool used by this project:
 - UART hardware ports exposed: 1 and 2
 - SPI buses exposed: 1 and 2
 
-I²C and SPI shared bus lines are counted once. Example: OLED and MPU6050 can both use SDA21/SCL22 on I²C bus 0 without consuming four pins. Assigning different SDA/SCL pairs to the same I²C bus number produces an editor `InterfaceConflictError`.
+I²C and SPI shared bus lines are counted once. Example: OLED and MPU6050 can both use SDA21/SCL22 on I²C bus 0 without consuming four pins. If `I2C()`, `I2CDevice()` or `MPU6050()` omits SDA/SCL after bus 0 was already claimed by the OLED, it inherits the existing bus pins. Assigning an explicitly different SDA/SCL pair to the same I²C bus number produces an editor `InterfaceConflictError`.
 
 ## Custom sensor dashboard
 
@@ -125,11 +125,13 @@ result = txn.run([
 ])
 ```
 
-Supported transaction operations in firmware v2.0: `MODE`, `WRITE`, `READ`, `ADC`, `DELAYUS`, `DELAYMS`, `PULSEIN`, `PULSEOUT`.
+Supported transaction operations in firmware v2.1: `MODE`, `WRITE`, `READ`, `ADC`, `DELAYUS`, `DELAYMS`, `PULSEIN`, `PULSEOUT`.
 
 ## Important runtime model
 
-Browser Python is isolated in a Pyodide worker. Generic read calls use a non-blocking cached-response model: the Python call requests the next ESP32 read and returns the most recent value. In `while True` live projects, the next browser cycle receives the new result. This avoids freezing the editor/UI because of Wi-Fi latency. Existing dedicated DHT11/Ultrasonic/Analog/Digital APIs continue using their optimized polling path.
+Browser Python is isolated in a Pyodide worker. A top-level `while True:` is split into **one-time initialization + repeated live-loop cycles**. Code before the loop now runs once per Run session, so counters, filters, objects and other Python state persist instead of being recreated every cycle. Source line positions are preserved for accurate error markers.
+
+Generic low-level read calls still use the intentional non-blocking cached-response model: a call requests the next ESP32 read and returns the most recent response, which is refreshed on the following live cycle. This avoids freezing the editor/UI on Wi-Fi latency. Dedicated DHT11/Ultrasonic/Analog/Digital APIs continue using their optimized polling path.
 
 ## Connection safety retained
 
@@ -141,15 +143,17 @@ Browser Python is isolated in a Pyodide worker. Generic read calls use a non-blo
 - No Connecting ↔ Connected blink during temporary misses
 - 1-second browser heartbeat while a hardware run is active
 - 10-second ESP32 failsafe
-- Registered PWM/digital/RGB outputs safe OFF on heartbeat timeout
+- Registered PWM/digital/RGB/transaction outputs move to their registered safe state on heartbeat timeout, including active-low relays
 - Bridge UART/SPI/I²C run resources released as applicable
 - OLED cleared on heartbeat timeout
+- Firmware central resource manager rejects cross-interface GPIO conflicts
+- Embedded/Wix Local Network Access failures include a direct-page/new-tab fallback hint
 
 ## Firmware
 
 Use:
 
-`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_0.ino`
+`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_1.ino`
 
 Required Arduino libraries for the retained OLED API:
 
@@ -161,4 +165,8 @@ Target: classic ESP32 / ESP32-WROOM-32 style DevKit with Arduino-ESP32 3.x.
 
 ## Examples
 
-v6.0 contains 38 selectable examples, including legacy projects plus Universal Digital Output, ADC plotting, PWM Servo, Motor Driver, I²C scanner, custom I²C register device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and custom timing transaction projects.
+v6.1 contains 38 selectable examples, including legacy projects plus Universal Digital Output, ADC plotting, PWM Servo, Motor Driver, I²C scanner, custom I²C register device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and custom timing transaction projects.
+
+## Trusted-LAN note
+
+The current kit keeps the simple classroom workflow: browser and ESP32 communicate directly on the same trusted Wi-Fi without a separate pairing password. For a public/commercial deployment on untrusted LANs, add a per-kit pairing/session credential before exposing configuration or output APIs beyond the trusted local network. This is intentionally not enabled in v6.1 so existing kit provisioning and browser connection behavior remain compatible.
