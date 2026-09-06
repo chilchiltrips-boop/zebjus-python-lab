@@ -129,7 +129,7 @@
     constructor(){
       this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";
       this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
-      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};
+      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";
     }
     get connected(){return !!this.base&&!!this.status;}
     _accept(status,base){
@@ -176,6 +176,7 @@
       if(this.connected){try{return await this.refresh();}catch(_){/* reconnect below */}}
       return this.reconnect(4);
     }
+    async flushCommands(){try{return await this._commandChain;}catch(_){return null;}}
     async _request(path,opts={},retry=true){
       if(!this.base)await this.reconnect(4);
       try{return await requestBase(this.base,path,opts);}
@@ -185,7 +186,7 @@
       }
     }
     async beginRun(){
-      await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();
+      await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();this._oledInitialized=false;
       return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
     }
     async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900});}
@@ -231,6 +232,30 @@
     async resetRotary(clk=32,dt=33,sw=-1){
       const data={clk:Number(clk),dt:Number(dt),sw:sw===null||sw===undefined?-1:Number(sw)};
       return this._request("/api/input/rotary/reset",{method:"POST",data,timeout:1400});
+    }
+    async ultrasonic(trig=18,echo=19,{maxCm=400}={}){
+      trig=Number(trig);echo=Number(echo);maxCm=Math.max(2,Math.min(600,Number(maxCm)||400));
+      if(!SAFE_RGB_PINS.includes(trig))throw new Error("Ultrasonic TRIG must use an output-capable pin: "+SAFE_RGB_PINS.join(", "));
+      if(!SAFE_DIGITAL_PINS.includes(echo)||trig===echo)throw new Error("Invalid ultrasonic ECHO pin.");
+      const q=`trig=${encodeURIComponent(trig)}&echo=${encodeURIComponent(echo)}&maxCm=${encodeURIComponent(maxCm)}`;
+      return this._request(`/api/input/ultrasonic?${q}`,{timeout:1800});
+    }
+    async oled(p={}){
+      const action=String(p.action||p.command||"").replace(/^OLED_/,"").toLowerCase();
+      if(!action)throw new Error("OLED action is required.");
+      const data={...p,action};delete data.command;
+      const cfg=`${Number(data.sda??21)},${Number(data.scl??22)},${Number(data.address??60)}`;
+      if(action==="init"&&this._oledInitialized&&this._oledConfig===cfg)return {ok:true,skipped:true,cached:true};
+      if(data.sda!==undefined&&(!SAFE_RGB_PINS.includes(Number(data.sda))||!SAFE_RGB_PINS.includes(Number(data.scl))))throw new Error("OLED SDA/SCL must use output-capable GPIO pins.");
+      const epoch=this._commandEpoch;
+      const task=async()=>{
+        if(epoch!==this._commandEpoch)return {ok:true,skipped:true};
+        const r=await this._request("/api/oled",{method:"POST",data,timeout:2200});
+        if(action==="init"){this._oledInitialized=true;this._oledConfig=cfg;}
+        if(epoch!==this._commandEpoch)return {ok:true,skipped:true};
+        return r;
+      };
+      this._commandChain=this._commandChain.then(task,task);return this._commandChain;
     }
     async rename(name){
       if(!this.base)await this.reconnect(4);const clean=normalizeKitName(name);if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");

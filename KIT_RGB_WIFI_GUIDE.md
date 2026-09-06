@@ -1,4 +1,4 @@
-# ZEBJUS Kit v1.4 — Wi-Fi, RGB and Universal Inputs
+# ZEBJUS Kit v1.5 — Wi-Fi, RGB, Universal Inputs, Ultrasonic and OLED
 
 ## Firmware
 
@@ -9,7 +9,7 @@ Upload:
 Expected Serial header:
 
 ```text
-ZEBJUS KIT RGB + INPUT WiFi v1.4
+ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC WiFi v1.5
 ```
 
 The existing kit Wi-Fi workflow remains the same:
@@ -68,3 +68,8 @@ encoder = RotaryEncoder(32, 33, 14)
 ## Run safety
 
 RGB output is active only during a Web Lab Run session. Program finish, End, error, or missed heartbeat forces RGB OFF.
+
+
+## OLED + Ultrasonic
+
+For HC-SR04 wiring, ESP32 ECHO level-shifting, SSD1306 wiring and the Python OLED drawing API, see `OLED_ULTRASONIC_GUIDE.md`.

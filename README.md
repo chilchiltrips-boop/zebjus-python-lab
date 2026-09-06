@@ -1,89 +1,81 @@
-# ZEBJUS Python Lab v5.21 — Stable Kit Connection + Pin Assist
+# ZEBJUS Python Lab v5.22 — OLED + Ultrasonic + Stable Kit Connection
 
-This stage keeps the RGB LED, editor, exact error-line highlighting, Undo/Redo, OpenCV/MediaPipe engine, Wi-Fi kit naming, saved Wi-Fi profiles, kit auto-reconnect, Run heartbeat and output failsafe.
+v5.22 keeps the complete v5.21 stable-connection architecture and adds a real HC-SR04 ultrasonic input API plus an extensible SSD1306 128×64 OLED drawing interface controlled directly from student Python.
 
+## Retained from v5.21
 
-## Added in v5.21
+- Cached IP primary → mDNS fallback.
+- Physical Kit ID verification before accepting a cached address.
+- 5 consecutive failures required before UI becomes Disconnected.
+- Failures 1–4 keep the visible state Connected.
+- Silent background reconnect; no routine `Connecting ↔ Connected` blinking.
+- Successful status/API/heartbeat resets the failure counter.
+- New DHCP IP updates the cached IP.
+- Run heartbeat every 1 second.
+- ESP output failsafe after 10 seconds without heartbeat.
+- Temporary Wi-Fi/API miss does not immediately stop Python.
+- `+ New Project` opens a blank editor.
+- Custom project draft autosave/restore, Undo/Redo, exact error line, Pin Assist, camera/OpenCV/MediaPipe and existing input APIs retained.
 
-- Cached IP is tried first, then mDNS (`kit-name.local`) fallback, with physical Kit ID verification before accepting a device.
-- The selected kit persists `kitName`, physical `kitChipId`, and last working `kitIp` separately. A newly discovered DHCP IP updates the cache automatically.
-- Stable connection state machine: 1–4 consecutive health/heartbeat misses keep the UI at **Kit connected**; only the 5th consecutive miss changes it to **Kit disconnected**.
-- Reconnect runs silently in the background, so the badge no longer blinks `Connecting ↔ Connected` during routine checks. Any successful status/API/heartbeat response resets the failure counter.
-- Run heartbeat remains every 1 second. ESP32 output failsafe is now 10 seconds; heartbeat timeout forces RGB/output safe OFF.
-- Temporary Wi-Fi/API misses do not immediately stop the Python program. The browser keeps the program alive while reconnecting.
-- Added **+ New Project** for a completely blank editor. Blank/custom code is auto-saved and restored, including an intentionally empty draft.
-- Camera bridge cache versions are aligned to v5.21.
+## Added in v5.22
 
-## Added in v5.20
+- Physical `Ultrasonic(trig, echo, max_cm=...)` support using `/api/input/ultrasonic`.
+- Default HC-SR04 pins: TRIG GPIO18, ECHO GPIO19.
+- Extensible `OLED` Python class for SSD1306 128×64 I2C displays.
+- Default OLED: SDA GPIO21, SCL GPIO22, address `0x3C`.
+- Browser OLED 128×64 preview mirrors Python OLED commands.
+- OLED primitives: clear, show, text, pixel, line, rectangle, circle, invert and contrast.
+- OLED convenience screens: text display, scrolling text, distance bar and ultrasonic radar frame.
+- OLED and Ultrasonic are integrated into autocomplete, Pin Assist, duplicate-pin checks and exact-line validation.
+- Learning Example menu expanded from 13 to **20 examples**.
+- Camera/JS cache references aligned to v5.22.
 
-- Context-aware GPIO suggestions inside `RGBLED(...)`, `AnalogInput(...)`, `Potentiometer(...)`, `DigitalInput(...)`, `Switch(...)`, and `RotaryEncoder(...)`.
-- Pins already used elsewhere in the same program are removed from the suggestion list.
-- Pins already entered earlier in the same constructor are not suggested again.
-- Unsupported GPIO selection is reported as `PinError` on the exact editor line before Run.
-- Reusing the same physical GPIO for two roles is reported as `PinConflictError` on the second conflicting line.
-- Pin validation runs both while editing and again before the program starts.
-
-## Universal Inputs retained from v5.19
-
-- Generic `AnalogInput(pin)` API.
-- Backward-compatible `Potentiometer(pin)` alias.
-- Generic `DigitalInput(pin, pullup=..., active_low=...)` API.
-- `Switch(pin)` API with push-button-friendly defaults.
-- `RotaryEncoder(clk, dt, switch)` API.
-- ESP32 continuously tracks rotary encoder movement.
-- Python can process `raw`, `value`, `percent`, switch state, rotary position, delta and direction.
-- Current example list contains only RGB LED + currently implemented input projects.
-- Generic input monitor cards for analog, switch and rotary values.
-
-## Python input API
+## Python examples
 
 ```python
-from zebjus import AnalogInput, Potentiometer, DigitalInput, Switch, RotaryEncoder
+from zebjus import Ultrasonic, OLED, sleep
 
-analog = AnalogInput(34)
-pot = Potentiometer(34)
-sensor = DigitalInput(32, pullup=False, active_low=False)
-button = Switch(32)
-encoder = RotaryEncoder(32, 33, 14)
+ultra = Ultrasonic(18, 19)
+oled = OLED(21, 22, 0x3C)
+
+while True:
+    cm = ultra.read()
+    oled.distance_bar(cm, max_cm=400, title="ULTRASONIC")
+    sleep(0.12)
 ```
 
-Analog methods:
+Generic custom OLED screens can be built from primitives:
 
-- `read()` → 0–255
-- `raw()` → 0–4095
-- `percent()` → 0–100
-- `millivolts()`
+```python
+from zebjus import OLED
 
-Digital methods:
+oled = OLED()
+oled.clear()
+oled.rect(0, 0, 128, 64)
+oled.line(0, 0, 127, 63)
+oled.circle(64, 32, 18)
+oled.text("Z", 61, 28)
+oled.show()
+```
 
-- `state()` → raw 0/1
-- `read()` / `active()` → Boolean
-- `Switch.pressed()` → Boolean
+## Hardware safety
 
-Rotary methods:
+HC-SR04 ECHO is normally a 5V signal. ESP32 GPIO is 3.3V logic, so use a voltage divider or level shifter on ECHO. Do not wire HC-SR04 ECHO directly to GPIO19.
 
-- `position()`
-- `delta()`
-- `direction()` → `CW`, `CCW`, `NONE`
-- `pressed()`
-- `switch_state()`
-
-## Safe analog pins while Wi-Fi is active
-
-`32, 33, 34, 35, 36, 39`
-
-## Supported digital input pins
-
-`4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39`
-
-GPIO34/35/36/39 require an external pull resistor when used as switches/encoder inputs.
-
-## ESP32 firmware
+## Firmware
 
 Upload:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_4.ino`
+`esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_WiFi_v1_5.ino`
+
+Required Arduino libraries:
+
+- Adafruit SSD1306
+- Adafruit GFX Library
+- Adafruit BusIO
 
 Expected Serial header:
 
-`ZEBJUS KIT RGB + INPUT WiFi v1.4`
+`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC WiFi v1.5`
+
+For wiring and the complete display API see `OLED_ULTRASONIC_GUIDE.md`.

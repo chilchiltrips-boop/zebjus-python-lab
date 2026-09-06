@@ -21,7 +21,7 @@ _ai_state={"detected":False,"fingers":0,"side":"","landmarks":[]}
 _face_state=[]
 _hand_landmarks=[]
 _sensor_state={"ultrasonic_cm":45.0,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
-_input_state={"analog":{},"digital":{},"rotary":{}}
+_input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{}}
 _current_frame=None
 _loaded_image=None
 
@@ -111,12 +111,7 @@ class Servo:
     def __init__(self,id=1): self.id=int(id)
     def write(self,angle=90): _send("SERVO_SET",id=self.id,angle=max(0,min(180,int(angle))))
 
-class Ultrasonic:
-    def __init__(self,id=1): self.id=int(id)
-    def read(self): return float(_sensor_state.get("ultrasonic_cm",0.0))
-    @property
-    def distance_cm(self): return self.read()
-
+SUPPORTED_OUTPUT_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33)
 SUPPORTED_ADC_PINS=(32,33,34,35,36,39)
 SUPPORTED_DIGITAL_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39)
 
@@ -124,6 +119,60 @@ def _analog_data(pin): return _input_state.get("analog",{}).get(str(int(pin)),{}
 def _digital_data(pin): return _input_state.get("digital",{}).get(str(int(pin)),{})
 def _rotary_key(clk,dt,sw): return f"{int(clk)},{int(dt)},{int(sw)}"
 def _rotary_data(clk,dt,sw): return _input_state.get("rotary",{}).get(_rotary_key(clk,dt,sw),{})
+def _ultrasonic_key(trig,echo): return f"{int(trig)},{int(echo)}"
+def _ultrasonic_data(trig,echo): return _input_state.get("ultrasonic",{}).get(_ultrasonic_key(trig,echo),{})
+
+class Ultrasonic:
+    def __init__(self,*args,trig=18,echo=19,max_cm=400):
+        # Backward compatible Ultrasonic() / Ultrasonic(1), plus physical Ultrasonic(18,19).
+        if len(args)==1:
+            self.id=int(args[0])
+        elif len(args)==2:
+            trig,echo=int(args[0]),int(args[1]);self.id=1
+        elif len(args)==0:
+            self.id=1
+        else:
+            raise ValueError("Ultrasonic expects Ultrasonic(), Ultrasonic(18,19), or named trig=/echo= pins")
+        self.trig=int(trig);self.echo=int(echo);self.max_cm=max(2,int(max_cm))
+        if self.trig not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"Unsupported ultrasonic TRIG pin {self.trig}. Use one of {SUPPORTED_OUTPUT_PINS}")
+        if self.echo not in SUPPORTED_DIGITAL_PINS: raise ValueError(f"Unsupported ultrasonic ECHO pin {self.echo}. Use one of {SUPPORTED_DIGITAL_PINS}")
+        if self.trig==self.echo: raise ValueError("Ultrasonic TRIG and ECHO pins must be different")
+    def read(self):
+        d=_ultrasonic_data(self.trig,self.echo)
+        return float(d.get("distanceCm",d.get("distance_cm",_sensor_state.get("ultrasonic_cm",0.0))))
+    def centimeters(self): return self.read()
+    @property
+    def distance_cm(self): return self.read()
+
+class OLED:
+    """SSD1306 128x64 I2C display. Commands mirror to the Lab OLED preview and the physical kit."""
+    def __init__(self,sda=21,scl=22,address=0x3C,width=128,height=64):
+        self.sda=int(sda);self.scl=int(scl);self.address=int(address);self.width=int(width);self.height=int(height)
+        if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"OLED SDA/SCL must use output-capable pins: {SUPPORTED_OUTPUT_PINS}")
+        if self.sda==self.scl: raise ValueError("OLED SDA and SCL pins must be different")
+        if self.width!=128 or self.height!=64: raise ValueError("This firmware currently supports SSD1306 128x64 OLED displays")
+        _send("OLED_INIT",sda=self.sda,scl=self.scl,address=self.address,width=self.width,height=self.height)
+    def _cmd(self,command,**kwargs): _send(command,sda=self.sda,scl=self.scl,address=self.address,width=self.width,height=self.height,**kwargs)
+    def clear(self,show=False): self._cmd("OLED_CLEAR",show=bool(show))
+    def show(self): self._cmd("OLED_SHOW")
+    def text(self,text,x=0,y=0,size=1,show=False): self._cmd("OLED_TEXT",text=str(text),x=int(x),y=int(y),size=max(1,min(4,int(size))),show=bool(show))
+    def pixel(self,x,y,on=True,show=False): self._cmd("OLED_PIXEL",x=int(x),y=int(y),on=bool(on),show=bool(show))
+    def line(self,x1,y1,x2,y2,on=True,show=False): self._cmd("OLED_LINE",x1=int(x1),y1=int(y1),x2=int(x2),y2=int(y2),on=bool(on),show=bool(show))
+    def rect(self,x,y,w,h,fill=False,on=True,show=False): self._cmd("OLED_RECT",x=int(x),y=int(y),w=int(w),h=int(h),fill=bool(fill),on=bool(on),show=bool(show))
+    def circle(self,x,y,r,fill=False,on=True,show=False): self._cmd("OLED_CIRCLE",x=int(x),y=int(y),r=int(r),fill=bool(fill),on=bool(on),show=bool(show))
+    def invert(self,enabled=True): self._cmd("OLED_INVERT",enabled=bool(enabled))
+    def contrast(self,value=127): self._cmd("OLED_CONTRAST",value=max(0,min(255,int(value))))
+    def display_text(self,text,x=0,y=0,size=1,clear=True): self._cmd("OLED_DISPLAY_TEXT",text=str(text),x=int(x),y=int(y),size=max(1,min(4,int(size))),clear=bool(clear))
+    def distance_bar(self,distance_cm,max_cm=400,title="Distance"):
+        self._cmd("OLED_DISTANCE_BAR",distance=float(distance_cm),maxCm=max(1,float(max_cm)),title=str(title))
+    def radar(self,angle,distance_cm,max_cm=200,title="RADAR"):
+        self._cmd("OLED_RADAR",angle=max(0,min(180,float(angle))),distance=max(0.0,float(distance_cm)),maxCm=max(1.0,float(max_cm)),title=str(title))
+    def scroll_text(self,text,y=24,size=1,speed=0.08,step=6,direction="left"):
+        text=str(text);size=max(1,min(4,int(size)));step=max(1,int(step));speed=max(0.01,float(speed));direction=str(direction).lower()
+        approx_w=max(1,len(text)*6*size)
+        positions=range(self.width,-approx_w-1,-step) if direction!="right" else range(-approx_w,self.width+1,step)
+        for x in positions:
+            self.display_text(text,x,y,size,True);time.sleep(speed)
 
 class AnalogInput:
     def __init__(self,pin=34):
@@ -372,10 +421,10 @@ sys.modules["HandTrackingModule"]=htm_mod;sys.modules["zebjus_wifi"]=wifi_mod
 
 z=types.ModuleType("zebjus")
 for k,v in {
-    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,
+    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,
     "Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
 }.items(): setattr(z,k,v)
-z.__all__=["RGBLED","LED","Motor","Servo","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
@@ -485,7 +534,7 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__pot_pin",Number(m.sensorState?.potPin)||34);
   pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
   pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
-  pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{}}));
+  pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{}}));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -495,7 +544,7 @@ _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_j
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
 _sensor_state={"ultrasonic_cm":float(__ultra),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
-_input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{}}
+_input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{},"ultrasonic":{}}
 _current_frame=None
 _loaded_image=None
   `);
@@ -507,7 +556,7 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
   }

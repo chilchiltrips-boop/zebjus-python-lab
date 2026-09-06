@@ -17,8 +17,8 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.21</span>
-      <p>Python • OpenCV • MediaPipe • RGB LED • Analog • Switch • Rotary</p>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.22</span>
+      <p>Python • OpenCV • MediaPipe • RGB • Ultrasonic • OLED • Analog • Switch • Rotary</p>
     </div>
     <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
@@ -50,6 +50,15 @@
               <option value="rotaryRead">Rotary Encoder + Switch</option>
               <option value="rotaryLed">Rotary → RGB LED</option>
               <option value="analogLed">Analog → RGB LED</option>
+              <option value="ultrasonicRead">Ultrasonic Distance</option>
+            </optgroup>
+            <optgroup label="OLED 128×64">
+              <option value="oledText">OLED Text Display</option>
+              <option value="oledTextAnimation">OLED Text Animation</option>
+              <option value="oledShapes">OLED Drawing Primitives</option>
+              <option value="ultrasonicOled">Ultrasonic → OLED Text</option>
+              <option value="ultrasonicRadar">Ultrasonic Radar Animation</option>
+              <option value="ultrasonicDistanceBar">Ultrasonic Distance Bar</option>
             </optgroup>
           </select>
         </label>
@@ -125,6 +134,14 @@
                 <strong>Ultrasonic</strong>
                 <div class="sensor-meter"><div id="ultraMeter" class="sensor-fill"></div></div>
                 <span id="ultraLabel">45.0 cm</span>
+              </div>
+            </div>
+
+            <div class="demo-card oled-card">
+              <canvas id="oledCanvas" class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas>
+              <div class="demo-grow">
+                <strong>OLED 128×64</strong>
+                <span id="oledLabel">SSD1306 · SDA 21 · SCL 22 · 0x3C</span>
               </div>
             </div>
 
@@ -228,6 +245,10 @@
         <code>DigitalInput(32)</code>
         <code>Switch(32)</code>
         <code>RotaryEncoder(32,33,14)</code>
+        <code>Ultrasonic(18,19)</code>
+        <code>OLED(21,22,0x3C)</code>
+        <code>oled.display_text("Hello")</code>
+        <code>oled.radar(angle, distance)</code>
         <code>analog.raw() → 0–4095</code>
         <code>button.pressed() → True/False</code>
         <code>encoder.position()</code>
@@ -235,6 +256,7 @@
         <code>ADC1: 32,33,34,35,36,39</code>
         <code>Digital input: 4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39</code>
         <code>GPIO34–39 need external pull resistor for switches</code>
+        <code>HC-SR04 ECHO is 5V → use divider/level shifter before ESP32 GPIO</code>
       </div>
     </section>
   </main>
@@ -246,9 +268,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.21"></script>
-  <script src="./kit-client.js?v=5.21"></script>
-  <script src="./ai.js?v=5.21"></script>
-  <script src="./app.js?v=5.21"></script>
+  <script src="./config.js?v=5.22"></script>
+  <script src="./kit-client.js?v=5.22"></script>
+  <script src="./ai.js?v=5.22"></script>
+  <script src="./app.js?v=5.22"></script>
 </body>
 </html>

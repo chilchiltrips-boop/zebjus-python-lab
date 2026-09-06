@@ -1,21 +1,26 @@
-# Current Student Projects — v5.21
+# ZEBJUS Python Lab v5.22 — 20 Current Examples
 
-Old placeholder projects have been removed from the Learning Example menu. New examples are added only when the corresponding hardware feature is implemented.
+1. RGB LED — Basic Colors
+2. RGB LED — Blink
+3. RGB LED — Animation
+4. RGB LED — Indication & Effects
+5. RGB LED — Fade / Breathing
+6. Generic Analog Input
+7. Potentiometer / Analog Knob
+8. Generic Digital Input
+9. Push Switch Input
+10. Switch → RGB LED
+11. Rotary Encoder + Push Switch
+12. Rotary Encoder → RGB LED
+13. Analog Input → RGB LED
+14. Ultrasonic Distance
+15. OLED Text Display
+16. OLED Text Animation
+17. OLED Drawing Primitives
+18. Ultrasonic → OLED Text
+19. Ultrasonic Radar Animation
+20. Ultrasonic OLED Distance Bar
 
-Current stage:
+Default non-conflicting kit wiring for the new hardware is RGB `25/26/27`, ultrasonic `TRIG=18 / ECHO=19`, and OLED `SDA=21 / SCL=22 / 0x3C`.
 
-1. RGB LED Basic Colors
-2. RGB LED Blink
-3. RGB LED Animation
-4. RGB LED Indication Effects
-5. RGB LED Fade / Breathing
-6. Generic Analog Input Reading
-7. Potentiometer / Analog Knob Reading
-8. Generic Digital Input Reading
-9. Push Switch Reading
-10. Switch Controls RGB LED
-11. Rotary Encoder + Push Switch Reading
-12. Rotary Encoder Controls RGB LED
-13. Analog Input Controls RGB LED
-
-Next hardware features can be added one by one without restoring unrelated examples.
+See `OLED_ULTRASONIC_GUIDE.md` for wiring, safety and Python API details.

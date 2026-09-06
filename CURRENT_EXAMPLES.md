@@ -1,6 +1,4 @@
-# ZEBJUS Python Lab v5.21 — Current Examples
-
-The Learning Example menu is intentionally limited to the hardware features currently developed and tested.
+# ZEBJUS Python Lab v5.22 — 20 Current Examples
 
 1. RGB LED — Basic Colors
 2. RGB LED — Blink
@@ -15,30 +13,14 @@ The Learning Example menu is intentionally limited to the hardware features curr
 11. Rotary Encoder + Push Switch
 12. Rotary Encoder → RGB LED
 13. Analog Input → RGB LED
+14. Ultrasonic Distance
+15. OLED Text Display
+16. OLED Text Animation
+17. OLED Drawing Primitives
+18. Ultrasonic → OLED Text
+19. Ultrasonic Radar Animation
+20. Ultrasonic OLED Distance Bar
 
-## Analog input pins
+Default non-conflicting kit wiring for the new hardware is RGB `25/26/27`, ultrasonic `TRIG=18 / ECHO=19`, and OLED `SDA=21 / SCL=22 / 0x3C`.
 
-With ESP32 Wi-Fi active, use ADC1 pins:
-
-`GPIO32, GPIO33, GPIO34, GPIO35, GPIO36, GPIO39`
-
-Use `AnalogInput(pin)` for generic analog sensors. `Potentiometer(pin)` is a convenience alias.
-
-## Digital input pins
-
-Supported input pins:
-
-`GPIO4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34, 35, 36, 39`
-
-GPIO34/35/36/39 do not have internal pull-up resistors. Use an external resistor when a switch or encoder requires a pull-up.
-
-## Rotary encoder
-
-Typical example:
-
-```python
-from zebjus import RotaryEncoder
-encoder = RotaryEncoder(32, 33, 14)  # CLK, DT, SW
-```
-
-The ESP32 continuously tracks rotation so steps are not dependent only on browser polling.
+See `OLED_ULTRASONIC_GUIDE.md` for wiring, safety and Python API details.

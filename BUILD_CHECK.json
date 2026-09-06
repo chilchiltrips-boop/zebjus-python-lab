@@ -1,6 +1,6 @@
 {
-  "ui_version": "5.21",
-  "examples_count": 13,
+  "ui_version": "5.22",
+  "examples_count": 20,
   "examples": {
     "ledBasic": "ok",
     "ledBlink": "ok",
@@ -14,42 +14,69 @@
     "switchLed": "ok",
     "rotaryRead": "ok",
     "rotaryLed": "ok",
-    "analogLed": "ok"
+    "analogLed": "ok",
+    "ultrasonicRead": "ok",
+    "oledText": "ok",
+    "oledTextAnimation": "ok",
+    "oledShapes": "ok",
+    "ultrasonicOled": "ok",
+    "ultrasonicRadar": "ok",
+    "ultrasonicDistanceBar": "ok"
   },
   "dropdown_missing": [],
-  "worker_python_blocks": [
-    "ok",
-    "ok",
-    "ok",
-    "ok",
-    "ok",
-    "ok"
-  ],
+  "worker_python_blocks": ["ok", "ok", "ok", "ok", "ok", "ok"],
   "classes": {
     "RGBLED": true,
+    "OLED": true,
+    "Ultrasonic": true,
     "AnalogInput": true,
     "Potentiometer": true,
     "DigitalInput": true,
     "Switch": true,
     "RotaryEncoder": true
   },
+  "oled": {
+    "driver": "SSD1306_128x64_I2C",
+    "default_sda": 21,
+    "default_scl": 22,
+    "default_address": "0x3C",
+    "browser_preview": true,
+    "drawing_primitives": ["clear", "show", "text", "pixel", "line", "rect", "circle"],
+    "convenience": ["display_text", "scroll_text", "distance_bar", "radar", "invert", "contrast"],
+    "generic_action_endpoint": true,
+    "queued_commands_flush_before_run_end": true
+  },
+  "ultrasonic": {
+    "type": "HC-SR04 compatible pulse trigger/echo",
+    "default_trig": 18,
+    "default_echo": 19,
+    "default_max_cm": 400,
+    "api": true,
+    "python_live_refresh": true,
+    "echo_5v_level_shift_warning_documented": true
+  },
   "firmware": {
-    "file": "ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_4.ino",
-    "version": "1.4",
+    "file": "ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_WiFi_v1_5.ino",
+    "version": "1.5",
     "analog_api": true,
     "digital_api": true,
     "rotary_api": true,
+    "ultrasonic_api": true,
+    "oled_api": true,
     "rotary_continuous": true,
     "run_failsafe": true,
     "wifi_profiles": true,
     "run_failsafe_ms": 10000,
-    "heartbeat_safe_off": true
+    "heartbeat_safe_off": true,
+    "heartbeat_clears_oled": true
   },
   "web_client": {
     "auto_reconnect": true,
     "analog": true,
     "digital": true,
     "rotary": true,
+    "ultrasonic": true,
+    "oled": true,
     "cached_ip_primary": true,
     "mdns_fallback": true,
     "kit_id_verify": true,
@@ -71,19 +98,28 @@
     "exclude_same_constructor_pins": true,
     "invalid_pin_exact_line": true,
     "duplicate_pin_exact_line": true,
-    "pre_run_validation": true
+    "pre_run_validation": true,
+    "oled_pins": true,
+    "ultrasonic_pins": true
   },
   "validation": {
     "app_js_syntax": "ok",
     "kit_client_js_syntax": "ok",
     "settings_js_syntax": "ok",
     "py_worker_js_syntax": "ok",
-    "python_examples_compiled": 13,
+    "ai_js_syntax": "ok",
+    "camera_bridge_js_syntax": "ok",
+    "python_examples_compiled": 20,
     "python_example_errors": 0,
+    "worker_python_blocks_compiled": 6,
+    "dropdown_matches_examples": true,
     "kit_client_cached_ip_primary_test": "ok",
     "kit_client_wrong_chip_rejected_test": "ok",
     "kit_client_mdns_fallback_test": "ok",
     "kit_client_new_ip_cache_test": "ok",
+    "kit_client_ultrasonic_request_test": "ok",
+    "kit_client_oled_command_queue_test": "ok",
+    "firmware_structural_check": "ok",
     "firmware_failsafe_10000ms_static_check": "ok",
     "camera_cache_alignment": "ok"
   },
@@ -92,5 +128,5 @@
     "autosave": true,
     "blank_draft_restore": true
   },
-  "camera_cache_version": "5.21"
+  "camera_cache_version": "5.22"
 }
