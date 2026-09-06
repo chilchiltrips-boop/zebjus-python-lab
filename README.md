@@ -1,10 +1,10 @@
-# ZEBJUS Python Lab v5.26 — Dynamic Sensor Dashboard
+# ZEBJUS Python Lab v5.27 — Dynamic Sensor Dashboard
 
-v5.26 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
+v5.27 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
 
-## v5.26 additions
+## v5.27 additions
 
-## v5.26 component selector + import autocomplete
+## v5.27 component selector + import autocomplete
 
 - `from zebjus import ...` now shows member suggestions after `import`, after commas, and for partial names. Matching is case-insensitive.
 - **Kit Output / Sensors** has an **Add component to main.py** selector. Selecting a supported component and pressing **+ Add** automatically adds the class to `from zebjus import ...`, inserts a starter constructor, chooses free supported GPIOs, and numbers repeated instances (`sw1`, `sw2`, `dht1`, `dht2`, `ultra1`, `ultra2`, etc.).
@@ -51,7 +51,7 @@ v5.26 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sen
 - 5 DHT11 examples added; current Learning Example menu has **25 examples**.
 - GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
 
-## v5.26 coding-first layout
+## v5.27 coding-first layout
 
 Desktop:
 
@@ -127,7 +127,7 @@ HC-SR04 ECHO is normally 5V. Use a voltage divider or level shifter before the E
 
 Upload:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino`
+`esp32_firmware/ZEBJUS_Kit_MultiGPIO_RGB_LED_Input_OLED_Ultrasonic_DHT11_WiFi_v1_7.ino`
 
 Required Arduino libraries for OLED:
 
@@ -137,3 +137,26 @@ Required Arduino libraries for OLED:
 
 DHT11 support is implemented directly in the firmware, so no additional DHT library is required.
 
+
+
+## v5.27 Live GPIO Allocator + numbered outputs
+
+The editor, Add Component selector, Pin Assist and Kit Output/Sensors now share the same GPIO resource model. The classic ESP32 DevKit profile exposes 15 safe output/PWM pins (`4,13,14,16,17,18,19,21,22,23,25,26,27,32,33`), 19 normal digital-input pins, six Wi-Fi-safe ADC1 pins (`32,33,34,35,36,39`), plus GPIO12 only as the special HC-SR04 ECHO option.
+
+Numbered output APIs are available for multi-device projects:
+
+```python
+from zebjus import LED1, LED2, RGBLED1, RGBLED2
+
+led1 = LED1(4)
+led2 = LED2(13)
+rgb1 = RGBLED1(25, 26, 27)
+rgb2 = RGBLED2(32, 33, 14)
+
+led1.on()
+led2.brightness(120)
+rgb1.red()
+rgb2.blue()
+```
+
+Autocomplete proposes the next free sequence (`LED1`, then `LED2`, etc.) and Add Component allocates conflict-free pins. Two RGB LEDs consume six output pins; every subsequent output-side component is calculated from the remaining output pool. Input-only pins are preferred for compatible sensors where practical to preserve output capacity. Firmware v1.7 tracks all active PWM pins and the 10-second heartbeat failsafe turns every registered LED/RGB/PWM output off.

@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v5.26 — OLED + Ultrasonic Guide
+# ZEBJUS Python Lab v5.27 — OLED + Ultrasonic Guide
 
 ## Default wiring
 
@@ -98,7 +98,7 @@ This is an OLED radar animation. A future physical scanning radar can reuse the 
 
 ## Pin Assist
 
-v5.26 validates and suggests pins for:
+v5.27 validates and suggests pins for:
 
 - `RGBLED(...)`
 - `AnalogInput(...)`
@@ -111,7 +111,7 @@ v5.26 validates and suggests pins for:
 
 OLED SDA/SCL and ultrasonic TRIG require output-capable GPIOs. The editor detects duplicate physical-pin use before Run.
 
-## Arduino libraries required by firmware v1.6
+## Arduino libraries required by firmware v1.7
 
 Install from Arduino Library Manager:
 
@@ -121,4 +121,4 @@ Install from Arduino Library Manager:
 
 The firmware file is:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino`
+`esp32_firmware/ZEBJUS_Kit_MultiGPIO_RGB_LED_Input_OLED_Ultrasonic_DHT11_WiFi_v1_7.ino`

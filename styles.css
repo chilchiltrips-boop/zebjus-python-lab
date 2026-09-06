@@ -695,7 +695,7 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
 
 
 /* ============================================================
-   v5.26 Component Picker + import-aware coding assistance
+   v5.27 Component Picker + import-aware coding assistance
    ============================================================ */
 .kit-output-title{display:grid!important;grid-template-columns:minmax(190px,.7fr) minmax(420px,1.55fr) auto;gap:8px;align-items:center}
 .kit-title-copy{min-width:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
@@ -709,3 +709,6 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
 @media(max-width:650px){.kit-output-title{grid-template-columns:1fr}.kit-name-text{justify-self:start}.hardware-picker-wrap{grid-column:auto;grid-template-columns:1fr auto}.hardware-limit-info{grid-column:1/-1}}
 
 .hardware-card .interface-badge{margin-left:auto;max-width:48%;font:700 7px ui-monospace,SFMono-Regular,Menlo,monospace;color:#84cfe4;background:rgba(25,121,150,.12);border:1px solid rgba(70,177,204,.22);padding:2px 5px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* v5.27 single LED live card */
+.single-led-card{min-width:220px}.single-led-visual{width:70px;height:70px;border-radius:20px;display:grid;place-items:center;background:radial-gradient(circle at 45% 35%,rgba(46,70,90,.85),rgba(8,14,24,.95));border:1px solid rgba(112,210,255,.18)}.single-led-visual i{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f8ffff,#6ce7ff 30%,#0d6d91 72%,#052836);opacity:.18;transition:opacity .14s ease,filter .14s ease}.single-led-card.live .single-led-visual{box-shadow:0 0 22px rgba(65,211,255,.12)}

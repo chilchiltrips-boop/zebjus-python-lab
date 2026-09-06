@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v5.26 — Component Selector / Import Autocomplete Test
+# ZEBJUS Python Lab v5.27 — Component Selector / Import Autocomplete Test
 
 ## Import autocomplete
 Type each line and confirm suggestions appear:

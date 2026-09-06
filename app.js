@@ -439,7 +439,7 @@ while True:
 
   const moduleMembers={
     zebjus:[
-      ["RGBLED","class","RGBLED","RGB LED: RGBLED(25,26,27)"],["LED","class","LED","Legacy white LED compatibility via kit RGB output"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
+      ["RGBLED","class","RGBLED","Legacy/default RGB LED API"],["LED","class","LED","Legacy RGB-white compatibility API"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
       ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],["Motor","class","Motor","Bridge API only; direct ESP motor-driver route planned"],["Servo","class","Servo","Bridge API only; direct ESP servo route planned"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
@@ -481,6 +481,7 @@ while True:
     ],
     RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
+    SingleLED:[["on()","method","on()","On"],["off()","method","off()","Off"],["write()","method","write()","Brightness 0–255"],["brightness()","method","brightness()","Brightness 0–255"],["blink()","method","blink()","Blink"],["pin","property","pin","Selected GPIO"]],
     OLED:[["clear()","method","clear()","Clear OLED buffer"],["show()","method","show()","Display buffered drawing"],["text()","method","text()","Draw text"],["display_text()","method","display_text()","Clear + show text"],["line()","method","line()","Draw line"],["rect()","method","rect()","Draw rectangle"],["circle()","method","circle()","Draw circle"],["pixel()","method","pixel()","Draw pixel"],["scroll_text()","method","scroll_text()","Scrolling text animation"],["distance_bar()","method","distance_bar()","Distance gauge"],["radar()","method","radar()","Ultrasonic radar frame"],["invert()","method","invert()","Invert display"],["contrast()","method","contrast()","Set contrast"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["centimeters()","method","centimeters()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"],["trig","property","trig","TRIG GPIO"],["echo","property","echo","ECHO GPIO"]],
     DHT11:[["read()","method","read()","Return temperature/humidity object"],["temperature()","method","temperature()","Temperature °C"],["humidity()","method","humidity()","Relative humidity %"],["get_values()","method","get_values()","Legacy [humidity×10,temp×10]"],["pin","property","pin","DATA GPIO"]],
@@ -507,6 +508,8 @@ while True:
     for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
+    if(new RegExp("\\b"+esc+"\\s*=\\s*LED\\d+\\s*\\(").test(code))return "SingleLED";
+    if(new RegExp("\\b"+esc+"\\s*=\\s*RGBLED\\d+\\s*\\(").test(code))return "RGBLED";
     if(new RegExp("\\b"+esc+"\\s*=\\s*(?:HandDetector\\s*\\(\\s*\\)|\\w+)\\.read\\s*\\(").test(code))return "HandResult";
     if(name==="rgb")return "RGBLED";if(name==="dht"||name==="dht11")return "DHT11";if(name==="plotter")return "SerialPlotter";if(name==="led")return "LED";if(name==="oled"||name==="display")return "OLED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
     if(name==="motor")return "Motor";if(name==="servo")return "Servo";if(name==="cam")return "Camera";if(name==="hand")return "HandDetector";if(name==="result")return "HandResult";
@@ -518,89 +521,101 @@ while True:
   function filterItems(items,prefix){const p=String(prefix||"").toLowerCase();return items.filter(x=>x[0].replace(/\(\)$/,"").toLowerCase().startsWith(p)).map(hintItem);}
 
   // ---------- GPIO pin assistance / validation ----------
+  // v5.27 uses one live resource model for autocomplete, Add Component, linting and dashboard order.
+  // Classic ESP32 DevKit: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
   const DIGITAL_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
+  const INPUT_ONLY_PINS=[34,35,36,39];
   const ULTRASONIC_ECHO_PINS=[12,...DIGITAL_INPUT_PINS];
+  const MAX_PWM_CHANNELS=15; // this project intentionally exposes at most the 15 safe output pins.
 
-  // v5.26 component catalog. "max" is the current physical/firmware limit when the component is used alone;
-  // mixed projects can reach the limit earlier because GPIOs are shared. Planned entries stay visible but disabled.
   const COMPONENT_CATALOG=[
-    {className:"RGBLED",label:"RGB LED",group:"Outputs",interface:"3 × PWM OUT",max:1,prefix:"rgb",status:"ready"},
-    {className:"LED",label:"LED (RGB compatibility)",group:"Outputs",interface:"compatibility output",max:1,prefix:"led",status:"ready"},
-    {className:"OLED",label:"OLED 128×64",group:"I²C",interface:"I²C · SDA/SCL",max:1,prefix:"oled",status:"ready"},
-    {className:"DHT11",label:"DHT11",group:"Sensors",interface:"1 × DATA GPIO",max:15,prefix:"dht",status:"ready"},
-    {className:"Ultrasonic",label:"Ultrasonic HC-SR04",group:"Sensors",interface:"1 OUT + 1 IN",max:10,prefix:"ultra",status:"ready"},
-    {className:"Potentiometer",label:"Potentiometer",group:"Inputs",interface:"ADC1 IN",max:6,prefix:"pot",status:"ready"},
-    {className:"AnalogInput",label:"Analog Input",group:"Inputs",interface:"ADC1 IN",max:6,prefix:"analog",status:"ready"},
-    {className:"Switch",label:"Switch",group:"Inputs",interface:"Digital IN",max:19,prefix:"sw",status:"ready"},
-    {className:"DigitalInput",label:"Digital Input",group:"Inputs",interface:"Digital IN",max:19,prefix:"din",status:"ready"},
-    {className:"RotaryEncoder",label:"Rotary Encoder",group:"Inputs",interface:"2–3 × Digital IN",max:4,prefix:"encoder",status:"ready"},
-    {className:"Servo",label:"Servo",group:"Future / bridge",interface:"PWM OUT",max:0,prefix:"servo",status:"planned",note:"Direct ESP firmware output API not enabled yet"},
-    {className:"Motor",label:"Motor Driver",group:"Future / bridge",interface:"PWM + DIR",max:0,prefix:"motor",status:"planned",note:"Direct ESP firmware output API not enabled yet"},
-    {className:"PWMInput",label:"PWM Signal Sensor",group:"Future / bridge",interface:"Pulse / Digital IN",max:0,prefix:"pwm",status:"planned",note:"Planned sensor API"},
-    {className:"DigitalOutput",label:"Single LED / Digital Output",group:"Future / bridge",interface:"Digital OUT",max:0,prefix:"led",status:"planned",note:"Planned multi-LED GPIO API"}
+    {className:"SingleLED",label:"Single LED",group:"Outputs",interface:"1 × PWM/Digital OUT",max:15,prefix:"led",status:"ready",numberedBase:"LED",pinCost:{out:1}},
+    {className:"RGBLED",label:"RGB LED",group:"Outputs",interface:"3 × PWM OUT",max:5,prefix:"rgb",status:"ready",numberedBase:"RGBLED",pinCost:{out:3}},
+    {className:"OLED",label:"OLED 128×64",group:"I²C",interface:"I²C · 2 GPIO",max:1,prefix:"oled",status:"ready",pinCost:{out:2}},
+    {className:"DHT11",label:"DHT11",group:"Sensors",interface:"1 × bidirectional DATA GPIO",max:15,prefix:"dht",status:"ready",pinCost:{out:1}},
+    {className:"Ultrasonic",label:"Ultrasonic HC-SR04",group:"Sensors",interface:"1 OUT + 1 IN",max:10,prefix:"ultra",status:"ready",pinCost:{out:1,input:1}},
+    {className:"Potentiometer",label:"Potentiometer",group:"Inputs",interface:"ADC1 IN",max:6,prefix:"pot",status:"ready",pinCost:{adc:1}},
+    {className:"AnalogInput",label:"Analog Input",group:"Inputs",interface:"ADC1 IN",max:6,prefix:"analog",status:"ready",pinCost:{adc:1}},
+    {className:"Switch",label:"Switch",group:"Inputs",interface:"Digital IN",max:19,prefix:"sw",status:"ready",pinCost:{input:1}},
+    {className:"DigitalInput",label:"Digital Input",group:"Inputs",interface:"Digital IN",max:19,prefix:"din",status:"ready",pinCost:{input:1}},
+    {className:"RotaryEncoder",label:"Rotary Encoder",group:"Inputs",interface:"2–3 × Digital IN",max:4,prefix:"encoder",status:"ready",pinCost:{input:3}},
+    {className:"Servo",label:"Servo",group:"Future / bridge",interface:"PWM OUT",max:0,prefix:"servo",status:"planned",note:"Direct ESP firmware servo route not enabled yet"},
+    {className:"Motor",label:"Motor Driver",group:"Future / bridge",interface:"PWM + DIR",max:0,prefix:"motor",status:"planned",note:"Direct ESP firmware motor-driver route not enabled yet"},
+    {className:"PWMInput",label:"PWM Signal Sensor",group:"Future / bridge",interface:"Pulse / Digital IN",max:0,prefix:"pwm",status:"planned",note:"Planned pulse-width input API"}
   ];
   const PIN_HINT_ORDER={
+    SingleLED:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
     RGBLED:[25,26,27,32,33,4,13,14,16,17,18,19,21,22,23],
     AnalogInput:[34,35,36,39,32,33],Potentiometer:[34,35,36,39,32,33],
-    DigitalInput:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
-    Switch:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
+    DigitalInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],
+    Switch:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],
     RotaryEncoder:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
-    Ultrasonic:[18,19,16,17,21,22,23,25,26,27,32,33,4,13,14],
-    DHT11:[13,14,16,17,18,19,21,22,23,25,26,27,32,33,4],
+    Ultrasonic:[14,18,16,17,21,22,23,25,26,27,32,33,4,13,19],
+    DHT11:[13,4,14,16,17,18,19,23,25,26,27,32,33,21,22],
     OLED:[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14]
   };
 
+  function numberedTokenInfo(token){
+    const m=String(token||"").match(/^(LED|RGBLED)(\d+)$/i);if(!m)return null;
+    return {base:m[1].toUpperCase()==="LED"?"LED":"RGBLED",index:Number(m[2])};
+  }
+  function canonicalHardwareClass(token){
+    const n=numberedTokenInfo(token);if(n)return n.base==="LED"?"SingleLED":"RGBLED";
+    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"].includes(token)?token:null;
+  }
+  function sequenceNumbers(src,base){
+    const nums=new Set();const re=new RegExp("\\b"+base+"(\\d+)\\b","g");let m;
+    while((m=re.exec(String(src||""))))nums.add(Number(m[1]));return nums;
+  }
+  function nextSequenceNumber(src,base,max){
+    const used=sequenceNumbers(src,base);for(let i=1;i<=max;i++)if(!used.has(i))return i;return null;
+  }
+  function gpioResourceState(src){
+    const entries=pinEntries(src),used=new Set(entries.map(x=>x.pin));
+    const freeOut=RGB_OUTPUT_PINS.filter(p=>!used.has(p));
+    const freeDigital=DIGITAL_INPUT_PINS.filter(p=>!used.has(p));
+    const freeAdc=ANALOG_INPUT_PINS.filter(p=>!used.has(p));
+    const freeEcho=ULTRASONIC_ECHO_PINS.filter(p=>!used.has(p));
+    return {entries,used,freeOut,freeDigital,freeAdc,freeEcho,usedOut:RGB_OUTPUT_PINS.length-freeOut.length,usedPins:used.size};
+  }
+  function dynamicZebjusMembers(src){
+    const out=[];const state=gpioResourceState(src);
+    const nextLed=nextSequenceNumber(src,"LED",15),nextRgb=nextSequenceNumber(src,"RGBLED",5);
+    if(nextLed!==null&&state.freeOut.length>=1)out.push([`LED${nextLed}`,"class",`LED${nextLed}`,`Single LED #${nextLed} · 1 OUT pin · ${state.freeOut.length}/${RGB_OUTPUT_PINS.length} OUT free`]);
+    if(nextRgb!==null&&state.freeOut.length>=3)out.push([`RGBLED${nextRgb}`,"class",`RGBLED${nextRgb}`,`RGB LED #${nextRgb} · 3 OUT pins · ${state.freeOut.length}/${RGB_OUTPUT_PINS.length} OUT free`]);
+    return [...out,...moduleMembers.zebjus];
+  }
+
   function pinEntries(src){
-    const out=[];
-    const lines=String(src||"").split(/\r?\n/);
+    const out=[];const lines=String(src||"").split(/\r?\n/);
     const add=(pin,line,role,kind,valid,offset=1)=>{if(Number.isFinite(pin))out.push({pin:Number(pin),line,role,kind,valid,offset});};
     lines.forEach((text,i)=>{
-      let m;
-      const rgb=/\bRGBLED\s*\(([^)]*)\)/g;
-      while((m=rgb.exec(text))){
-        const args=m[1],hasNamed=/\b(?:red|green|blue)\s*=/.test(args);
-        const positional=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
-        // RGBLED(), RGBLED(1) use the kit default physical RGB pins.
-        if(!hasNamed&&positional.length<=1){
+      const clean=text.replace(/#.*$/,"");let m;
+      const single=/\b(LED\d+)\s*\(([^)]*)\)/g;
+      while((m=single.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,i+1,`${m[1]} output`,"SingleLED",RGB_OUTPUT_PINS,m.index+1);}
+      const rgb=/\b(RGBLED(?:\d+)?)\s*\(([^)]*)\)/g;
+      while((m=rgb.exec(clean))){
+        const token=m[1],args=m[2],hasNamed=/\b(?:red|green|blue)\s*=/.test(args),positional=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
+        if(token==="RGBLED"&&!hasNamed&&positional.length<=1){
           add(25,i+1,"RGB red","RGBLED",RGB_OUTPUT_PINS,m.index+1);add(26,i+1,"RGB green","RGBLED",RGB_OUTPUT_PINS,m.index+1);add(27,i+1,"RGB blue","RGBLED",RGB_OUTPUT_PINS,m.index+1);
         }else{
           const r=parseNumberArg(args,"red",0,null),g=parseNumberArg(args,"green",1,null),b=parseNumberArg(args,"blue",2,null);
-          if(r!==null)add(r,i+1,"RGB red","RGBLED",RGB_OUTPUT_PINS,m.index+1);
-          if(g!==null)add(g,i+1,"RGB green","RGBLED",RGB_OUTPUT_PINS,m.index+1);
-          if(b!==null)add(b,i+1,"RGB blue","RGBLED",RGB_OUTPUT_PINS,m.index+1);
+          if(r!==null)add(r,i+1,`${token} red`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);if(g!==null)add(g,i+1,`${token} green`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);if(b!==null)add(b,i+1,`${token} blue`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);
         }
       }
       const analog=/\b(AnalogInput|Potentiometer)\s*\(([^)]*)\)/g;
-      while((m=analog.exec(text))){const pin=parseNumberArg(m[2],"pin",0,34);add(pin,i+1,m[1]+" input",m[1],ANALOG_INPUT_PINS,m.index+1);}
+      while((m=analog.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,34);add(pin,i+1,m[1]+" input",m[1],ANALOG_INPUT_PINS,m.index+1);}
       const digital=/\b(DigitalInput|Switch)\s*\(([^)]*)\)/g;
-      while((m=digital.exec(text))){const pin=parseNumberArg(m[2],"pin",0,32);add(pin,i+1,m[1]+" input",m[1],DIGITAL_INPUT_PINS,m.index+1);}
+      while((m=digital.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,32);add(pin,i+1,m[1]+" input",m[1],DIGITAL_INPUT_PINS,m.index+1);}
       const rotary=/\bRotaryEncoder\s*\(([^)]*)\)/g;
-      while((m=rotary.exec(text))){
-        const args=m[1],clk=parseNumberArg(args,"clk",0,32),dt=parseNumberArg(args,"dt",1,33),sw=parseNumberArg(args,"switch",2,-1);
-        add(clk,i+1,"Rotary CLK","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
-        add(dt,i+1,"Rotary DT","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
-        if(sw>=0)add(sw,i+1,"Rotary switch","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);
-      }
+      while((m=rotary.exec(clean))){const args=m[1],clk=parseNumberArg(args,"clk",0,32),dt=parseNumberArg(args,"dt",1,33),sw=parseNumberArg(args,"switch",2,-1);add(clk,i+1,"Rotary CLK","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);add(dt,i+1,"Rotary DT","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);if(sw>=0)add(sw,i+1,"Rotary switch","RotaryEncoder",DIGITAL_INPUT_PINS,m.index+1);}
       const ultrasonic=/\bUltrasonic\s*\(([^)]*)\)/g;
-      while((m=ultrasonic.exec(text))){
-        const args=m[1],pos=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
-        let trig=parseNumberArg(args,"trig",0,18),echo=parseNumberArg(args,"echo",1,19);
-        if(pos.length===1&&!/\b(?:trig|echo)\s*=/.test(args)){trig=18;echo=19;}
-        add(trig,i+1,"Ultrasonic TRIG","Ultrasonic",RGB_OUTPUT_PINS,m.index+1);
-        add(echo,i+1,"Ultrasonic ECHO","Ultrasonic",ULTRASONIC_ECHO_PINS,m.index+1);
-      }
-      const dht=/\bDHT11\s*\(([^)]*)\)/g;
-      while((m=dht.exec(text))){const pin=parseNumberArg(m[1],"pin",0,13);add(pin,i+1,"DHT11 DATA","DHT11",RGB_OUTPUT_PINS,m.index+1);}
-      const oled=/\bOLED\s*\(([^)]*)\)/g;
-      while((m=oled.exec(text))){
-        const args=m[1],sda=parseNumberArg(args,"sda",0,21),scl=parseNumberArg(args,"scl",1,22);
-        add(sda,i+1,"OLED SDA","OLED",RGB_OUTPUT_PINS,m.index+1);
-        add(scl,i+1,"OLED SCL","OLED",RGB_OUTPUT_PINS,m.index+1);
-      }
-    });
-    return out;
+      while((m=ultrasonic.exec(clean))){const args=m[1],pos=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));let trig=parseNumberArg(args,"trig",0,18),echo=parseNumberArg(args,"echo",1,19);if(pos.length===1&&!/\b(?:trig|echo)\s*=/.test(args)){trig=18;echo=19;}add(trig,i+1,"Ultrasonic TRIG","Ultrasonic",RGB_OUTPUT_PINS,m.index+1);add(echo,i+1,"Ultrasonic ECHO","Ultrasonic",ULTRASONIC_ECHO_PINS,m.index+1);}
+      const dht=/\bDHT11\s*\(([^)]*)\)/g;while((m=dht.exec(clean))){const pin=parseNumberArg(m[1],"pin",0,13);add(pin,i+1,"DHT11 DATA","DHT11",RGB_OUTPUT_PINS,m.index+1);}
+      const oled=/\bOLED\s*\(([^)]*)\)/g;while((m=oled.exec(clean))){const args=m[1],sda=parseNumberArg(args,"sda",0,21),scl=parseNumberArg(args,"scl",1,22);add(sda,i+1,"OLED SDA","OLED",RGB_OUTPUT_PINS,m.index+1);add(scl,i+1,"OLED SCL","OLED",RGB_OUTPUT_PINS,m.index+1);}
+    });return out;
   }
 
   function hardwarePinValidation(src){
@@ -624,22 +639,14 @@ while True:
 
   function pinHintContext(cm){
     const cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
-    const m=left.match(/\b(RGBLED|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED)\s*\(([^()]*)$/);
-    if(!m)return null;
-    const type=m[1],args=m[2],parts=args.split(","),argIndex=Math.max(0,parts.length-1);
-    // OLED third argument is I2C address; Ultrasonic third argument is max_cm — neither is a GPIO.
-    if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;
-    const currentPart=parts[parts.length-1]||"";
-    const prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];
-    if(prefix===undefined)return null;
-    const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1]));
-    const usedElsewhere=pinEntries(full).map(x=>x.pin);
-    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;
-    if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;
-    if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;
-    if(type==="OLED"||type==="DHT11")pins=RGB_OUTPUT_PINS;
+    const m=left.match(/\b(RGBLED(?:\d+)?|LED\d+|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED)\s*\(([^()]*)$/);if(!m)return null;
+    const token=m[1],type=/^LED\d+$/.test(token)?"SingleLED":/^RGBLED\d+$/.test(token)?"RGBLED":token,args=m[2],parts=args.split(","),argIndex=Math.max(0,parts.length-1);
+    if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;
+    const currentPart=parts[parts.length-1]||"",prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];if(prefix===undefined)return null;
+    const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1])),usedElsewhere=pinEntries(full).map(x=>x.pin);
+    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
     pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
-    const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — available ${type} pin`,className:"hint-constant"}));
+    const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — free ${type} pin · ${pins.length} compatible free`,className:"hint-constant"}));
     return {list,from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
   }
 
@@ -832,13 +839,14 @@ while True:
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    // v5.26: import-member completion also works after commas and with partial names.
+    // v5.27: import-member completion also works after commas and with partial names.
     m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cv2|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s*(.*)$/);
     if(m){
       const moduleName=m[1],tail=m[2]||"",segment=(tail.split(",").pop()||"").replace(/^\s*\(?\s*/,"");
       const pm=segment.match(/([A-Za-z_]\w*)?$/);prefix=pm?.[1]||"";
       const already=new Set(tail.replace(/[()]/g,"").split(",").map(x=>x.trim().split(/\s+as\s+/i)[0]).filter(Boolean));
-      const available=(moduleMembers[moduleName]||[]).filter(x=>!already.has(x[0])||x[0]===prefix);
+      const sourceMembers=moduleName==="zebjus"?dynamicZebjusMembers(full):(moduleMembers[moduleName]||[]);
+      const available=sourceMembers.filter(x=>!already.has(x[0])||x[0]===prefix);
       return{list:filterItems(available,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
     }
 
@@ -852,7 +860,8 @@ while True:
 
     m=line.match(/([A-Za-z_]\w*)$/);prefix=m?.[1]||"";
     const userSymbols=collectUserSymbols(full);
-    return{list:filterItems([...userSymbols,...base],prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
+    const seqHints=dynamicZebjusMembers(full).filter(x=>/^(?:LED|RGBLED)\d+$/.test(x[0]));
+    return{list:filterItems([...userSymbols,...seqHints,...base],prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
   }
 
   function initEditor(){
@@ -987,7 +996,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.26",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.27",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1151,128 +1160,59 @@ while True:
     }
     return out;
   }
-  function requestedRgbPins(src){
-    const m=src.match(/\bRGBLED\s*\(([^)]*)\)/);if(!m)return [25,26,27];
-    const args=m[1],hasNamed=/\b(?:red|green|blue)\s*=/.test(args);
-    const positional=args.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
-    if(!hasNamed&&positional.length<=1)return [25,26,27];
-    const r=parseNumberArg(args,"red",0,25),g=parseNumberArg(args,"green",1,26),b=parseNumberArg(args,"blue",2,27);
-    return [r,g,b];
-  }
+  function requestedRgbPins(src){return pinEntries(src).filter(x=>x.kind==="RGBLED"||x.kind==="SingleLED").map(x=>x.pin);}
 
 
   function componentByClass(className){return COMPONENT_CATALOG.find(x=>x.className===className)||null;}
   function constructorCount(src,className){
-    const escaped=String(className).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    return [...String(src||"").matchAll(new RegExp("(?:^|\\n)\\s*[A-Za-z_]\\w*\\s*=\\s*(?:zebjus\\.)?"+escaped+"\\s*\\(","g"))].length;
+    const patterns=className==="SingleLED"?["LED\\d+"]:className==="RGBLED"?["RGBLED(?:\\d+)?"]:[String(className).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")];
+    return patterns.reduce((n,p)=>n+[...String(src||"").matchAll(new RegExp("(?:^|\\n)\\s*[A-Za-z_]\\w*\\s*=\\s*(?:zebjus\\.)?"+p+"\\s*\\(","g"))].length,0);
   }
-  function nextHardwareVariable(src,item){
-    const re=new RegExp("\\b"+item.prefix+"(\\d+)\\b","g");let max=0,m;
-    while((m=re.exec(String(src||""))))max=Math.max(max,Number(m[1])||0);
-    return item.prefix+(max+1);
-  }
+  function nextHardwareVariable(src,item){const re=new RegExp("\\b"+item.prefix+"(\\d+)\\b","gi");let max=0,m;while((m=re.exec(String(src||""))))max=Math.max(max,Number(m[1])||0);return item.prefix+(max+1);}
   function firstFree(list,used){return list.find(p=>!used.has(p));}
   function suggestedHardwareArgs(item,src){
-    const used=new Set(pinEntries(src).map(x=>x.pin));
-    if(item.className==="RGBLED"){
-      const pref=[25,26,27,32,33,4,13,14,16,17,18,19,21,22,23].filter(p=>!used.has(p));
-      return pref.length>=3?`${pref[0]}, ${pref[1]}, ${pref[2]}`:null;
-    }
-    if(item.className==="LED")return "1"; // legacy LED maps to the kit RGB compatibility output.
-    if(item.className==="OLED"){
-      const pref=[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14].filter(p=>!used.has(p));
-      return pref.length>=2?`${pref[0]}, ${pref[1]}, 0x3C`:null;
-    }
-    if(item.className==="DHT11"){
-      const p=firstFree([13,4,14,16,17,18,19,23,25,26,27,32,33,21,22],used);return p==null?null:String(p);
-    }
-    if(item.className==="Ultrasonic"){
-      const trig=firstFree([14,18,16,17,21,22,23,25,26,27,32,33,4,13,19],used);if(trig==null)return null;
-      const used2=new Set(used);used2.add(trig);const echo=firstFree([12,34,35,36,39,19,18,17,16,33,32,27,26,25,23,22,21,14,13,4],used2);
-      return echo==null?null:`${trig}, ${echo}`;
-    }
-    if(item.className==="AnalogInput"||item.className==="Potentiometer"){
-      const p=firstFree([34,35,36,39,32,33],used);return p==null?null:String(p);
-    }
-    if(item.className==="Switch"||item.className==="DigitalInput"){
-      const p=firstFree([32,33,34,35,36,39,14,27,26,25,4,13,16,17,18,19,21,22,23],used);return p==null?null:String(p);
-    }
-    if(item.className==="RotaryEncoder"){
-      const free=[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39].filter(p=>!used.has(p));
-      return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;
-    }
+    const state=gpioResourceState(src),used=state.used;
+    if(item.className==="SingleLED"){const p=firstFree(PIN_HINT_ORDER.SingleLED,used);return p==null?null:String(p);}
+    if(item.className==="RGBLED"){const pref=PIN_HINT_ORDER.RGBLED.filter(p=>!used.has(p));return pref.length>=3?`${pref[0]}, ${pref[1]}, ${pref[2]}`:null;}
+    if(item.className==="OLED"){const pref=PIN_HINT_ORDER.OLED.filter(p=>!used.has(p));return pref.length>=2?`${pref[0]}, ${pref[1]}, 0x3C`:null;}
+    if(item.className==="DHT11"){const p=firstFree(PIN_HINT_ORDER.DHT11,used);return p==null?null:String(p);}
+    if(item.className==="Ultrasonic"){const trig=firstFree(PIN_HINT_ORDER.Ultrasonic,used);if(trig==null)return null;const used2=new Set(used);used2.add(trig);const echo=firstFree([12,34,35,36,39,19,18,17,16,33,32,27,26,25,23,22,21,14,13,4],used2);return echo==null?null:`${trig}, ${echo}`;}
+    if(item.className==="AnalogInput"||item.className==="Potentiometer"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
+    if(item.className==="Switch"||item.className==="DigitalInput"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
+    if(item.className==="RotaryEncoder"){const free=PIN_HINT_ORDER.RotaryEncoder.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
     return "1";
   }
+  function importTokenForComponent(item,src){
+    if(item.numberedBase){const n=nextSequenceNumber(src,item.numberedBase,item.max);return n===null?null:`${item.numberedBase}${n}`;}return item.className;
+  }
   function ensureZebjusImport(src,className){
-    src=String(src||"");
-    const paren=/from\s+zebjus\s+import\s*\(([\s\S]*?)\)/m.exec(src);
-    if(paren){
-      const tokens=paren[1].split(",").map(x=>x.trim()).filter(Boolean);
-      if(tokens.includes(className))return src;
-      const body=paren[1],indent=(body.match(/\n([ \t]*)\S/)||[])[1]||"    ";
-      const replacement=`from zebjus import (${body.replace(/\s*$/,"")}${body.trim()?",":""}\n${indent}${className}\n)`;
-      return src.slice(0,paren.index)+replacement+src.slice(paren.index+paren[0].length);
-    }
-    const one=/^[ \t]*from\s+zebjus\s+import\s+([^\n#]+)/m.exec(src);
-    if(one){
-      const tokens=one[1].split(",").map(x=>x.trim()).filter(Boolean);
-      if(tokens.includes(className))return src;
-      return src.slice(0,one.index)+one[0].replace(one[1],one[1].trim()+", "+className)+src.slice(one.index+one[0].length);
-    }
-    const lines=src.split("\n");let at=0;
-    while(at<lines.length&&(lines[at].trim()===""||/^\s*#/.test(lines[at])))at++;
-    lines.splice(at,0,`from zebjus import ${className}`,"");return lines.join("\n");
+    src=String(src||"");const paren=/from\s+zebjus\s+import\s*\(([\s\S]*?)\)/m.exec(src);
+    if(paren){const tokens=paren[1].split(",").map(x=>x.trim()).filter(Boolean);if(tokens.includes(className))return src;const body=paren[1],indent=(body.match(/\n([ \t]*)\S/)||[])[1]||"    ";const replacement=`from zebjus import (${body.replace(/\s*$/ ,"")}${body.trim()?",":""}\n${indent}${className}\n)`;return src.slice(0,paren.index)+replacement+src.slice(paren.index+paren[0].length);}
+    const one=/^[ \t]*from\s+zebjus\s+import\s+([^\n#]+)/m.exec(src);if(one){const tokens=one[1].split(",").map(x=>x.trim()).filter(Boolean);if(tokens.includes(className))return src;return src.slice(0,one.index)+one[0].replace(one[1],one[1].trim()+", "+className)+src.slice(one.index+one[0].length);}
+    const lines=src.split("\n");let at=0;while(at<lines.length&&(lines[at].trim()===""||/^\s*#/.test(lines[at])))at++;lines.splice(at,0,`from zebjus import ${className}`,"");return lines.join("\n");
   }
   function insertHardwareConstructor(src,line){
-    const lines=String(src||"").split("\n");let lastImport=-1;
-    for(let i=0;i<lines.length;i++)if(/^\s*(?:from\s+\S+\s+import\b|import\s+\S+)/.test(lines[i]))lastImport=i;
-    let at=lastImport+1;
-    while(at<lines.length&&lines[at].trim()==="")at++;
-    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Motor|Servo)\s*\(/.test(lines[at]))at++;
-    lines.splice(at,0,line);if(at+1<lines.length&&lines[at+1].trim()!=="")lines.splice(at+1,0,"");
-    return lines.join("\n");
+    const lines=String(src||"").split("\n");let lastImport=-1;for(let i=0;i<lines.length;i++)if(/^\s*(?:from\s+\S+\s+import\b|import\s+\S+)/.test(lines[i]))lastImport=i;let at=lastImport+1;while(at<lines.length&&lines[at].trim()==="")at++;
+    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Motor|Servo)\s*\(/.test(lines[at]))at++;
+    lines.splice(at,0,line);if(at+1<lines.length&&lines[at+1].trim()!=="")lines.splice(at+1,0,"");return lines.join("\n");
   }
+  function allocatorSummary(src){const st=gpioResourceState(src);return `GPIO free · OUT ${st.freeOut.length}/${RGB_OUTPUT_PINS.length} · Digital ${st.freeDigital.length}/${DIGITAL_INPUT_PINS.length} · ADC1 ${st.freeAdc.length}/${ANALOG_INPUT_PINS.length}`;}
   function updateHardwarePickerInfo(){
-    const sel=$("hardwarePicker"),info=$("hardwareLimitInfo");if(!sel||!info)return;
-    const src=getCode();
-    for(const o of sel.querySelectorAll("option[value]")){
-      if(!o.value)continue;const it=componentByClass(o.value);if(!it)continue;
-      if(it.status!=="ready"){o.disabled=true;o.textContent=`${it.label} · ${it.interface} · planned`;continue;}
-      const used=constructorCount(src,it.className),hasPins=suggestedHardwareArgs(it,src)!==null,available=used<it.max&&hasPins;
-      o.disabled=!available;o.textContent=`${it.label} · ${it.interface} · ${used}/${it.max} used${available?"":" · limit/pins reached"}`;
-    }
-    const item=componentByClass(sel.value);if(!item){info.textContent="Select a component · limits are current firmware/GPIO limits";return;}
-    const count=constructorCount(src,item.className);
-    info.textContent=item.status==="ready"?`${item.interface} · ${count}/${item.max} used${item.max>1?" · shared GPIOs can reduce remaining count":""}`:`${item.interface} · ${item.note||"Planned"}`;
+    const sel=$("hardwarePicker"),info=$("hardwareLimitInfo");if(!sel||!info)return;const src=getCode(),state=gpioResourceState(src);
+    for(const o of sel.querySelectorAll("option[value]")){if(!o.value)continue;const it=componentByClass(o.value);if(!it)continue;if(it.status!=="ready"){o.disabled=true;o.textContent=`${it.label} · ${it.interface} · planned`;continue;}const used=constructorCount(src,it.className),hasPins=suggestedHardwareArgs(it,src)!==null,seqOk=!it.numberedBase||nextSequenceNumber(src,it.numberedBase,it.max)!==null,available=used<it.max&&hasPins&&seqOk;o.disabled=!available;o.textContent=`${it.label} · ${it.interface} · ${used}/${it.max}${available?"":" · no resources"}`;}
+    const item=componentByClass(sel.value);info.textContent=item?`${item.interface} · ${constructorCount(src,item.className)}/${item.max} used · ${allocatorSummary(src)}`:allocatorSummary(src);
   }
-  function populateHardwarePicker(){
-    const sel=$("hardwarePicker");if(!sel)return;
-    sel.innerHTML='<option value="">+ Add component to main.py…</option>';
-    const groups=new Map();
-    for(const item of COMPONENT_CATALOG){
-      if(!groups.has(item.group)){const g=document.createElement("optgroup");g.label=item.group;groups.set(item.group,g);sel.appendChild(g);}
-      const o=document.createElement("option");o.value=item.className;o.dataset.status=item.status;o.dataset.label=item.label;o.dataset.interface=item.interface;o.dataset.max=String(item.max);o.disabled=item.status!=="ready";
-      o.textContent=item.status==="ready"?`${item.label} · ${item.interface} · max ${item.max}`:`${item.label} · ${item.interface} · planned`;
-      groups.get(item.group).appendChild(o);
-    }
-    updateHardwarePickerInfo();
-  }
+  function populateHardwarePicker(){const sel=$("hardwarePicker");if(!sel)return;sel.innerHTML='<option value="">+ Add component to main.py…</option>';const groups=new Map();for(const item of COMPONENT_CATALOG){if(!groups.has(item.group)){const g=document.createElement("optgroup");g.label=item.group;groups.set(item.group,g);sel.appendChild(g);}const o=document.createElement("option");o.value=item.className;o.disabled=item.status!=="ready";o.textContent=item.status==="ready"?`${item.label} · ${item.interface} · max ${item.max}`:`${item.label} · ${item.interface} · planned`;groups.get(item.group).appendChild(o);}updateHardwarePickerInfo();}
   function addSelectedHardware(){
-    const sel=$("hardwarePicker"),item=componentByClass(sel?.value);if(!item||item.status!=="ready")return;
-    let src=getCode(),count=constructorCount(src,item.className);
-    if(count>=item.max){$("hardwareLimitInfo").textContent=`${item.label}: current maximum ${item.max} reached`;return;}
-    const args=suggestedHardwareArgs(item,src);
-    if(args===null){$("hardwareLimitInfo").textContent=`${item.label}: no conflict-free supported GPIOs left`;return;}
-    const variable=nextHardwareVariable(src,item);
-    src=ensureZebjusImport(src,item.className);
-    src=insertHardwareConstructor(src,`${variable} = ${item.className}(${args})`);
-    setCode(src);scheduleHardwareCards(src);updateHardwarePickerInfo();
-    $("hardwareLimitInfo").textContent=`Added ${variable} · ${item.interface}`;
+    const sel=$("hardwarePicker"),item=componentByClass(sel?.value);if(!item||item.status!=="ready")return;let src=getCode(),count=constructorCount(src,item.className);if(count>=item.max){$("hardwareLimitInfo").textContent=`${item.label}: current maximum ${item.max} reached`;return;}const args=suggestedHardwareArgs(item,src);if(args===null){$("hardwareLimitInfo").textContent=`${item.label}: no conflict-free GPIO resources left`;return;}const token=importTokenForComponent(item,src);if(!token){$("hardwareLimitInfo").textContent=`${item.label}: sequence limit reached`;return;}const variable=nextHardwareVariable(src,item);src=ensureZebjusImport(src,token);src=insertHardwareConstructor(src,`${variable} = ${token}(${args})`);setCode(src);scheduleHardwareCards(src);updateHardwarePickerInfo();$("hardwareLimitInfo").textContent=`Added ${variable} = ${token}(${args}) · ${allocatorSummary(src)}`;
   }
 
-  // v5.26: Build the Kit Output / Sensors dashboard from the student's source code.
+
+  // v5.27: Build the Kit Output / Sensors dashboard
+
+  // v5.27: Build the Kit Output / Sensors dashboard from the student's source code.
   // Import order controls card order. Multiple constructor instances become separate cards.
-  const HARDWARE_CLASSES=new Set(["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"]);
+  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"]);
   const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder"];
 
   function parseCtorNumber(args,name,index,defaultValue=null){
@@ -1285,15 +1225,15 @@ while True:
     return defaultValue;
   }
 
-  function hardwareSpec(className,args="",variable="",sourceIndex=0){
-    const c=String(className||"");
-    const meta=componentByClass(c);
-    const spec={className:c,args:String(args||""),variable:String(variable||""),sourceIndex,interface:meta?.interface||"",maxCount:meta?.max||0};
-    if(c==="RGBLED"||c==="LED"){
-      spec.type="rgb";spec.title=c==="LED"?"LED / RGB Output":"RGB LED";
-      spec.r=parseCtorNumber(args,"red",0,25);spec.g=parseCtorNumber(args,"green",1,26);spec.b=parseCtorNumber(args,"blue",2,27);
-      if(c==="LED"||String(args).split(",").filter(x=>x.trim()).length<=1){spec.r=25;spec.g=26;spec.b=27;}
-      spec.identity=`${spec.r},${spec.g},${spec.b}`;
+  function hardwareSpec(className,args="",variable="",sourceIndex=0,token=""){
+    const c=String(className||""),meta=componentByClass(c),spec={className:c,token:token||c,args:String(args||""),variable:String(variable||""),sourceIndex,interface:meta?.interface||"",maxCount:meta?.max||0};
+    if(c==="SingleLED"){
+      spec.type="led";spec.title="Single LED";spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=spec.pin==null?(spec.token||variable||"unassigned"):String(spec.pin);
+    }else if(c==="RGBLED"||c==="LED"){
+      spec.type="rgb";spec.title=c==="LED"?"LED / RGB Output":"RGB LED";const numbered=/^RGBLED\d+$/.test(spec.token);
+      spec.r=parseCtorNumber(args,"red",0,numbered?null:25);spec.g=parseCtorNumber(args,"green",1,numbered?null:26);spec.b=parseCtorNumber(args,"blue",2,numbered?null:27);
+      if(c==="LED"){spec.r=25;spec.g=26;spec.b=27;}else if(!numbered&&String(args).split(",").filter(x=>x.trim()).length<=1){spec.r=25;spec.g=26;spec.b=27;}
+      spec.identity=`${spec.r??"?"},${spec.g??"?"},${spec.b??"?"}`;
     }else if(c==="DHT11"){
       spec.type="dht11";spec.title="DHT11";spec.pin=parseCtorNumber(args,"pin",0,13);spec.identity=String(spec.pin);
     }else if(c==="Ultrasonic"){
@@ -1328,27 +1268,25 @@ while True:
         const token=raw.replace(/#.*/,"").trim();if(!token)continue;
         if(token==="*"){starImport=true;continue;}
         const parts=token.split(/\s+as\s+/i).map(x=>x.trim()),original=parts[0],alias=parts[1]||original;
-        if(HARDWARE_CLASSES.has(original)){
-          imports.push({className:original,alias,pos:m.index+offset});aliasMap.set(alias,original);
-        }
+        const canonical=canonicalHardwareClass(original);
+        if(canonical&&HARDWARE_CLASSES.has(canonical)){imports.push({className:canonical,token:original,alias,pos:m.index+offset});aliasMap.set(alias,{className:canonical,token:original});}
         offset+=raw.length+1;
       }
     }
     const constructors=[];
     const ctorRe=/(?:^|\n)\s*([A-Za-z_]\w*)\s*=\s*(?:(?:zebjus)\.)?([A-Za-z_]\w*)\s*\(([^)]*)\)/gm;
     while((m=ctorRe.exec(src))){
-      const variable=m[1],token=m[2],className=aliasMap.get(token)||token;
-      if(!HARDWARE_CLASSES.has(className))continue;
-      const spec=hardwareSpec(className,m[3],variable,m.index);if(spec)constructors.push(spec);
+      const variable=m[1],token=m[2],mapped=aliasMap.get(token),className=mapped?.className||canonicalHardwareClass(token),sourceToken=mapped?.token||token;
+      if(!className||!HARDWARE_CLASSES.has(className))continue;const spec=hardwareSpec(className,m[3],variable,m.index,sourceToken);if(spec)constructors.push(spec);
     }
     const result=[],used=new Set();
     if(starImport&&!imports.length)return DEFAULT_HARDWARE_CLASSES.map((c,i)=>hardwareSpec(c,"","",i));
     if(imports.length){
       for(const imp of imports.sort((a,b)=>a.pos-b.pos)){
-        const matches=constructors.filter((x,i)=>x.className===imp.className&&!used.has(i)).sort((a,b)=>a.sourceIndex-b.sourceIndex);
+        const numbered=!!numberedTokenInfo(imp.token);const matches=constructors.filter((x,i)=>(numbered?x.token===imp.token:x.className===imp.className)&&!used.has(i)).sort((a,b)=>a.sourceIndex-b.sourceIndex);
         if(matches.length){
           for(const sp of matches){const idx=constructors.indexOf(sp);used.add(idx);result.push(sp);}
-        }else result.push(hardwareSpec(imp.className,"","",imp.pos));
+        }else result.push(hardwareSpec(imp.className,"","",imp.pos,imp.token));
       }
       constructors.forEach((sp,i)=>{if(!used.has(i))result.push(sp);});
     }else if(constructors.length)result.push(...constructors.sort((a,b)=>a.sourceIndex-b.sourceIndex));
@@ -1369,7 +1307,8 @@ while True:
     const title=escapeHtml(sp.title),key=escapeHtml(sp.key);
     const iface=escapeHtml(sp.interface||"");
     const head=`<div class="card-title-row"><span class="sensor-status-dot"></span><strong>${title}</strong><span class="instance-name">${name}</span>${iface?`<span class="interface-badge">${iface}</span>`:""}</div>`;
-    if(sp.type==="rgb")return `<div class="demo-card hardware-card rgb-card" data-hw-key="${key}" data-hw-type="rgb"><div class="rgb-shell"><div class="rgb-led" data-role="rgb-led"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rgb-label">R0 G0 B0</span><span class="sensor-secondary">GPIO ${sp.r}/${sp.g}/${sp.b}</span></div></div>`;
+    if(sp.type==="led")return `<div class="demo-card hardware-card single-led-card" data-hw-key="${key}" data-hw-type="led"><div class="single-led-visual"><i data-role="single-led-glow"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="single-led-label">${sp.pin==null?"PIN NOT ASSIGNED":"OFF"}</span><div class="analog-bar"><i data-role="single-led-fill"></i></div><span class="sensor-secondary">${sp.pin==null?`Use ${escapeHtml(sp.token||"LED1")}(GPIO)`:`GPIO${sp.pin}`}</span></div></div>`;
+    if(sp.type==="rgb")return `<div class="demo-card hardware-card rgb-card" data-hw-key="${key}" data-hw-type="rgb"><div class="rgb-shell"><div class="rgb-led" data-role="rgb-led"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rgb-label">R0 G0 B0</span><span class="sensor-secondary">${sp.r==null||sp.g==null||sp.b==null?`Assign 3 pins in ${escapeHtml(sp.token||"RGBLED1")}(R,G,B)`:`GPIO ${sp.r}/${sp.g}/${sp.b}`}</span></div></div>`;
     if(sp.type==="dht11")return `<div class="demo-card hardware-card dht-card" data-hw-key="${key}" data-hw-type="dht11"><div class="dht-visual"><div class="thermo"><i data-role="temp-fill"></i></div><div class="humidity-gauge"><i data-role="hum-fill"></i><b data-role="hum-mini">--%</b></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="dht-main">--.- °C · --.- %RH</span><span class="sensor-secondary" data-role="dht-detail">DATA GPIO${sp.pin}</span></div></div>`;
     if(sp.type==="ultrasonic")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="ultrasonic"><div class="ultra-visual"><div class="ultra-face"><i></i><i></i></div><div class="ultra-beam" data-role="ultra-beam"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="ultra-label">--.- cm</span><div class="ultra-range"><i data-role="ultra-fill"></i></div><span class="sensor-secondary">TRIG ${sp.trig} · ECHO ${sp.echo}</span></div></div>`;
     if(sp.type==="oled")return `<div class="demo-card hardware-card oled-card" data-hw-key="${key}" data-hw-type="oled"><canvas ${index===0?'id="oledCanvas" ':''}class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas><div class="demo-grow">${head}<span class="sensor-primary">Live OLED Preview</span><span class="sensor-secondary" data-role="oled-label">SDA ${sp.sda} · SCL ${sp.scl} · 0x${Number(sp.address).toString(16).toUpperCase()}</span></div></div>`;
@@ -1393,8 +1332,8 @@ while True:
     hardwareLayoutSignature=signature;activeHardwareCards=cards;
     grid.innerHTML=cards.map((sp,i)=>hardwareCardHtml(sp,i)).join("");
     initOledPreview();updateSensorGraphics();
-    // Re-apply the current RGB state after a layout refresh.
-    if(sensorState.rgb)updateRgb(sensorState.rgb.r,sensorState.rgb.g,sensorState.rgb.b);
+    // Re-apply current per-output RGB states after a layout refresh.
+    if(sensorState.rgbOutputs)Object.values(sensorState.rgbOutputs).forEach(updateRgbCommand);else if(sensorState.rgb)updateRgb(sensorState.rgb.r,sensorState.rgb.g,sensorState.rgb.b);
   }
 
   function scheduleHardwareCards(src){
@@ -1589,8 +1528,8 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED|LED|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
-    const inputSpecs=requestedInputs(src),rgbPins=/\bRGBLED\s*\(/.test(src)?requestedRgbPins(src):[];
+    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
+    const inputSpecs=requestedInputs(src),rgbPins=requestedRgbPins(src);
     const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo]),...inputSpecs.dht11.map(x=>x.pin)];
     const conflict=inputPins.find(pin=>rgbPins.includes(pin));
     if(conflict!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${conflict} is selected for both an input and RGB output.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
@@ -1790,7 +1729,8 @@ while True:
       try{await kitClient.flushCommands();await kitClient.endRun();kitCommandErrorShown=false;}
       catch(e){if(!kitCommandErrorShown){log("Kit OFF error: "+(e?.message||e));kitCommandErrorShown=true;}}
     }
-    applyDemo(stopRgb);
+    for(const sp of activeHardwareCards.filter(x=>x.type==="rgb"))applyDemo({command:"RGB_LED_SET",id:Number((String(sp.token||"").match(/RGBLED(\d+)/)||[])[1]||1),rPin:sp.r,gPin:sp.g,bPin:sp.b,r:0,g:0,b:0});
+    for(const sp of activeHardwareCards.filter(x=>x.type==="led"&&x.pin!=null))applyDemo({command:"LED_SET",pin:sp.pin,value:0});
     applyDemo({command:"MOTOR_SET",id:1,speed:0});
   }
 
@@ -1887,14 +1827,21 @@ while True:
     legend.innerHTML=series.map(([name,a],idx)=>`<span class="plot-key" style="color:${colors[idx%colors.length]}"><i class="plot-dot"></i>${escapeHtml(name)} <span class="plot-value">${a[a.length-1].y.toFixed(2)}</span></span>`).join("");
   }
 
-  function updateRgb(r,g,b){
-    r=Math.max(0,Math.min(255,+r||0));g=Math.max(0,Math.min(255,+g||0));b=Math.max(0,Math.min(255,+b||0));
-    sensorState.rgb={r,g,b};
-    const glow=Math.max(r,g,b)>0?`0 0 22px rgba(${r},${g},${b},.82), inset 0 0 0 2px #ffffff66`:"inset 0 0 0 2px #4a5262";
-    document.querySelectorAll('[data-role="rgb-led"]').forEach(el=>{el.style.background=`rgb(${r},${g},${b})`;el.style.boxShadow=glow;});
-    document.querySelectorAll('[data-role="rgb-label"]').forEach(el=>el.textContent=`R${r} G${g} B${b}`);
-    document.querySelectorAll('.hardware-card[data-hw-type="rgb"]').forEach(el=>el.classList.toggle("live",Math.max(r,g,b)>0));
+  function paintRgbCard(card,r,g,b){
+    if(!card)return;r=Math.max(0,Math.min(255,+r||0));g=Math.max(0,Math.min(255,+g||0));b=Math.max(0,Math.min(255,+b||0));
+    const led=card.querySelector('[data-role="rgb-led"]'),label=card.querySelector('[data-role="rgb-label"]'),glow=Math.max(r,g,b)>0?`0 0 22px rgba(${r},${g},${b},.82), inset 0 0 0 2px #ffffff66`:"inset 0 0 0 2px #4a5262";
+    if(led){led.style.background=`rgb(${r},${g},${b})`;led.style.boxShadow=glow;}if(label)label.textContent=`R${r} G${g} B${b}`;card.classList.toggle("live",Math.max(r,g,b)>0);
   }
+  function updateRgbCommand(p={}){
+    const r=Math.max(0,Math.min(255,+p.r||0)),g=Math.max(0,Math.min(255,+p.g||0)),b=Math.max(0,Math.min(255,+p.b||0)),id=Number(p.id||1);
+    sensorState.rgbOutputs=sensorState.rgbOutputs||{};const hasPins=[p.rPin,p.gPin,p.bPin].every(v=>v!==undefined&&v!==null),key=hasPins?`${Number(p.rPin)},${Number(p.gPin)},${Number(p.bPin)}`:`id:${id}`;sensorState.rgbOutputs[key]={...p,r,g,b,id};
+    let matched=0;for(const sp of activeHardwareCards.filter(x=>x.type==="rgb")){
+      const byPins=hasPins&&Number(sp.r)===Number(p.rPin)&&Number(sp.g)===Number(p.gPin)&&Number(sp.b)===Number(p.bPin);const tokenId=Number((String(sp.token||"").match(/RGBLED(\d+)/)||[])[1]||1),byId=!hasPins&&tokenId===id;
+      if(byPins||byId){paintRgbCard(findHardwareCard(sp),r,g,b);matched++;}
+    }
+    if(!matched&&activeHardwareCards.filter(x=>x.type==="rgb").length===1)paintRgbCard(findHardwareCard(activeHardwareCards.find(x=>x.type==="rgb")),r,g,b);
+  }
+  function updateRgb(r,g,b){sensorState.rgb={r,g,b};for(const sp of activeHardwareCards.filter(x=>x.type==="rgb"))paintRgbCard(findHardwareCard(sp),r,g,b);}
 
   function initOledPreview(){
     const canvases=[...document.querySelectorAll(".oled-canvas")];
@@ -1959,8 +1906,11 @@ while True:
 
   function applyDemo(p){
     if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
-    if(p.command==="RGB_LED_SET"&&+p.id===1)updateRgb(p.r,p.g,p.b);
-    if(p.command==="LED_SET"&&+p.id===1)updateRgb(+p.value?255:0,+p.value?255:0,+p.value?255:0);
+    if(p.command==="RGB_LED_SET")updateRgbCommand(p);
+    if(p.command==="LED_SET"){
+      const pin=Number(p.pin),value=Math.max(0,Math.min(255,Number(p.value??0)));
+      for(const sp of activeHardwareCards.filter(x=>x.type==="led"&&(x.pin==null||Number(x.pin)===pin))){const card=findHardwareCard(sp);if(!card)continue;const glow=card.querySelector('[data-role="single-led-glow"]'),label=card.querySelector('[data-role="single-led-label"]'),fill=card.querySelector('[data-role="single-led-fill"]');if(glow){glow.style.opacity=String(.18+.82*value/255);glow.style.filter=`drop-shadow(0 0 ${Math.round(4+14*value/255)}px rgba(80,220,255,.95))`;}if(label)label.textContent=value===0?"OFF":`Brightness ${value}`;if(fill)fill.style.width=(value/255*100)+"%";card.classList.toggle("live",value>0);}
+    }
     if(p.command==="MOTOR_SET"){
       const speed=Math.max(-100,Math.min(100,+p.speed||0));
       for(const sp of activeHardwareCards.filter(x=>x.type==="motor"&&Number(x.id)===Number(p.id||1))){
@@ -2016,7 +1966,9 @@ while True:
 
     if(kitClient?.connected){
       try{
-        if(p.command==="RGB_LED_SET"){
+        if(p.command==="LED_SET"){
+          let result;try{result=await kitClient.led(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.led(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
+        }else if(p.command==="RGB_LED_SET"){
           let result;
           try{result=await kitClient.rgb(p);}
           catch(e){

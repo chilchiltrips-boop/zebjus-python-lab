@@ -101,6 +101,33 @@ class LED:
         for _ in range(int(count)):
             self.on();time.sleep(float(interval));self.off();time.sleep(float(interval))
 
+class _SingleLED:
+    def __init__(self,pin,slot=1,active_high=True):
+        self.pin=int(pin);self.slot=int(slot);self.active_high=bool(active_high)
+        if self.pin not in SUPPORTED_RGB_PINS: raise ValueError(f"LED pin {self.pin} must be output-capable. Use one of {SUPPORTED_RGB_PINS}")
+    def write(self,value=255): _send("LED_SET",id=self.slot,pin=self.pin,value=_clamp255(value),activeHigh=self.active_high)
+    def brightness(self,value=255): self.write(value)
+    def on(self): self.write(255)
+    def off(self): self.write(0)
+    def blink(self,count=3,interval=.5):
+        for _ in range(int(count)):
+            self.on();time.sleep(float(interval));self.off();time.sleep(float(interval))
+
+def _make_led_class(slot):
+    class NumberedLED(_SingleLED):
+        def __init__(self,pin,active_high=True): super().__init__(pin,slot=slot,active_high=active_high)
+    NumberedLED.__name__=f"LED{slot}";NumberedLED.__qualname__=NumberedLED.__name__;return NumberedLED
+
+def _make_rgb_class(slot):
+    class NumberedRGBLED(RGBLED):
+        def __init__(self,*args,**kwargs):
+            if slot>1 and len(args)==0 and not any(k in kwargs for k in ("red","green","blue")): raise ValueError(f"RGBLED{slot} needs three GPIO pins, e.g. RGBLED{slot}(32,33,4)")
+            super().__init__(*args,**kwargs);self.id=slot
+    NumberedRGBLED.__name__=f"RGBLED{slot}";NumberedRGBLED.__qualname__=NumberedRGBLED.__name__;return NumberedRGBLED
+
+LED_CLASSES={i:_make_led_class(i) for i in range(1,16)}
+RGBLED_CLASSES={i:_make_rgb_class(i) for i in range(1,6)}
+
 class Motor:
     def __init__(self,id=1): self.id=int(id)
     def forward(self,speed=50): _send("MOTOR_SET",id=self.id,speed=max(0,min(100,int(speed))))
@@ -470,7 +497,9 @@ for k,v in {
     "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
     "plot":plot,"clear_plot":clear_plot,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
 }.items(): setattr(z,k,v)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]
+for i,c in LED_CLASSES.items(): setattr(z,f"LED{i}",c)
+for i,c in RGBLED_CLASSES.items(): setattr(z,f"RGBLED{i}",c)
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")

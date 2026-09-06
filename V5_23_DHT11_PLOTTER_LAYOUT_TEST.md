@@ -3,7 +3,7 @@
 ## Firmware
 
 1. Install Adafruit SSD1306, Adafruit GFX and Adafruit BusIO.
-2. Upload `esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino`.
+2. Upload `esp32_firmware/ZEBJUS_Kit_MultiGPIO_RGB_LED_Input_OLED_Ultrasonic_DHT11_WiFi_v1_7.ino`.
 3. DHT11: VCC 3.3V, GND GND, DATA GPIO13.
 4. Current ultrasonic setup is supported as TRIG GPIO14 / ECHO GPIO12. Keep the HC-SR04 ECHO voltage divider/level shifter.
 

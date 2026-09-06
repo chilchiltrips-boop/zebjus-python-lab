@@ -200,6 +200,11 @@
         try{return await this._request("/api/rgb/off",{method:"POST",data:d,timeout:1200},false);}catch(_){throw e;}
       }
     }
+    async led(p={}){
+      const data={pin:Number(p.pin),value:Math.max(0,Math.min(255,Number(p.value??0))),id:p.id??1,activeHigh:p.activeHigh===false?0:1};
+      const epoch=this._commandEpoch;const task=async()=>{if(epoch!==this._commandEpoch)return {ok:true,skipped:true};const r=await this._request("/api/output/led",{method:"POST",data,timeout:1600});if(epoch!==this._commandEpoch)return {ok:true,skipped:true};return r;};
+      this._commandChain=this._commandChain.then(task,task);return this._commandChain;
+    }
     async rgb(p={}){
       const data={r:p.r??0,g:p.g??0,b:p.b??0,id:p.id??1};
       if(p.rPin!==undefined){data.rPin=p.rPin;data.gPin=p.gPin;data.bPin=p.bPin;}

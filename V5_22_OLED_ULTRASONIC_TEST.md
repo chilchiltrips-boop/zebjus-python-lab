@@ -2,11 +2,11 @@
 
 ## 1. Firmware
 
-Upload `esp32_firmware/ZEBJUS_Kit_RGB_Input_OLED_Ultrasonic_DHT11_WiFi_v1_6.ino` after installing Adafruit SSD1306, Adafruit GFX Library and Adafruit BusIO.
+Upload `esp32_firmware/ZEBJUS_Kit_MultiGPIO_RGB_LED_Input_OLED_Ultrasonic_DHT11_WiFi_v1_7.ino` after installing Adafruit SSD1306, Adafruit GFX Library and Adafruit BusIO.
 
 Expected Serial header:
 
-`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC + DHT11 WiFi v1.6`
+`ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC + DHT11 WiFi v1.7`
 
 ## 2. OLED wiring test
 
