@@ -1,5 +1,5 @@
 {
-  "ui_version": "5.25",
+  "ui_version": "5.26",
   "examples_count": 25,
   "examples": {
     "ledBasic": "ok",
@@ -126,13 +126,15 @@
     "layout_order_static_check": "ok",
     "firmware_structural_check": "ok",
     "firmware_failsafe_10000ms_static_check": true,
-    "camera_cache_alignment": "5.25",
+    "camera_cache_alignment": "5.26",
     "dynamic_import_order_test": "ok",
     "dynamic_multiple_switch_test": "ok",
     "dynamic_multiple_mixed_sensor_test": "ok",
-    "dynamic_default_cards_count": 9,
-    "styles_cache_version": "5.25",
-    "headless_visual_screenshot": "not available in this container; static HTML/CSS/JS checks used"
+    "dynamic_default_cards_count": 7,
+    "styles_cache_version": "5.26",
+    "headless_visual_screenshot": "not available in this container; static HTML/CSS/JS checks used",
+    "component_selector_static_checks": "ok",
+    "import_autocomplete_comma_partial_checks": "ok"
   },
   "layout": {
     "desktop_editor_share": "~80%+",
@@ -150,7 +152,7 @@
     "imshow_min_height_desktop_px": 510,
     "gradient_grid_dark_theme": true,
     "responsive_editor_first": true,
-    "styles_cache_version": "5.25"
+    "styles_cache_version": "5.26"
   },
   "dynamic_sensor_dashboard": {
     "import_order_controls_card_order": true,
@@ -181,6 +183,42 @@
       "servo_needle": true
     },
     "oled_preview_css_size": "up to 300x150 desktop",
-    "oled_pixel_crisp_scaling": true
+    "oled_pixel_crisp_scaling": true,
+    "interface_badges": true,
+    "default_cards_exclude_unimplemented_direct_outputs": true
+  },
+  "component_selector": {
+    "available_in_kit_output_header": true,
+    "auto_adds_zebjus_import": true,
+    "auto_inserts_constructor": true,
+    "repeated_instances_numbered": true,
+    "auto_free_pin_selection": true,
+    "dynamic_limit_disable": true,
+    "interface_and_max_shown": true,
+    "current_limits": {
+      "RGBLED": 1,
+      "LED_compatibility": 1,
+      "OLED": 1,
+      "DHT11": 15,
+      "Ultrasonic": 10,
+      "AnalogInput_ADC1_total": 6,
+      "Potentiometer_ADC1_total": 6,
+      "DigitalInput": 19,
+      "Switch": 19,
+      "RotaryEncoder": 4
+    },
+    "planned_disabled": [
+      "Servo direct ESP API",
+      "Motor Driver direct ESP API",
+      "PWM Signal Sensor",
+      "Single LED / DigitalOutput multi-GPIO API"
+    ]
+  },
+  "autocomplete": {
+    "zebjus_import_empty": true,
+    "zebjus_import_partial": true,
+    "zebjus_import_after_comma": true,
+    "case_insensitive": true,
+    "duplicate_member_filter": true
   }
 }

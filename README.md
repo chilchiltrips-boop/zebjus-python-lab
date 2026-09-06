@@ -1,8 +1,18 @@
-# ZEBJUS Python Lab v5.25 — Dynamic Sensor Dashboard
+# ZEBJUS Python Lab v5.26 — Dynamic Sensor Dashboard
 
-v5.25 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
+v5.26 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
 
-## v5.25 additions
+## v5.26 additions
+
+## v5.26 component selector + import autocomplete
+
+- `from zebjus import ...` now shows member suggestions after `import`, after commas, and for partial names. Matching is case-insensitive.
+- **Kit Output / Sensors** has an **Add component to main.py** selector. Selecting a supported component and pressing **+ Add** automatically adds the class to `from zebjus import ...`, inserts a starter constructor, chooses free supported GPIOs, and numbers repeated instances (`sw1`, `sw2`, `dht1`, `dht2`, `ultra1`, `ultra2`, etc.).
+- Selector labels show interface type and the current maximum when the component is used alone. Mixed projects may reach limits earlier because components share GPIOs.
+- Current limits shown by the UI: RGB LED 1 active, OLED 1 active, DHT11 up to 15 GPIO slots, Ultrasonic up to 10 GPIO pairs, Analog/Potentiometer 6 ADC1 inputs, Digital/Switch 19 inputs, Rotary Encoder 4 firmware slots.
+- Servo, Motor Driver, PWM Signal Sensor and true multi-LED Digital Output are visible as **planned** entries but are disabled until direct ESP firmware APIs exist. Existing bridge/demo `Motor`/`Servo` classes are retained for backward compatibility.
+- Supported hardware cards also show their interface badge (PWM, I²C, ADC1, Digital IN, etc.).
+
 
 - Serial Plotter moved to the lower data column and enlarged.
 - Output / Terminal is directly below Serial Plotter in the same column.
@@ -41,7 +51,7 @@ v5.25 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sen
 - 5 DHT11 examples added; current Learning Example menu has **25 examples**.
 - GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
 
-## v5.25 coding-first layout
+## v5.26 coding-first layout
 
 Desktop:
 

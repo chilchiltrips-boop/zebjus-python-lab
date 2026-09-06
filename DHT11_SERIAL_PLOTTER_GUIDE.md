@@ -1,4 +1,4 @@
-# DHT11 + Serial Plotter Guide — v5.25
+# DHT11 + Serial Plotter Guide — v5.26
 
 ## Wiring
 

@@ -692,3 +692,20 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
   .kit-output-panel .sensor-grid{grid-template-columns:1fr}
   .kit-output-panel .sensor-grid .oled-card{grid-column:auto}
 }
+
+
+/* ============================================================
+   v5.26 Component Picker + import-aware coding assistance
+   ============================================================ */
+.kit-output-title{display:grid!important;grid-template-columns:minmax(190px,.7fr) minmax(420px,1.55fr) auto;gap:8px;align-items:center}
+.kit-title-copy{min-width:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.hardware-picker-wrap{display:grid;grid-template-columns:minmax(220px,1fr) auto minmax(145px,.62fr);gap:5px;align-items:center;min-width:0}
+.hardware-picker{min-width:0;width:100%;height:29px;border-radius:7px;border:1px solid #294463;background:linear-gradient(180deg,#101b2d,#0a1321);color:#dceaff;padding:0 28px 0 9px;font:600 10px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
+.hardware-picker:focus{border-color:#4f82c7;box-shadow:0 0 0 2px rgba(72,135,220,.14)}
+.hardware-picker optgroup{background:#101827;color:#8fa8cf}.hardware-picker option{background:#0d1624;color:#d9e8ff}
+.hardware-limit-info{min-width:0;font-size:8px;line-height:1.2;color:#89a3c9;white-space:normal}
+.hardware-add-btn{white-space:nowrap}.kit-name-text{justify-self:end;white-space:nowrap}
+@media(max-width:1100px){.kit-output-title{grid-template-columns:1fr auto}.hardware-picker-wrap{grid-column:1/-1;grid-row:2;grid-template-columns:minmax(210px,1fr) auto minmax(130px,.65fr)}}
+@media(max-width:650px){.kit-output-title{grid-template-columns:1fr}.kit-name-text{justify-self:start}.hardware-picker-wrap{grid-column:auto;grid-template-columns:1fr auto}.hardware-limit-info{grid-column:1/-1}}
+
+.hardware-card .interface-badge{margin-left:auto;max-width:48%;font:700 7px ui-monospace,SFMono-Regular,Menlo,monospace;color:#84cfe4;background:rgba(25,121,150,.12);border:1px solid rgba(70,177,204,.22);padding:2px 5px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
