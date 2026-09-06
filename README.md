@@ -1,6 +1,20 @@
-# ZEBJUS Python Lab v5.24 — Gradient Grid Dark IDE
+# ZEBJUS Python Lab v5.25 — Dynamic Sensor Dashboard
 
-v5.24 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
+v5.25 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
+
+## v5.25 additions
+
+- Serial Plotter moved to the lower data column and enlarged.
+- Output / Terminal is directly below Serial Plotter in the same column.
+- OpenCV / imshow output is enlarged for dashboards and vision projects.
+- Kit Output / Sensors is now generated dynamically from `main.py`.
+- `from zebjus import ...` order controls the dashboard card order.
+- Multiple `Switch`, `Potentiometer`, `AnalogInput`, `Ultrasonic`, `DHT11`, and `RotaryEncoder` instances receive separate live cards.
+- Sensor cards use live visual animations: switch toggle, rotary dial, analog knob, ultrasonic beam, DHT gauges, RGB glow, servo/motor motion.
+- OLED preview is enlarged to make 128x64 text readable while keeping pixel-crisp scaling.
+- When no supported hardware is referenced, the complete default dashboard remains visible.
+- In real-kit mode an unread sensor shows `WAITING` rather than a misleading demo value.
+
 
 ## Stable kit connection retained
 
@@ -15,7 +29,7 @@ v5.24 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sen
 - Temporary Wi-Fi/API misses do not immediately stop the Python program.
 - `+ New Project` opens a blank editor; custom draft auto-save/restore is retained.
 
-## v5.24 additions
+## v5.23 sensor features retained
 
 - Physical `DHT11(pin=13)` API using `/api/input/dht11`.
 - Direct temperature °C and humidity %RH methods.
@@ -27,20 +41,21 @@ v5.24 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sen
 - 5 DHT11 examples added; current Learning Example menu has **25 examples**.
 - GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
 
-## v5.24 coding-first layout
+## v5.25 coding-first layout
 
 Desktop:
 
 1. Project controls
 2. Main workspace: large `main.py` editor (~80%+) + compact right utility column
    - Camera / MediaPipe
-   - Serial Plotter
    - Image Upload
-3. Second row: Kit Output / Sensors + OpenCV / `imshow` Output
-4. Full-width Output / Terminal
+3. Full-width dynamic Kit Output / Sensors dashboard
+4. Lower results workspace
+   - Large OpenCV / `imshow` output at left
+   - Serial Plotter above Output / Terminal in the right data column
 5. Compact Quick Tools / Project Reference
 
-The visual theme uses a dark neutral editor surface with subtle gradient accents on panels and controls. Tablet/mobile layouts stack progressively with the editor kept first. Quick Reference remains collapsible inside the editor panel.
+The editor stays neutral/dark for comfortable coding. Gradient accents are restricted to dashboard panels, borders and controls. Tablet/mobile layouts keep the editor first and stack the remaining tools progressively.
 
 ## DHT11 Python API
 
@@ -112,6 +127,3 @@ Required Arduino libraries for OLED:
 
 DHT11 support is implemented directly in the firmware, so no additional DHT library is required.
 
-
-## v5.24 Layout
-Desktop layout uses an approximately 80/20 main.py + utility-column workspace. Camera, Serial Plotter and Image Upload are stacked beside the editor. Below that, Kit Output/Sensors and OpenCV/imshow share a row; Output/Terminal is full-width, followed by Quick Tools / Project Reference. Responsive breakpoints stack panels on smaller screens.

@@ -557,3 +557,138 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
   .kit-output-panel .sensor-grid .oled-card{grid-column:auto}
   .workspace-tool-grid{grid-template-columns:1fr}
 }
+
+/* ============================================================
+   v5.25 Dynamic Sensor Dashboard + Large Visual Results
+   ============================================================ */
+.primary-workspace{
+  grid-template-columns:minmax(0,4.5fr) minmax(250px,1fr);
+  height:clamp(620px,calc(100vh - 144px),900px)
+}
+.utility-column{
+  grid-template-rows:minmax(300px,1.35fr) minmax(230px,.85fr);
+  gap:6px
+}
+.upload-utility .source-image-wrap{min-height:92px;max-height:132px}
+.upload-utility #sourceImagePreview{max-height:132px}
+
+/* Dynamic kit dashboard */
+.kit-output-panel{overflow:visible}
+.kit-output-panel .sensor-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:6px;padding:7px
+}
+.kit-output-panel .sensor-grid .demo-card{
+  min-height:96px;padding:8px 9px;gap:10px;
+  background:
+    radial-gradient(circle at 16% 8%,rgba(109,124,255,.09),transparent 34%),
+    linear-gradient(145deg,#0c1728,#09121f);
+  border:1px solid #213858;border-radius:10px;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease
+}
+.kit-output-panel .sensor-grid .demo-card:hover{transform:translateY(-1px);border-color:#36577e;box-shadow:0 8px 22px rgba(0,0,0,.22)}
+.hardware-card .demo-grow{min-width:0;display:grid;gap:4px}
+.hardware-card .card-title-row{display:flex;align-items:center;gap:6px;min-width:0}
+.hardware-card .card-title-row strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hardware-card .instance-name{font:8px ui-monospace,SFMono-Regular,Menlo,monospace;color:#6f88ad;background:#0a1321;border:1px solid #1c3150;padding:2px 5px;border-radius:999px;white-space:nowrap}
+.hardware-card .sensor-primary{font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#dceaff}
+.hardware-card .sensor-secondary{font-size:8px;color:#8095b7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hardware-card .sensor-status-dot{width:6px;height:6px;border-radius:50%;background:#42516b;box-shadow:0 0 0 3px rgba(66,81,107,.12)}
+.hardware-card.live .sensor-status-dot{background:#2fd17b;box-shadow:0 0 8px rgba(47,209,123,.7)}
+
+/* RGB */
+.rgb-shell{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle,#182640,#0a1220);border:1px solid #263b5b;flex:0 0 auto}
+.rgb-led{width:31px;height:31px;border-radius:50%;background:#232d3d;box-shadow:inset 0 0 0 2px #46536a;transition:background .16s ease,box-shadow .16s ease}
+
+/* Potentiometer / analog dial */
+.pot-knob{width:58px;height:58px;border-radius:50%;position:relative;flex:0 0 auto;background:radial-gradient(circle at 40% 34%,#33445f,#111b2a 62%,#070d16);border:2px solid #344d70;box-shadow:inset 0 0 0 5px #0a1220,0 4px 13px #0007}
+.pot-knob::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1px dashed #58739b;opacity:.7}
+.pot-needle{position:absolute;left:50%;top:8px;width:3px;height:21px;border-radius:3px;background:linear-gradient(#71e5f1,#7c8cff);transform-origin:50% 21px;transform:rotate(-135deg);transition:transform .18s ease;box-shadow:0 0 7px #5ccde4}
+.analog-bar{height:6px;background:#111e31;border-radius:99px;overflow:hidden;border:1px solid #213654}
+.analog-bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6579ff,#20c8d7);transition:width .18s ease}
+
+/* Switch animation */
+.switch-visual{width:62px;height:38px;border-radius:22px;padding:4px;background:#101b2d;border:1px solid #2d4262;position:relative;flex:0 0 auto;transition:background .18s,border-color .18s,box-shadow .18s}
+.switch-visual i{display:block;width:28px;height:28px;border-radius:50%;background:linear-gradient(145deg,#68758a,#303b4e);box-shadow:0 2px 5px #0008;transition:transform .2s ease,background .2s ease}
+.switch-visual.active{background:#123929;border-color:#27895b;box-shadow:0 0 15px rgba(47,209,123,.13)}
+.switch-visual.active i{transform:translateX(24px);background:linear-gradient(145deg,#58eaa1,#20b774)}
+.switch-state-text{font-weight:800;letter-spacing:.04em}
+
+/* Rotary encoder animation */
+.rotary-visual{width:62px;height:62px;border-radius:50%;position:relative;flex:0 0 auto;background:repeating-conic-gradient(from 0deg,#476184 0 3deg,#121d2d 3deg 15deg);border:2px solid #304b70;box-shadow:inset 0 0 0 7px #0b1422,0 4px 14px #0008}
+.rotary-dial{position:absolute;inset:10px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#3d5270,#172337 66%,#0a101b);transition:transform .16s ease}
+.rotary-dial::after{content:"";position:absolute;left:50%;top:4px;width:3px;height:16px;border-radius:3px;background:#55d8e7;box-shadow:0 0 6px #55d8e7;transform:translateX(-50%)}
+.rotary-press{position:absolute;right:-3px;bottom:-1px;width:12px;height:12px;border-radius:50%;background:#39475c;border:2px solid #0a1220;transition:background .16s,box-shadow .16s}
+.rotary-press.active{background:#2fd17b;box-shadow:0 0 8px #2fd17b}
+
+/* Ultrasonic visual */
+.ultra-visual{width:76px;height:62px;position:relative;flex:0 0 auto;overflow:hidden}
+.ultra-face{position:absolute;left:0;top:13px;width:36px;height:36px;border-radius:8px;background:#1a2940;border:1px solid #36506f;display:flex;align-items:center;justify-content:space-around;padding:3px;z-index:2}
+.ultra-face i{width:12px;height:12px;border-radius:50%;border:3px solid #8aa3c4;background:#0b111c;box-shadow:inset 0 0 0 2px #36465b}
+.ultra-beam{position:absolute;left:32px;top:8px;width:42px;height:46px;opacity:.8;background:repeating-radial-gradient(ellipse at left center,transparent 0 7px,rgba(63,210,224,.75) 8px 9px,transparent 10px 14px);clip-path:polygon(0 42%,100% 0,100% 100%,0 58%);transform-origin:left center;transition:transform .18s ease,opacity .18s ease}
+.ultra-range{height:6px;background:#101e31;border:1px solid #213956;border-radius:99px;overflow:hidden}
+.ultra-range i{display:block;height:100%;width:0;background:linear-gradient(90deg,#20d7d1,#6d7cff);transition:width .18s ease}
+
+/* DHT11 gauges */
+.dht-visual{width:74px;height:66px;display:flex;gap:8px;align-items:center;justify-content:center;flex:0 0 auto}
+.thermo{width:18px;height:55px;border:2px solid #5d7090;border-radius:11px 11px 14px 14px;position:relative;background:#0b1320;overflow:hidden}
+.thermo::after{content:"";position:absolute;bottom:2px;left:3px;width:8px;height:8px;border-radius:50%;background:#ff6b7f;box-shadow:0 0 8px rgba(255,107,127,.5)}
+.thermo i{position:absolute;left:6px;bottom:8px;width:3px;height:35%;background:linear-gradient(#ffba63,#ff657b);border-radius:3px;transition:height .25s ease}
+.humidity-gauge{width:42px;height:54px;border-radius:20px 20px 24px 24px;background:#0b1726;border:1px solid #2b4568;position:relative;overflow:hidden;display:grid;place-items:center}
+.humidity-gauge i{position:absolute;left:0;right:0;bottom:0;height:50%;background:linear-gradient(180deg,rgba(31,203,219,.55),rgba(52,118,255,.72));transition:height .25s ease}
+.humidity-gauge b{position:relative;z-index:2;font:800 8px ui-monospace,monospace;color:#d9f8ff}
+
+/* OLED: intentionally large and crisp */
+.kit-output-panel .sensor-grid .oled-card{grid-column:span 2;min-height:164px;align-items:center}
+.kit-output-panel .sensor-grid .oled-canvas{
+  width:300px;height:150px;max-width:min(68%,300px);flex:0 0 auto;
+  background:#000;border:3px solid #314c6d;border-radius:7px;
+  image-rendering:pixelated;image-rendering:crisp-edges;
+  box-shadow:inset 0 0 18px rgba(34,177,255,.13),0 8px 20px #0008
+}
+
+/* Motor/servo compact animation */
+.motor-visual{width:54px;height:54px;border-radius:50%;background:radial-gradient(circle,#1e3452,#0b1422);border:4px solid #324b70;display:grid;place-items:center;font-weight:900;color:#90b4ee;transition:transform .18s ease;flex:0 0 auto}
+.servo-visual{width:66px;height:46px;border-radius:9px;background:#101b2d;border:1px solid #2d4568;position:relative;overflow:hidden;flex:0 0 auto}
+.servo-visual::before{content:"";position:absolute;left:50%;bottom:3px;width:8px;height:8px;border-radius:50%;background:#71829d;transform:translateX(-50%)}
+.servo-visual i{position:absolute;left:50%;bottom:7px;width:3px;height:30px;border-radius:3px;background:#ffbf5a;transform-origin:50% 100%;transition:transform .18s ease;box-shadow:0 0 7px rgba(255,191,90,.55)}
+
+/* Large OpenCV left, Plotter + Terminal stacked at right */
+.results-workspace{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(390px,.75fr);gap:6px;align-items:stretch;min-width:0}
+.data-output-column{display:grid;grid-template-rows:minmax(300px,1.2fr) minmax(190px,.8fr);gap:6px;min-width:0;min-height:0}
+.imshow-panel .image-output{min-height:510px;max-height:680px;padding:10px}
+.imshow-panel #resultImage{max-height:645px;max-width:100%;object-fit:contain}
+.plotter-lower-panel{display:flex;flex-direction:column;min-height:0}
+.plotter-lower-panel .plotter-body{padding:6px;gap:5px;min-height:0;flex:1;display:flex;flex-direction:column}
+.plotter-lower-panel #serialPlotterCanvas{width:100%;height:auto!important;min-height:245px;flex:1;background:linear-gradient(180deg,#07101b,#08111d);border:1px solid #1d3453;border-radius:7px}
+.plotter-lower-panel .plotter-legend{max-height:52px;overflow:auto;font-size:8px}
+.terminal-lower-panel{display:flex;flex-direction:column;min-height:0}
+.terminal-lower-panel #terminal.output-view.active{flex:1;min-height:185px;max-height:300px;padding:9px 10px;background:linear-gradient(180deg,#060c14,#080e18)}
+
+@media(max-width:1280px){
+  .primary-workspace{grid-template-columns:minmax(0,3.6fr) minmax(250px,1fr)}
+  .results-workspace{grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr)}
+  .kit-output-panel .sensor-grid{grid-template-columns:repeat(auto-fit,minmax(175px,1fr))}
+  .kit-output-panel .sensor-grid .oled-canvas{width:256px;height:128px}
+}
+@media(max-width:980px){
+  .primary-workspace{height:auto;grid-template-columns:1fr}
+  .utility-column{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);grid-template-rows:auto}
+  .results-workspace{grid-template-columns:1fr}
+  .imshow-panel .image-output{min-height:400px;max-height:560px}
+  .data-output-column{grid-template-columns:1fr 1fr;grid-template-rows:auto}
+  .plotter-lower-panel #serialPlotterCanvas{min-height:220px}
+  .kit-output-panel .sensor-grid .oled-card{grid-column:span 2}
+}
+@media(max-width:720px){
+  .utility-column,.data-output-column{grid-template-columns:1fr;grid-template-rows:auto}
+  .kit-output-panel .sensor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kit-output-panel .sensor-grid .oled-card{grid-column:1/-1;flex-direction:column;align-items:stretch}
+  .kit-output-panel .sensor-grid .oled-canvas{width:100%;height:auto;aspect-ratio:2/1;max-width:100%}
+  .imshow-panel .image-output{min-height:330px}
+}
+@media(max-width:440px){
+  .kit-output-panel .sensor-grid{grid-template-columns:1fr}
+  .kit-output-panel .sensor-grid .oled-card{grid-column:auto}
+}

@@ -8,7 +8,8 @@
   let kitFailureCount=0,kitEverConnected=false,lastHardwareWarning="",lastHardwareWarningAt=0;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
-  let oledBuffer=null,oledBufferCtx=null,oledVisibleCtx=null,oledInverted=false;
+  let oledBuffer=null,oledBufferCtx=null,oledInverted=false;
+  let activeHardwareCards=[],hardwareLayoutSignature="",hardwareLayoutTimer=null;
 
   const isEmbedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
@@ -846,6 +847,7 @@ while True:
     editor.getWrapperElement().style.fontSize=(prefs.fontSize||14)+"px";
     editor.on("change",(cm,ch)=>{
       updateHistoryButtons();
+      scheduleHardwareCards(cm.getValue());
       if(prefs.autoSave){clearTimeout(window.__save);$("saveState").textContent="Saving…";window.__save=setTimeout(()=>{localStorage.setItem("zebjus.lab.code",cm.getValue());$("saveState").textContent="Saved";},220);}
       if((ch.origin==="+input"||ch.origin==="paste")&&!cm.state.completionActive){
         const typed=(ch.text||[]).join("\n"),cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch);
@@ -958,7 +960,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.24",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.25",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1129,6 +1131,137 @@ while True:
     if(!hasNamed&&positional.length<=1)return [25,26,27];
     const r=parseNumberArg(args,"red",0,25),g=parseNumberArg(args,"green",1,26),b=parseNumberArg(args,"blue",2,27);
     return [r,g,b];
+  }
+
+
+  // v5.25: Build the Kit Output / Sensors dashboard from the student's source code.
+  // Import order controls card order. Multiple constructor instances become separate cards.
+  const HARDWARE_CLASSES=new Set(["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"]);
+  const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder","Motor","Servo"];
+
+  function parseCtorNumber(args,name,index,defaultValue=null){
+    const text=String(args||"");
+    const named=text.match(new RegExp("\\b"+name+"\\s*=\\s*(-?0x[0-9a-fA-F]+|-?\\d+)","i"));
+    const toNum=v=>/^[-+]?0x/i.test(String(v))?parseInt(v,16):Number(v);
+    if(named)return toNum(named[1]);
+    const positional=text.split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
+    if(index<positional.length&&/^-?(?:0x[0-9a-fA-F]+|\d+)$/.test(positional[index]))return toNum(positional[index]);
+    return defaultValue;
+  }
+
+  function hardwareSpec(className,args="",variable="",sourceIndex=0){
+    const c=String(className||"");
+    const spec={className:c,args:String(args||""),variable:String(variable||""),sourceIndex};
+    if(c==="RGBLED"||c==="LED"){
+      spec.type="rgb";spec.title=c==="LED"?"LED / RGB Output":"RGB LED";
+      spec.r=parseCtorNumber(args,"red",0,25);spec.g=parseCtorNumber(args,"green",1,26);spec.b=parseCtorNumber(args,"blue",2,27);
+      if(c==="LED"||String(args).split(",").filter(x=>x.trim()).length<=1){spec.r=25;spec.g=26;spec.b=27;}
+      spec.identity=`${spec.r},${spec.g},${spec.b}`;
+    }else if(c==="DHT11"){
+      spec.type="dht11";spec.title="DHT11";spec.pin=parseCtorNumber(args,"pin",0,13);spec.identity=String(spec.pin);
+    }else if(c==="Ultrasonic"){
+      spec.type="ultrasonic";spec.title="Ultrasonic";
+      const pos=String(args).split(",").map(x=>x.trim()).filter(x=>x&&!x.includes("="));
+      spec.trig=parseCtorNumber(args,"trig",0,18);spec.echo=parseCtorNumber(args,"echo",1,19);spec.maxCm=parseCtorNumber(args,"max_cm",2,400);
+      if(pos.length===1&&!/\b(?:trig|echo)\s*=/.test(args)){spec.trig=18;spec.echo=19;}
+      spec.identity=`${spec.trig},${spec.echo}`;
+    }else if(c==="OLED"){
+      spec.type="oled";spec.title="OLED 128×64";spec.sda=parseCtorNumber(args,"sda",0,21);spec.scl=parseCtorNumber(args,"scl",1,22);spec.address=parseCtorNumber(args,"address",2,0x3C);spec.identity=`${spec.sda},${spec.scl},${spec.address}`;
+    }else if(c==="AnalogInput"||c==="Potentiometer"){
+      spec.type="analog";spec.title=c==="Potentiometer"?"Potentiometer":"Analog Input";spec.pin=parseCtorNumber(args,"pin",0,34);if(c==="Potentiometer"&&spec.pin===1)spec.pin=34;spec.identity=String(spec.pin);
+    }else if(c==="DigitalInput"||c==="Switch"){
+      spec.type="digital";spec.title=c==="Switch"?"Switch":"Digital Input";spec.pin=parseCtorNumber(args,"pin",0,32);spec.identity=String(spec.pin);
+    }else if(c==="RotaryEncoder"){
+      spec.type="rotary";spec.title="Rotary Encoder";spec.clk=parseCtorNumber(args,"clk",0,32);spec.dt=parseCtorNumber(args,"dt",1,33);spec.sw=parseCtorNumber(args,"switch",2,-1);spec.identity=`${spec.clk},${spec.dt},${spec.sw}`;
+    }else if(c==="Motor"){
+      spec.type="motor";spec.title="Motor";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
+    }else if(c==="Servo"){
+      spec.type="servo";spec.title="Servo";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
+    }else return null;
+    return spec;
+  }
+
+  function detectHardwareCards(src){
+    src=String(src||"");
+    const imports=[],aliasMap=new Map();let starImport=false,m;
+    const importRe=/^[ \t]*from\s+zebjus\s+import\s+(?:\(([^)]*)\)|([^\n#]+))/gm;
+    while((m=importRe.exec(src))){
+      const body=(m[1]??m[2]??"");let offset=0;
+      for(const raw of body.split(",")){
+        const token=raw.replace(/#.*/,"").trim();if(!token)continue;
+        if(token==="*"){starImport=true;continue;}
+        const parts=token.split(/\s+as\s+/i).map(x=>x.trim()),original=parts[0],alias=parts[1]||original;
+        if(HARDWARE_CLASSES.has(original)){
+          imports.push({className:original,alias,pos:m.index+offset});aliasMap.set(alias,original);
+        }
+        offset+=raw.length+1;
+      }
+    }
+    const constructors=[];
+    const ctorRe=/(?:^|\n)\s*([A-Za-z_]\w*)\s*=\s*(?:(?:zebjus)\.)?([A-Za-z_]\w*)\s*\(([^)]*)\)/gm;
+    while((m=ctorRe.exec(src))){
+      const variable=m[1],token=m[2],className=aliasMap.get(token)||token;
+      if(!HARDWARE_CLASSES.has(className))continue;
+      const spec=hardwareSpec(className,m[3],variable,m.index);if(spec)constructors.push(spec);
+    }
+    const result=[],used=new Set();
+    if(starImport&&!imports.length)return DEFAULT_HARDWARE_CLASSES.map((c,i)=>hardwareSpec(c,"","",i));
+    if(imports.length){
+      for(const imp of imports.sort((a,b)=>a.pos-b.pos)){
+        const matches=constructors.filter((x,i)=>x.className===imp.className&&!used.has(i)).sort((a,b)=>a.sourceIndex-b.sourceIndex);
+        if(matches.length){
+          for(const sp of matches){const idx=constructors.indexOf(sp);used.add(idx);result.push(sp);}
+        }else result.push(hardwareSpec(imp.className,"","",imp.pos));
+      }
+      constructors.forEach((sp,i)=>{if(!used.has(i))result.push(sp);});
+    }else if(constructors.length)result.push(...constructors.sort((a,b)=>a.sourceIndex-b.sourceIndex));
+    else result.push(...DEFAULT_HARDWARE_CLASSES.map((c,i)=>hardwareSpec(c,"","",i)));
+
+    const counts={};
+    result.forEach((sp,i)=>{
+      counts[sp.className]=(counts[sp.className]||0)+1;
+      const suffix=counts[sp.className];
+      sp.instance=suffix;
+      sp.key=`${sp.type}:${sp.variable||sp.className+suffix}:${sp.identity}`;
+    });
+    return result;
+  }
+
+  function hardwareCardHtml(sp,index){
+    const name=escapeHtml(sp.variable||((sp.instance>1)?`${sp.className}${sp.instance}`:"default"));
+    const title=escapeHtml(sp.title),key=escapeHtml(sp.key);
+    const head=`<div class="card-title-row"><span class="sensor-status-dot"></span><strong>${title}</strong><span class="instance-name">${name}</span></div>`;
+    if(sp.type==="rgb")return `<div class="demo-card hardware-card rgb-card" data-hw-key="${key}" data-hw-type="rgb"><div class="rgb-shell"><div class="rgb-led" data-role="rgb-led"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rgb-label">R0 G0 B0</span><span class="sensor-secondary">GPIO ${sp.r}/${sp.g}/${sp.b}</span></div></div>`;
+    if(sp.type==="dht11")return `<div class="demo-card hardware-card dht-card" data-hw-key="${key}" data-hw-type="dht11"><div class="dht-visual"><div class="thermo"><i data-role="temp-fill"></i></div><div class="humidity-gauge"><i data-role="hum-fill"></i><b data-role="hum-mini">--%</b></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="dht-main">--.- °C · --.- %RH</span><span class="sensor-secondary" data-role="dht-detail">DATA GPIO${sp.pin}</span></div></div>`;
+    if(sp.type==="ultrasonic")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="ultrasonic"><div class="ultra-visual"><div class="ultra-face"><i></i><i></i></div><div class="ultra-beam" data-role="ultra-beam"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="ultra-label">--.- cm</span><div class="ultra-range"><i data-role="ultra-fill"></i></div><span class="sensor-secondary">TRIG ${sp.trig} · ECHO ${sp.echo}</span></div></div>`;
+    if(sp.type==="oled")return `<div class="demo-card hardware-card oled-card" data-hw-key="${key}" data-hw-type="oled"><canvas ${index===0?'id="oledCanvas" ':''}class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas><div class="demo-grow">${head}<span class="sensor-primary">Live OLED Preview</span><span class="sensor-secondary" data-role="oled-label">SDA ${sp.sda} · SCL ${sp.scl} · 0x${Number(sp.address).toString(16).toUpperCase()}</span></div></div>`;
+    if(sp.type==="analog")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="analog"><div class="pot-knob"><div class="pot-needle" data-role="pot-needle"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="analog-label">-- / 255</span><div class="analog-bar"><i data-role="analog-fill"></i></div><span class="sensor-secondary" data-role="analog-detail">GPIO${sp.pin}</span></div></div>`;
+    if(sp.type==="digital")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="digital"><div class="switch-visual" data-role="switch-visual"><i></i></div><div class="demo-grow">${head}<span class="sensor-primary switch-state-text" data-role="switch-label">WAITING</span><span class="sensor-secondary">GPIO${sp.pin}</span></div></div>`;
+    if(sp.type==="rotary")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="rotary"><div class="rotary-visual"><div class="rotary-dial" data-role="rotary-dial"></div><div class="rotary-press" data-role="rotary-press"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rotary-label">Position 0</span><span class="sensor-secondary" data-role="rotary-detail">CLK ${sp.clk} · DT ${sp.dt}${sp.sw>=0?` · SW ${sp.sw}`:""}</span></div></div>`;
+    if(sp.type==="motor")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="motor"><div class="motor-visual" data-role="motor-visual">M</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="motor-label">Stopped</span><div class="analog-bar"><i data-role="motor-fill"></i></div><span class="sensor-secondary">Motor ID ${sp.id}</span></div></div>`;
+    if(sp.type==="servo")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="servo"><div class="servo-visual"><i data-role="servo-needle"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="servo-label">90°</span><span class="sensor-secondary">Servo ID ${sp.id}</span></div></div>`;
+    return "";
+  }
+
+  function findHardwareCard(sp){
+    return [...document.querySelectorAll("#sensorGrid .hardware-card")].find(el=>el.dataset.hwKey===sp.key)||null;
+  }
+
+  function renderHardwareCards(src){
+    const grid=$("sensorGrid");if(!grid)return;
+    const cards=detectHardwareCards(src);
+    const signature=JSON.stringify(cards.map(x=>[x.key,x.className,x.variable,x.identity]));
+    if(signature===hardwareLayoutSignature)return;
+    hardwareLayoutSignature=signature;activeHardwareCards=cards;
+    grid.innerHTML=cards.map((sp,i)=>hardwareCardHtml(sp,i)).join("");
+    initOledPreview();updateSensorGraphics();
+    // Re-apply the current RGB state after a layout refresh.
+    if(sensorState.rgb)updateRgb(sensorState.rgb.r,sensorState.rgb.g,sensorState.rgb.b);
+  }
+
+  function scheduleHardwareCards(src){
+    clearTimeout(hardwareLayoutTimer);
+    hardwareLayoutTimer=setTimeout(()=>renderHardwareCards(src),90);
   }
   async function refreshInputsFromKit(src,showError=false){
     if(prefs.demoMode)return true;
@@ -1308,6 +1441,7 @@ while True:
     if(running){log("Program already running. Press Stop first.");return;}
 
     const src=getCode();
+    renderHardwareCards(src);
     clearEditorIssue();
     const lint=await requestLint(src,true);
     if(!lint.ok){
@@ -1537,12 +1671,54 @@ while True:
   }
 
   function updateSensorGraphics(){
-    const d=Math.max(0,Number(sensorState.ultrasonicCm)||0),p=Math.max(0,Math.min(255,Number(sensorState.potValue)||0));
-    $("ultraLabel").textContent=d.toFixed(1)+" cm";$("ultraMeter").style.width=Math.min(100,d/400*100)+"%";
-    $("potLabel").textContent=`${p} / 255 · GPIO${sensorState.potPin||34} · raw ${sensorState.potRaw||0}`;$("potNeedle").style.transform=`rotate(${-135+(p/255)*270}deg)`;
-    if($("dhtTempLabel"))$("dhtTempLabel").textContent=`${Number(sensorState.dhtTemperature||0).toFixed(1)} °C`;
-    if($("dhtHumLabel"))$("dhtHumLabel").textContent=`${Number(sensorState.dhtHumidity||0).toFixed(1)} %RH`;
-    if($("dhtPinLabel"))$("dhtPinLabel").textContent=`DATA GPIO${sensorState.dhtPin||13}`;
+    for(const sp of activeHardwareCards){
+      const card=findHardwareCard(sp);if(!card)continue;
+      const role=n=>card.querySelector(`[data-role="${n}"]`);
+      if(sp.type==="analog"){
+        const d=sensorState.inputs?.analog?.[String(sp.pin)]||{},hasData=Object.keys(d).length>0;
+        const fallback=prefs.demoMode&&sp.pin===(sensorState.potPin||34);
+        const value=Math.max(0,Math.min(255,Number(d.value255??d.value??(fallback?sensorState.potValue:0))||0));
+        const raw=Number(d.raw??(fallback?sensorState.potRaw:Math.round(value*4095/255)))||0;
+        const percent=Math.max(0,Math.min(100,Number(d.percent??Math.round(value*100/255))||0));
+        if(role("analog-label"))role("analog-label").textContent=(!hasData&&!prefs.demoMode)?"WAITING":`${value} / 255 · ${percent}%`;
+        if(role("analog-detail"))role("analog-detail").textContent=(!hasData&&!prefs.demoMode)?`GPIO${sp.pin} · run code to read`:`GPIO${sp.pin} · raw ${raw}${d.millivolts!==undefined?` · ${Number(d.millivolts)} mV`:""}`;
+        if(role("pot-needle"))role("pot-needle").style.transform=`rotate(${-135+(value/255)*270}deg)`;
+        if(role("analog-fill"))role("analog-fill").style.width=percent+"%";
+        card.classList.toggle("live",hasData||prefs.demoMode);
+      }else if(sp.type==="digital"){
+        const d=sensorState.inputs?.digital?.[String(sp.pin)]||{};
+        const active=!!d.active,state=Number(d.state??(active?1:0));
+        if(role("switch-visual"))role("switch-visual").classList.toggle("active",active);
+        if(role("switch-label")){role("switch-label").textContent=Object.keys(d).length?(active?"ACTIVE / PRESSED":"RELEASED"):"WAITING";role("switch-label").style.color=active?"#62e9a2":"";}
+        card.classList.toggle("live",Object.keys(d).length>0);
+      }else if(sp.type==="rotary"){
+        const key=`${sp.clk},${sp.dt},${sp.sw}`,d=sensorState.inputs?.rotary?.[key]||{};
+        const pos=Number(d.position??0),delta=Number(d.delta??0),dir=String(d.direction||"NONE"),pressed=!!d.pressed;
+        if(role("rotary-dial"))role("rotary-dial").style.transform=`rotate(${pos*18}deg)`;
+        if(role("rotary-press"))role("rotary-press").classList.toggle("active",pressed);
+        if(role("rotary-label"))role("rotary-label").textContent=`Position ${pos} · ${dir}`;
+        if(role("rotary-detail"))role("rotary-detail").textContent=`Δ${delta} · CLK ${sp.clk} · DT ${sp.dt}${sp.sw>=0?` · SW ${pressed?"pressed":"released"}`:""}`;
+        card.classList.toggle("live",Object.keys(d).length>0);
+      }else if(sp.type==="ultrasonic"){
+        const key=`${sp.trig},${sp.echo}`,data=sensorState.inputs?.ultrasonic?.[key]||{},hasData=Object.keys(data).length>0;
+        const isDefault=prefs.demoMode&&sp.trig===18&&sp.echo===19;
+        const d=Math.max(0,Number(data.distanceCm??data.ultrasonicCm??(isDefault?sensorState.ultrasonicCm:0))||0),max=Math.max(1,Number(sp.maxCm)||400),pct=Math.min(100,d/max*100);
+        if(role("ultra-label"))role("ultra-label").textContent=(!hasData&&!prefs.demoMode)?"WAITING":d.toFixed(1)+" cm";
+        if(role("ultra-fill"))role("ultra-fill").style.width=pct+"%";
+        if(role("ultra-beam")){role("ultra-beam").style.transform=`scaleX(${Math.max(.18,pct/100)})`;role("ultra-beam").style.opacity=String(.35+.65*Math.min(1,pct/100));}
+        card.classList.toggle("live",hasData||prefs.demoMode);
+      }else if(sp.type==="dht11"){
+        const data=sensorState.inputs?.dht11?.[String(sp.pin)]||{},hasData=Object.keys(data).length>0;
+        const isDefault=prefs.demoMode&&sp.pin===(sensorState.dhtPin||13);
+        const t=Number(data.temperature??(isDefault?sensorState.dhtTemperature:0))||0,h=Math.max(0,Math.min(100,Number(data.humidity??(isDefault?sensorState.dhtHumidity:0))||0));
+        if(role("dht-main"))role("dht-main").textContent=(!hasData&&!prefs.demoMode)?"WAITING":`${t.toFixed(1)} °C · ${h.toFixed(1)} %RH`;
+        if(role("dht-detail"))role("dht-detail").textContent=`DATA GPIO${sp.pin}${data.valid===false?" · read invalid":""}`;
+        if(role("temp-fill"))role("temp-fill").style.height=Math.max(4,Math.min(100,t/50*100))+"%";
+        if(role("hum-fill"))role("hum-fill").style.height=h+"%";
+        if(role("hum-mini"))role("hum-mini").textContent=Math.round(h)+"%";
+        card.classList.toggle("live",hasData||prefs.demoMode);
+      }
+    }
   }
 
   function clearPlotter(){
@@ -1575,25 +1751,32 @@ while True:
 
   function updateRgb(r,g,b){
     r=Math.max(0,Math.min(255,+r||0));g=Math.max(0,Math.min(255,+g||0));b=Math.max(0,Math.min(255,+b||0));
-    $("rgbLed").style.background=`rgb(${r},${g},${b})`;
-    const glow=Math.max(r,g,b)>0?`0 0 18px rgba(${r},${g},${b},.95), inset 0 0 0 2px #ffffff66`:"inset 0 0 0 2px #4a5262";
-    $("rgbLed").style.boxShadow=glow;$("rgbLabel").textContent=`R${r} G${g} B${b}`;
+    sensorState.rgb={r,g,b};
+    const glow=Math.max(r,g,b)>0?`0 0 22px rgba(${r},${g},${b},.82), inset 0 0 0 2px #ffffff66`:"inset 0 0 0 2px #4a5262";
+    document.querySelectorAll('[data-role="rgb-led"]').forEach(el=>{el.style.background=`rgb(${r},${g},${b})`;el.style.boxShadow=glow;});
+    document.querySelectorAll('[data-role="rgb-label"]').forEach(el=>el.textContent=`R${r} G${g} B${b}`);
+    document.querySelectorAll('.hardware-card[data-hw-type="rgb"]').forEach(el=>el.classList.toggle("live",Math.max(r,g,b)>0));
   }
 
   function initOledPreview(){
-    const canvas=$("oledCanvas");if(!canvas)return false;
+    const canvases=[...document.querySelectorAll(".oled-canvas")];
     if(!oledBuffer){
       oledBuffer=document.createElement("canvas");oledBuffer.width=128;oledBuffer.height=64;
-      oledBufferCtx=oledBuffer.getContext("2d");oledVisibleCtx=canvas.getContext("2d");
-      oledBufferCtx.imageSmoothingEnabled=false;oledVisibleCtx.imageSmoothingEnabled=false;
-      oledBufferCtx.fillStyle="#000";oledBufferCtx.fillRect(0,0,128,64);commitOledPreview();
+      oledBufferCtx=oledBuffer.getContext("2d");oledBufferCtx.imageSmoothingEnabled=false;
+      oledBufferCtx.fillStyle="#000";oledBufferCtx.fillRect(0,0,128,64);
     }
-    return true;
+    commitOledPreview();
+    return canvases.length>0;
   }
   function commitOledPreview(){
-    if(!oledBufferCtx||!oledVisibleCtx)return;
-    oledVisibleCtx.save();oledVisibleCtx.setTransform(1,0,0,1,0,0);oledVisibleCtx.fillStyle="#000";oledVisibleCtx.fillRect(0,0,128,64);oledVisibleCtx.drawImage(oledBuffer,0,0);oledVisibleCtx.restore();
+    if(!oledBufferCtx)return;
+    document.querySelectorAll(".oled-canvas").forEach(canvas=>{
+      const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=false;
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#000";ctx.fillRect(0,0,128,64);ctx.drawImage(oledBuffer,0,0);ctx.restore();
+      canvas.classList.toggle("oled-invert",oledInverted);
+    });
   }
+
   function oledColor(on=true){return on===false||on===0||on==="0"?"#000":"#fff";}
   function drawOledText(ctx,text,x,y,size=1,on=true){
     size=Math.max(1,Math.min(4,Number(size)||1));ctx.fillStyle=oledColor(on);ctx.font=`${7*size}px monospace`;ctx.textBaseline="top";
@@ -1604,7 +1787,7 @@ while True:
     if(!initOledPreview())return;
     const ctx=oledBufferCtx,cmd=String(p.command||"");
     const show=p.show===true||p.show===1||p.show==="1"||p.show==="true";
-    if(cmd==="OLED_INIT"){$("oledLabel").textContent=`SSD1306 · SDA ${p.sda??21} · SCL ${p.scl??22} · 0x${Number(p.address??60).toString(16).toUpperCase()}`;return;}
+    if(cmd==="OLED_INIT"){document.querySelectorAll('[data-role="oled-label"]').forEach(el=>el.textContent=`SSD1306 · SDA ${p.sda??21} · SCL ${p.scl??22} · 0x${Number(p.address??60).toString(16).toUpperCase()}`);return;}
     if(cmd==="OLED_CLEAR"){ctx.fillStyle="#000";ctx.fillRect(0,0,128,64);if(show)commitOledPreview();return;}
     if(cmd==="OLED_SHOW"){commitOledPreview();return;}
     if(cmd==="OLED_TEXT"){drawOledText(ctx,p.text,p.x,p.y,p.size,p.on!==false);if(show)commitOledPreview();return;}
@@ -1619,8 +1802,8 @@ while True:
     }else if(cmd==="OLED_CIRCLE"){
       ctx.beginPath();ctx.arc(Number(p.x)||0,Number(p.y)||0,Math.max(0,Number(p.r)||0),0,Math.PI*2);if(p.fill===true||p.fill===1||p.fill==="1"||p.fill==="true")ctx.fill();else ctx.stroke();
     }else if(cmd==="OLED_INVERT"){
-      oledInverted=p.enabled===true||p.enabled===1||p.enabled==="1"||p.enabled==="true";$("oledCanvas").classList.toggle("oled-invert",oledInverted);return;
-    }else if(cmd==="OLED_CONTRAST"){$("oledLabel").textContent=`OLED contrast ${Math.max(0,Math.min(255,Number(p.value)||0))}`;return;}
+      oledInverted=p.enabled===true||p.enabled===1||p.enabled==="1"||p.enabled==="true";document.querySelectorAll(".oled-canvas").forEach(c=>c.classList.toggle("oled-invert",oledInverted));return;
+    }else if(cmd==="OLED_CONTRAST"){document.querySelectorAll('[data-role="oled-label"]').forEach(el=>el.textContent=`OLED contrast ${Math.max(0,Math.min(255,Number(p.value)||0))}`);return;}
     else if(cmd==="OLED_DISTANCE_BAR"){
       ctx.fillStyle="#000";ctx.fillRect(0,0,128,64);drawOledText(ctx,p.title||"Distance",2,2,1,true);
       const d=Math.max(0,Number(p.distance)||0),mx=Math.max(1,Number(p.maxCm)||400),ratio=Math.min(1,d/mx);drawOledText(ctx,`${d.toFixed(1)} cm`,34,20,1,true);
@@ -1637,11 +1820,23 @@ while True:
   }
 
   function applyDemo(p){
-    if(p.command&&String(p.command).startsWith("OLED_"))applyOledCommand(p);
+    if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
     if(p.command==="RGB_LED_SET"&&+p.id===1)updateRgb(p.r,p.g,p.b);
     if(p.command==="LED_SET"&&+p.id===1)updateRgb(+p.value?255:0,+p.value?255:0,+p.value?255:0);
-    if(p.command==="MOTOR_SET"&&+p.id===1){const s=Math.max(-100,Math.min(100,+p.speed||0));$("motorMeter").style.width=Math.abs(s)+"%";$("motorLabel").textContent=s===0?"Stopped":`${s>0?"Forward":"Backward"} ${Math.abs(s)}%`;}
-    if(p.command==="SERVO_SET"&&+p.id===1){const a=Math.max(0,Math.min(180,+p.angle||0));$("servoNeedle").style.transform=`rotate(${a-90}deg)`;$("servoLabel").textContent=a+"°";}
+    if(p.command==="MOTOR_SET"){
+      const speed=Math.max(-100,Math.min(100,+p.speed||0));
+      for(const sp of activeHardwareCards.filter(x=>x.type==="motor"&&Number(x.id)===Number(p.id||1))){
+        const card=findHardwareCard(sp);if(!card)continue;const fill=card.querySelector('[data-role="motor-fill"]'),label=card.querySelector('[data-role="motor-label"]'),visual=card.querySelector('[data-role="motor-visual"]');
+        if(fill)fill.style.width=Math.abs(speed)+"%";if(label)label.textContent=speed===0?"Stopped":`${speed>0?"Forward":"Backward"} ${Math.abs(speed)}%`;if(visual)visual.style.transform=`rotate(${speed*1.8}deg)`;card.classList.toggle("live",speed!==0);
+      }
+    }
+    if(p.command==="SERVO_SET"){
+      const angle=Math.max(0,Math.min(180,+p.angle||0));
+      for(const sp of activeHardwareCards.filter(x=>x.type==="servo"&&Number(x.id)===Number(p.id||1))){
+        const card=findHardwareCard(sp);if(!card)continue;const needle=card.querySelector('[data-role="servo-needle"]'),label=card.querySelector('[data-role="servo-label"]');
+        if(needle)needle.style.transform=`rotate(${angle-90}deg)`;if(label)label.textContent=angle+"°";card.classList.add("live");
+      }
+    }
   }
 
   function updateSensorPacket(data){
@@ -1665,11 +1860,9 @@ while True:
     }
     if(sensor==="DIGITAL"){
       const pin=Number(data.pin);sensorState.inputs.digital[String(pin)]={...data,pin};
-      if($("switchLabel"))$("switchLabel").textContent=`GPIO${pin} · ${data.active?"ACTIVE / PRESSED":"released"} · state ${data.state}`;
     }
     if(sensor==="ROTARY"){
       const key=`${Number(data.clk)},${Number(data.dt)},${Number(data.sw??-1)}`;sensorState.inputs.rotary[key]={...data};
-      if($("rotaryLabel"))$("rotaryLabel").textContent=`Pos ${data.position} · ${data.direction||"NONE"} · Δ${data.delta||0} · SW ${data.pressed?"pressed":"released"}`;
     }
     updateSensorGraphics();
   }
@@ -1810,7 +2003,7 @@ while True:
   document.querySelectorAll(".output-tab").forEach(b=>b.onclick=()=>switchOutput(b.dataset.view));
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
-  $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";initOledPreview();
+  $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
   window.addEventListener("pagehide",()=>{stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
-  updateRgb(0,0,0);updateSensorGraphics();drawSerialPlotter();setupCameraBridge();initEditor();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
+  initEditor();renderHardwareCards(getCode());initOledPreview();updateRgb(0,0,0);updateSensorGraphics();drawSerialPlotter();setupCameraBridge();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
 })();
