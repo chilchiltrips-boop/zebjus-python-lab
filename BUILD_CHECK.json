@@ -1,5 +1,5 @@
 {
-  "ui_version": "5.23",
+  "ui_version": "5.24",
   "examples_count": 25,
   "examples": {
     "ledBasic": "ok",
@@ -62,13 +62,11 @@
     "clears_on_new_run": true
   },
   "layout_order": [
-    "Code Editor",
-    "Kit Output / Sensors",
-    "Camera / MediaPipe",
+    "Project controls",
+    "Main workspace: main.py editor + Camera / MediaPipe + Serial Plotter + Image Upload",
+    "Kit Output / Sensors + OpenCV / imshow Output",
     "Output / Terminal",
-    "OpenCV / imshow Output",
-    "Serial Plotter",
-    "Image Upload"
+    "Quick Tools / Project Reference"
   ],
   "oled": {
     "driver": "SSD1306_128x64_I2C",
@@ -126,6 +124,22 @@
     "layout_order_static_check": "ok",
     "firmware_structural_check": "ok",
     "firmware_failsafe_10000ms_static_check": true,
-    "camera_cache_alignment": "5.23"
+    "camera_cache_alignment": "5.24"
+  },
+  "layout": {
+    "desktop_editor_share": "~80%+",
+    "right_utility_stack": [
+      "Camera / MediaPipe",
+      "Serial Plotter",
+      "Image Upload"
+    ],
+    "second_row_two_columns": [
+      "Kit Output / Sensors",
+      "OpenCV / imshow Output"
+    ],
+    "terminal_full_width": true,
+    "gradient_grid_dark_theme": true,
+    "responsive_editor_first": true,
+    "styles_cache_version": "5.24"
   }
 }

@@ -8,7 +8,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=5.24">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.23</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.24</span>
       <p>Python • OpenCV • MediaPipe • RGB • DHT11 • Ultrasonic • OLED • Inputs • Plotter</p>
     </div>
     <div class="top-actions">
@@ -83,8 +83,8 @@
       </div>
     </section>
 
-    <section class="workspace-single">
-      <div class="panel editor-panel">
+    <section class="primary-workspace">
+      <div class="panel editor-panel editor-main-panel">
         <div class="panel-title editor-title">
           <div>
             <strong>main.py</strong>
@@ -103,94 +103,108 @@
           </div>
         </details>
       </div>
-    </section>
 
-    <section class="panel demo-panel compact-section">
-      <div class="panel-title compact-title">
-        <strong>Kit Output / Sensors</strong>
-        <span id="kitNameText" class="muted">ZB-000123</span>
-      </div>
-      <div class="demo-items sensor-grid">
-        <div class="demo-card">
-          <div class="rgb-shell"><div id="rgbLed" class="rgb-led"></div></div>
-          <div class="demo-grow"><strong>RGB LED</strong><span id="rgbLabel">R0 G0 B0</span></div>
-        </div>
-        <div class="demo-card dht-card">
-          <div class="dht-icon">DHT</div>
-          <div class="demo-grow">
-            <strong>DHT11</strong>
-            <div class="dht-values"><span id="dhtTempLabel">28.0 °C</span><span id="dhtHumLabel">65.0 %RH</span></div>
-            <span id="dhtPinLabel">DATA GPIO13</span>
+      <aside class="utility-column">
+        <section class="panel camera-panel compact-section utility-panel camera-utility">
+          <div class="panel-title compact-title">
+            <strong>Camera / MediaPipe</strong>
+            <div class="camera-head-actions"><span id="cameraIndexText" class="muted">Camera 0</span><button id="cameraToggleBtn" class="btn tiny">Start</button></div>
           </div>
-        </div>
-        <div class="demo-card">
-          <div class="ultra-icon"><i></i><i></i></div>
-          <div class="demo-grow"><strong>Ultrasonic</strong><div class="sensor-meter"><div id="ultraMeter" class="sensor-fill"></div></div><span id="ultraLabel">45.0 cm</span></div>
-        </div>
-        <div class="demo-card oled-card">
-          <canvas id="oledCanvas" class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas>
-          <div class="demo-grow"><strong>OLED 128×64</strong><span id="oledLabel">SSD1306 · SDA 21 · SCL 22 · 0x3C</span></div>
-        </div>
-        <div class="demo-card">
-          <div class="pot-knob" id="potKnob"><div id="potNeedle" class="pot-needle"></div></div>
-          <div class="demo-grow"><strong id="potTitle">Analog Input</strong><span id="potLabel">128 / 255</span></div>
-        </div>
-        <div class="demo-card"><div class="motor-icon">SW</div><div class="demo-grow"><strong>Digital Switch</strong><span id="switchLabel">No switch read yet</span></div></div>
-        <div class="demo-card"><div class="motor-icon">↻</div><div class="demo-grow"><strong>Rotary Encoder</strong><span id="rotaryLabel">No rotary read yet</span></div></div>
-        <div class="demo-card"><div class="motor-icon">M</div><div class="demo-grow"><strong>Motor</strong><div class="meter"><div id="motorMeter" class="meter-fill"></div></div><span id="motorLabel">Stopped</span></div></div>
-        <div class="demo-card"><div class="servo"><div id="servoNeedle" class="servo-needle"></div></div><div><strong>Servo</strong><span id="servoLabel">90°</span></div></div>
-      </div>
+          <div class="camera-compact-body">
+            <div class="camera-wrap">
+              <video id="cameraVideo" playsinline muted></video><canvas id="cameraOverlay"></canvas>
+              <img id="cameraResultImage" class="camera-result-image" alt="OpenCV / MediaPipe output">
+              <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div><div id="cameraResultLabel" class="camera-result-label" hidden>OpenCV Output</div>
+            </div>
+            <div class="ai-stats">
+              <div><span>Hand</span><strong id="handDetected">—</strong></div><div><span>Fingers</span><strong id="fingerCount">0</strong></div>
+              <div><span>Side</span><strong id="handSide">—</strong></div><div><span>Faces</span><strong id="faceCount">0</strong></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel plotter-panel compact-section utility-panel plotter-utility">
+          <div class="panel-title compact-title">
+            <div><strong>Serial Plotter</strong> <span class="muted">Python <code>plot(...)</code></span></div>
+            <button id="clearPlotterBtn" class="btn tiny">Clear</button>
+          </div>
+          <div class="plotter-body">
+            <canvas id="serialPlotterCanvas" width="1200" height="220" aria-label="Serial Plotter"></canvas>
+            <div id="serialPlotterLegend" class="plotter-legend"><span>No plot data yet</span></div>
+          </div>
+        </section>
+
+        <section class="panel image-load-panel compact-section utility-panel upload-utility">
+          <div class="panel-title compact-title"><strong>Image Upload</strong><button id="clearImageBtn" class="btn tiny">Clear</button></div>
+          <div class="image-loader compact-image-loader">
+            <label class="file-btn"><input id="imageInput" type="file" accept="image/*" multiple><span>Upload Images</span></label>
+            <div class="source-image-wrap"><img id="sourceImagePreview" alt="Loaded source"><div id="sourceImagePlaceholder">No image uploaded</div></div>
+            <div class="image-info-row"><span id="sourceImageInfo" class="muted">Upload image → copy path → use cv2.imread().</span><div class="upload-path-hint"><code>cv2.imread("uploads/image.jpg")</code></div></div>
+            <div id="uploadedFileList" class="uploaded-file-list"><div class="uploaded-empty">Uploaded paths appear here.</div></div>
+          </div>
+        </section>
+      </aside>
     </section>
 
-    <section class="panel camera-panel compact-section">
-      <div class="panel-title compact-title">
-        <strong>Camera / MediaPipe</strong>
-        <div class="camera-head-actions"><span id="cameraIndexText" class="muted">Camera 0</span><button id="cameraToggleBtn" class="btn tiny">Start</button></div>
-      </div>
-      <div class="camera-compact-body">
-        <div class="camera-wrap">
-          <video id="cameraVideo" playsinline muted></video><canvas id="cameraOverlay"></canvas>
-          <img id="cameraResultImage" class="camera-result-image" alt="OpenCV / MediaPipe output">
-          <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div><div id="cameraResultLabel" class="camera-result-label" hidden>OpenCV Output</div>
+    <section class="secondary-workspace">
+      <section class="panel demo-panel compact-section kit-output-panel">
+        <div class="panel-title compact-title">
+          <strong>Kit Output / Sensors</strong>
+          <span id="kitNameText" class="muted">ZB-000123</span>
         </div>
-        <div class="ai-stats">
-          <div><span>Hand</span><strong id="handDetected">—</strong></div><div><span>Fingers</span><strong id="fingerCount">0</strong></div>
-          <div><span>Side</span><strong id="handSide">—</strong></div><div><span>Faces</span><strong id="faceCount">0</strong></div>
+        <div class="demo-items sensor-grid">
+          <div class="demo-card">
+            <div class="rgb-shell"><div id="rgbLed" class="rgb-led"></div></div>
+            <div class="demo-grow"><strong>RGB LED</strong><span id="rgbLabel">R0 G0 B0</span></div>
+          </div>
+          <div class="demo-card dht-card">
+            <div class="dht-icon">DHT</div>
+            <div class="demo-grow">
+              <strong>DHT11</strong>
+              <div class="dht-values"><span id="dhtTempLabel">28.0 °C</span><span id="dhtHumLabel">65.0 %RH</span></div>
+              <span id="dhtPinLabel">DATA GPIO13</span>
+            </div>
+          </div>
+          <div class="demo-card">
+            <div class="ultra-icon"><i></i><i></i></div>
+            <div class="demo-grow"><strong>Ultrasonic</strong><div class="sensor-meter"><div id="ultraMeter" class="sensor-fill"></div></div><span id="ultraLabel">45.0 cm</span></div>
+          </div>
+          <div class="demo-card oled-card">
+            <canvas id="oledCanvas" class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas>
+            <div class="demo-grow"><strong>OLED 128×64</strong><span id="oledLabel">SSD1306 · SDA 21 · SCL 22 · 0x3C</span></div>
+          </div>
+          <div class="demo-card">
+            <div class="pot-knob" id="potKnob"><div id="potNeedle" class="pot-needle"></div></div>
+            <div class="demo-grow"><strong id="potTitle">Analog Input</strong><span id="potLabel">128 / 255</span></div>
+          </div>
+          <div class="demo-card"><div class="motor-icon">SW</div><div class="demo-grow"><strong>Digital Switch</strong><span id="switchLabel">No switch read yet</span></div></div>
+          <div class="demo-card"><div class="motor-icon">↻</div><div class="demo-grow"><strong>Rotary Encoder</strong><span id="rotaryLabel">No rotary read yet</span></div></div>
+          <div class="demo-card"><div class="motor-icon">M</div><div class="demo-grow"><strong>Motor</strong><div class="meter"><div id="motorMeter" class="meter-fill"></div></div><span id="motorLabel">Stopped</span></div></div>
+          <div class="demo-card"><div class="servo"><div id="servoNeedle" class="servo-needle"></div></div><div><strong>Servo</strong><span id="servoLabel">90°</span></div></div>
         </div>
-      </div>
+      </section>
+
+      <section class="panel image-result-panel compact-section imshow-panel">
+        <div class="panel-title compact-title"><strong>OpenCV / imshow Output</strong><span class="muted">cv2.imshow() / show()</span></div>
+        <div id="imageOutput" class="output-view image-output active">
+          <p id="imagePlaceholder">Use <code>cv2.imshow()</code> or <code>show(image)</code> to display a result.</p>
+          <img id="resultImage" alt="OpenCV output">
+        </div>
+      </section>
     </section>
 
-    <section class="panel output-panel compact-section">
+    <section class="panel output-panel compact-section terminal-full-row">
       <div class="panel-title compact-title"><strong>Output / Terminal</strong><button id="clearBtn" class="btn tiny">Clear</button></div>
       <pre id="terminal" class="output-view active">Starting Python worker…</pre>
     </section>
 
-    <section class="panel image-result-panel compact-section">
-      <div class="panel-title compact-title"><strong>OpenCV / imshow Output</strong><span class="muted">cv2.imshow() / show()</span></div>
-      <div id="imageOutput" class="output-view image-output active">
-        <p id="imagePlaceholder">Use <code>cv2.imshow()</code> or <code>show(image)</code> to display a result.</p>
-        <img id="resultImage" alt="OpenCV output">
-      </div>
-    </section>
-
-    <section class="panel plotter-panel compact-section">
-      <div class="panel-title compact-title">
-        <div><strong>Serial Plotter</strong> <span class="muted">Live values from Python <code>plot(...)</code></span></div>
-        <button id="clearPlotterBtn" class="btn tiny">Clear Plot</button>
-      </div>
-      <div class="plotter-body">
-        <canvas id="serialPlotterCanvas" width="1200" height="220" aria-label="Serial Plotter"></canvas>
-        <div id="serialPlotterLegend" class="plotter-legend"><span>No plot data yet</span></div>
-      </div>
-    </section>
-
-    <section class="panel image-load-panel compact-section">
-      <div class="panel-title compact-title"><strong>Image Upload</strong><button id="clearImageBtn" class="btn tiny">Clear</button></div>
-      <div class="image-loader compact-image-loader">
-        <label class="file-btn"><input id="imageInput" type="file" accept="image/*" multiple><span>Upload Images</span></label>
-        <div class="source-image-wrap"><img id="sourceImagePreview" alt="Loaded source"><div id="sourceImagePlaceholder">No image uploaded</div></div>
-        <div class="image-info-row"><span id="sourceImageInfo" class="muted">Upload an image, copy its path, then use cv2.imread().</span><div class="upload-path-hint"><code>cv2.imread("uploads/your-image.jpg")</code></div></div>
-        <div id="uploadedFileList" class="uploaded-file-list"><div class="uploaded-empty">Uploaded image paths will appear here.</div></div>
+    <section class="panel workspace-tools-panel compact-section">
+      <div class="panel-title compact-title"><strong>Quick Tools / Project Reference</strong><span class="muted">Useful while building projects</span></div>
+      <div class="workspace-tool-grid">
+        <div class="workspace-tool"><strong>Run</strong><span>▶ Run / ■ End · draft auto-saves</span></div>
+        <div class="workspace-tool"><strong>Sensors</strong><span>DHT11 · Ultrasonic · Analog · Switch · Rotary</span></div>
+        <div class="workspace-tool"><strong>Outputs</strong><span>RGB LED · OLED · OpenCV / imshow</span></div>
+        <div class="workspace-tool"><strong>Graph</strong><span><code>plot(Name=value)</code> for any numeric value</span></div>
       </div>
     </section>
   </main>
@@ -202,9 +216,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.23"></script>
-  <script src="./kit-client.js?v=5.23"></script>
-  <script src="./ai.js?v=5.23"></script>
-  <script src="./app.js?v=5.23"></script>
+  <script src="./config.js?v=5.24"></script>
+  <script src="./kit-client.js?v=5.24"></script>
+  <script src="./ai.js?v=5.24"></script>
+  <script src="./app.js?v=5.24"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v5.23 — 25 Current Examples
+# ZEBJUS Python Lab v5.24 — 25 Current Examples
 
 1. RGB LED — Basic Colors
 2. RGB LED — Blink

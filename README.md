@@ -1,6 +1,6 @@
-# ZEBJUS Python Lab v5.23 — DHT11 + Serial Plotter + Compact Layout
+# ZEBJUS Python Lab v5.24 — Gradient Grid Dark IDE
 
-v5.23 keeps the v5.21 stable kit connection architecture and the v5.22 OLED/Ultrasonic features, then adds physical DHT11 support, a generic Python-driven Serial Plotter, and a compact full-width learning layout.
+v5.24 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
 
 ## Stable kit connection retained
 
@@ -15,7 +15,7 @@ v5.23 keeps the v5.21 stable kit connection architecture and the v5.22 OLED/Ultr
 - Temporary Wi-Fi/API misses do not immediately stop the Python program.
 - `+ New Project` opens a blank editor; custom draft auto-save/restore is retained.
 
-## v5.23 additions
+## v5.24 additions
 
 - Physical `DHT11(pin=13)` API using `/api/input/dht11`.
 - Direct temperature °C and humidity %RH methods.
@@ -27,17 +27,20 @@ v5.23 keeps the v5.21 stable kit connection architecture and the v5.22 OLED/Ultr
 - 5 DHT11 examples added; current Learning Example menu has **25 examples**.
 - GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
 
-## Compact UI order
+## v5.24 coding-first layout
 
-1. Python code editor
-2. Kit Output / Sensors
-3. Camera / MediaPipe
-4. Output / Terminal
-5. OpenCV / `imshow` Output
-6. Serial Plotter
-7. Image Upload
+Desktop:
 
-Panels use full page width and reduced padding/heights so the browser space is used efficiently. Quick Reference is collapsed inside the editor panel.
+1. Project controls
+2. Main workspace: large `main.py` editor (~80%+) + compact right utility column
+   - Camera / MediaPipe
+   - Serial Plotter
+   - Image Upload
+3. Second row: Kit Output / Sensors + OpenCV / `imshow` Output
+4. Full-width Output / Terminal
+5. Compact Quick Tools / Project Reference
+
+The visual theme uses a dark neutral editor surface with subtle gradient accents on panels and controls. Tablet/mobile layouts stack progressively with the editor kept first. Quick Reference remains collapsible inside the editor panel.
 
 ## DHT11 Python API
 
@@ -108,3 +111,7 @@ Required Arduino libraries for OLED:
 - Adafruit BusIO
 
 DHT11 support is implemented directly in the firmware, so no additional DHT library is required.
+
+
+## v5.24 Layout
+Desktop layout uses an approximately 80/20 main.py + utility-column workspace. Camera, Serial Plotter and Image Upload are stacked beside the editor. Below that, Kit Output/Sensors and OpenCV/imshow share a row; Output/Terminal is full-width, followed by Quick Tools / Project Reference. Responsive breakpoints stack panels on smaller screens.
