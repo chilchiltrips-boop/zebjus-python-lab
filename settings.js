@@ -5,7 +5,7 @@
   const client=Kit?new Kit.KitClient():null;
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitIp:"",wsUrl:"",
+    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",demoUltrasonic:45,demoPot:128
   };
 
@@ -66,7 +66,7 @@
     current={
       ...current,
       autoCamera:$("autoCamera").checked,demoMode:$("demoMode").checked,
-      kitName:entered,kitId:entered,kitIp:$("kitIp").value.trim(),wsUrl:$("wsUrl").value.trim(),
+      kitName:entered,kitId:entered,kitChipId:current.kitChipId||"",kitIp:$("kitIp").value.trim(),wsUrl:$("wsUrl").value.trim(),
       cameraIndex:Number($("cameraSelect").value)||0,fontSize:Number($("fontSize").value)||14,
       autoSave:$("autoSave").checked,stdin:$("stdinBox").value||"",
       demoUltrasonic:Number($("demoUltrasonic").value)||45,demoPot:Number($("demoPot").value)||0
@@ -90,12 +90,13 @@
     const name=Kit.normalizeKitName(nameOverride||$("kitName").value);
     if(name.length<3)throw new Error("Enter the kit name, for example zebjus_kit_1.");
     setConnBadge("Connecting…");setMessage("kitNameMessage","");
-    client.name=name;client.ipHint=$("kitIp").value.trim();
+    const sameSavedKit=Kit.normalizeKitName(current.kitName||"")===name;
+    client.name=name;client.ipHint=$("kitIp").value.trim();client.chipId=sameSavedKit?String(current.kitChipId||""):"";
     let status;
     try{status=await client.connect(name,client.ipHint);}
     catch(_){status=await client.reconnect(4);}
     $("kitName").value=status.name||name;$("kitIp").value=status.ip||"";$("newKitName").value=status.name||name;
-    current.kitName=status.name||name;current.kitId=current.kitName;current.kitIp=status.ip||"";current.demoMode=false;$("demoMode").checked=false;persist();
+    current.kitName=status.name||name;current.kitId=current.kitName;current.kitChipId=String(status.chipId||"");current.kitIp=status.ip||"";current.demoMode=false;$("demoMode").checked=false;persist();
     setConnBadge("Connected",true);renderKitInfo(status);
     refreshSavedWifi().catch(()=>{});
     return status;
@@ -109,7 +110,7 @@
       const found=await Kit.scanDefaultKits(30,(done,total,count)=>{o.textContent=`Scanning ${done}/${total} — ${count} found`;});
       sel.innerHTML="";
       if(!found.length){const none=document.createElement("option");none.value="";none.textContent="No default kits found";sel.appendChild(none);setMessage("kitNameMessage","No kit found. You can still enter a custom kit name manually.");return;}
-      found.forEach(({status})=>{const op=document.createElement("option");op.value=status.name;op.dataset.ip=status.ip||"";op.textContent=`${status.name} — ${status.ip||"local"}`;sel.appendChild(op);});
+      found.forEach(({status})=>{const op=document.createElement("option");op.value=status.name;op.dataset.ip=status.ip||"";op.dataset.chip=status.chipId||"";op.textContent=`${status.name} — ${status.ip||"local"}`;sel.appendChild(op);});
       sel.dispatchEvent(new Event("change"));setMessage("kitNameMessage",`${found.length} kit(s) found on this Wi-Fi.`,"ok-text");
     }finally{btn.disabled=false;}
   }
@@ -120,7 +121,7 @@
     try{
       setMessage("kitNameMessage","Checking name on this Wi-Fi…");
       const r=await client.rename(name);
-      current.kitName=name;current.kitId=name;current.kitIp="";persist();$("kitName").value=name;$("kitIp").value="";
+      current.kitName=name;current.kitId=name;current.kitChipId=String(client.chipId||current.kitChipId||"");current.kitIp="";persist();$("kitName").value=name;$("kitIp").value="";
       setMessage("kitNameMessage",r.message||`Name saved as ${name}. Kit is restarting.`,"ok-text");client.disconnect();setConnBadge("Restarting…");
     }catch(e){
       if(e.status===409)setMessage("kitNameMessage","Another person is using this name on this Wi-Fi network.","error-text");
@@ -130,7 +131,7 @@
 
   async function resetKitName(){
     try{
-      const r=await client.resetName();current.kitName="";current.kitId="";current.kitIp="";persist();$("kitName").value="";$("newKitName").value="";
+      const r=await client.resetName();current.kitName="";current.kitId="";current.kitChipId="";current.kitIp="";persist();$("kitName").value="";$("newKitName").value="";
       setMessage("kitNameMessage",r.message||"Auto name reset. Kit will choose the next free zebjus_kit_N name after restart.","ok-text");client.disconnect();setConnBadge("Restarting…");
     }catch(e){setMessage("kitNameMessage","Reset failed: "+e.message,"error-text");}
   }
@@ -196,7 +197,7 @@
   $("connectKitBtn").onclick=()=>connectKit().catch(e=>{setConnBadge("Not connected");setMessage("kitNameMessage","Connection failed: "+e.message,"error-text");});
   $("scanKitsBtn").onclick=()=>scanKits().catch(e=>setMessage("kitNameMessage","Scan failed: "+e.message,"error-text"));
   $("disconnectKitBtn").onclick=()=>{client?.disconnect();setConnBadge("Not connected");renderKitInfo(null);};
-  $("kitSelect").onchange=e=>{const op=e.target.selectedOptions[0];if(!op?.value)return;$("kitName").value=op.value;$("kitIp").value=op.dataset.ip||"";connectKit(op.value).catch(err=>setMessage("kitNameMessage","Connection failed: "+err.message,"error-text"));};
+  $("kitSelect").onchange=e=>{const op=e.target.selectedOptions[0];if(!op?.value)return;$("kitName").value=op.value;$("kitIp").value=op.dataset.ip||"";current.kitName=op.value;current.kitChipId=op.dataset.chip||"";connectKit(op.value).catch(err=>setMessage("kitNameMessage","Connection failed: "+err.message,"error-text"));};
   $("renameKitBtn").onclick=renameKit;$("resetKitNameBtn").onclick=resetKitName;$("scanWifiBtn").onclick=scanWifi;$("saveWifiBtn").onclick=saveWifi;$("resetWifiBtn").onclick=resetWifi;
   $("refreshSavedWifiBtn").onclick=()=>refreshSavedWifi().catch(e=>setMessage("wifiMessage","Saved Wi-Fi read failed: "+e.message,"error-text"));
   $("useSavedWifiBtn").onclick=useSavedWifi;$("forgetSavedWifiBtn").onclick=forgetSavedWifi;

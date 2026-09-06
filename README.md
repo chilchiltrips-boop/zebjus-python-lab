@@ -1,6 +1,18 @@
-# ZEBJUS Python Lab v5.20 — Pin Assist + Universal Inputs
+# ZEBJUS Python Lab v5.21 — Stable Kit Connection + Pin Assist
 
 This stage keeps the RGB LED, editor, exact error-line highlighting, Undo/Redo, OpenCV/MediaPipe engine, Wi-Fi kit naming, saved Wi-Fi profiles, kit auto-reconnect, Run heartbeat and output failsafe.
+
+
+## Added in v5.21
+
+- Cached IP is tried first, then mDNS (`kit-name.local`) fallback, with physical Kit ID verification before accepting a device.
+- The selected kit persists `kitName`, physical `kitChipId`, and last working `kitIp` separately. A newly discovered DHCP IP updates the cache automatically.
+- Stable connection state machine: 1–4 consecutive health/heartbeat misses keep the UI at **Kit connected**; only the 5th consecutive miss changes it to **Kit disconnected**.
+- Reconnect runs silently in the background, so the badge no longer blinks `Connecting ↔ Connected` during routine checks. Any successful status/API/heartbeat response resets the failure counter.
+- Run heartbeat remains every 1 second. ESP32 output failsafe is now 10 seconds; heartbeat timeout forces RGB/output safe OFF.
+- Temporary Wi-Fi/API misses do not immediately stop the Python program. The browser keeps the program alive while reconnecting.
+- Added **+ New Project** for a completely blank editor. Blank/custom code is auto-saved and restored, including an intentionally empty draft.
+- Camera bridge cache versions are aligned to v5.21.
 
 ## Added in v5.20
 
@@ -70,8 +82,8 @@ GPIO34/35/36/39 require an external pull resistor when used as switches/encoder 
 
 Upload:
 
-`esp32_firmware/ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_3.ino`
+`esp32_firmware/ZEBJUS_Kit_RGB_UniversalInput_WiFi_v1_4.ino`
 
 Expected Serial header:
 
-`ZEBJUS KIT RGB + INPUT WiFi v1.3`
+`ZEBJUS KIT RGB + INPUT WiFi v1.4`

@@ -1,4 +1,4 @@
-# ZEBJUS Kit v1.3 — Wi-Fi, RGB and Universal Inputs
+# ZEBJUS Kit v1.4 — Wi-Fi, RGB and Universal Inputs
 
 ## Firmware
 
@@ -9,7 +9,7 @@ Upload:
 Expected Serial header:
 
 ```text
-ZEBJUS KIT RGB + INPUT WiFi v1.3
+ZEBJUS KIT RGB + INPUT WiFi v1.4
 ```
 
 The existing kit Wi-Fi workflow remains the same:

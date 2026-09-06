@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.20</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.21</span>
       <p>Python • OpenCV • MediaPipe • RGB LED • Analog • Switch • Rotary</p>
     </div>
     <div class="top-actions">
@@ -57,6 +57,7 @@
       </div>
 
       <div class="project-actions">
+        <button id="newProjectBtn" class="btn primary" title="Create a blank custom project">+ New Project</button>
         <button id="undoBtn" class="btn" title="Undo (⌘Z / Ctrl+Z)">↶ Undo</button>
         <button id="redoBtn" class="btn" title="Redo (⌘⇧Z / Ctrl+Y)">↷ Redo</button>
         <button id="autocompleteBtn" class="btn" title="Show suggestions">⌘ Suggestions</button>
@@ -75,7 +76,7 @@
           </div>
           <span id="saveState" class="save-state">Saved</span>
         </div>
-        <textarea id="codeEditor" spellcheck="false"># Select an RGB LED or Input example above.</textarea>
+        <textarea id="codeEditor" spellcheck="false"></textarea>
         <div id="editorIssueBar" class="editor-issue-bar" hidden></div>
       </div>
 
@@ -245,9 +246,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.20"></script>
-  <script src="./kit-client.js?v=5.20"></script>
-  <script src="./ai.js?v=5.20"></script>
-  <script src="./app.js?v=5.20"></script>
+  <script src="./config.js?v=5.21"></script>
+  <script src="./kit-client.js?v=5.21"></script>
+  <script src="./ai.js?v=5.21"></script>
+  <script src="./app.js?v=5.21"></script>
 </body>
 </html>

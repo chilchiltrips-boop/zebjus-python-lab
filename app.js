@@ -3,7 +3,9 @@
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
-  let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,kitReconnectBusy=false,activePotPin=34;
+  let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,kitReconnectBusy=false,kitHeartbeatPingBusy=false,activePotPin=34;
+  const KIT_FAILURE_LIMIT=5;
+  let kitFailureCount=0,kitEverConnected=false;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
 
@@ -14,13 +16,14 @@
   let sensorState={ultrasonicCm:45,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{}}};
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitIp:"",wsUrl:"",
+    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",
     demoUltrasonic:45,demoPot:128
   };
   function getSettings(){let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(e){}return {...defaults,...s};}
   let prefs=getSettings();
   if(!prefs.kitName&&prefs.kitId&&!/^ZB-/i.test(prefs.kitId))prefs.kitName=prefs.kitId;
+  if(kitClient){kitClient.name=prefs.kitName||"";kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=String(prefs.kitChipId||"");}
   sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
   sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
   sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
@@ -618,7 +621,8 @@ while True:
   function initEditor(){
     if(typeof CodeMirror==="undefined"){$("editorLoadError").hidden=false;return;}
     CodeMirror.registerHelper("hint","zebjusPython",hintProvider);
-    $("codeEditor").value=(prefs.autoSave?localStorage.getItem("zebjus.lab.code"):null)||examples.ledBasic;
+    const savedDraft=prefs.autoSave?localStorage.getItem("zebjus.lab.code"):null;
+    $("codeEditor").value=savedDraft!==null?savedDraft:examples.ledBasic;
     editor=CodeMirror.fromTextArea($("codeEditor"),{
       mode:"python",theme:"zebjus",lineNumbers:true,gutters:["CodeMirror-linenumbers","zebjus-errors"],indentUnit:4,tabSize:4,indentWithTabs:false,
       matchBrackets:true,autoCloseBrackets:true,styleActiveLine:true,
@@ -649,7 +653,13 @@ while True:
   }
 
   function getCode(){return editor?editor.getValue():$("codeEditor").value;}
-  function setCode(t){if(editor){editor.setValue(t);editor.focus();}}
+  function setCode(t){if(editor){editor.setValue(String(t??""));editor.focus();}}
+  function saveDraftNow(){if(!prefs.autoSave)return;localStorage.setItem("zebjus.lab.code",getCode());if($("saveState"))$("saveState").textContent="Saved";}
+  async function newProject(){
+    if(running)await stopProgram();
+    setCode("");clearEditorIssue();terminal.textContent="";saveDraftNow();
+    badge($("pythonStatus"),"Python ready","ok");
+  }
   function updateHistoryButtons(){
     if(!editor)return;const h=editor.historySize();
     if($("undoBtn"))$("undoBtn").disabled=!h.undo;if($("redoBtn"))$("redoBtn").disabled=!h.redo;
@@ -738,7 +748,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.20",{type:"module"});
+    worker=new Worker("./py-worker.js?v=5.21",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -912,6 +922,7 @@ while True:
       for(const r of specs.rotary){
         const d=await kitClient.rotary(r.clk,r.dt,r.sw,{pullup:r.pullup});updateSensorPacket(d);
       }
+      markKitSuccess(kitClient.status);
       return true;
     }catch(e){
       if(showError)log("Input read error: "+(e?.message||e));
@@ -1051,7 +1062,7 @@ while True:
       updateSensorGraphics();
     }
     if(!prefs.demoMode&&/\b(?:AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(liveCode)){
-      const ok=await refreshInputsFromKit(liveCode,false);if(!ok){await ensureKitConnected(false);await refreshInputsFromKit(liveCode,false);}
+      const ok=await refreshInputsFromKit(liveCode,false);if(!ok)scheduleSilentReconnect();
     }
     const frame=await refreshLiveAI();
     if(!liveMode||!running)return;
@@ -1191,21 +1202,82 @@ while True:
     postProgramToWorker(src,runFrame);
   }
 
-  function stopKitHeartbeat(){if(kitHeartbeatTimer){clearInterval(kitHeartbeatTimer);kitHeartbeatTimer=null;}}
+  function persistKitIdentity(st){
+    if(!st)return;
+    prefs.kitName=st.name||prefs.kitName||prefs.kitId||"";
+    prefs.kitId=prefs.kitName; // legacy field kept for compatibility
+    prefs.kitChipId=String(st.chipId||prefs.kitChipId||"");
+    if(st.ip)prefs.kitIp=st.ip; // DHCP/new-IP cache update
+    localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
+    if(kitClient){kitClient.name=prefs.kitName;kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=prefs.kitChipId||"";}
+    if($("kitNameText"))$("kitNameText").textContent=prefs.kitName||"No kit selected";
+  }
+
+  function markKitSuccess(st=null){
+    kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;
+    if(st)persistKitIdentity(st);
+    if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
+  }
+
+  function markKitFailure(reason=""){
+    kitFailureCount=Math.min(KIT_FAILURE_LIMIT,kitFailureCount+1);
+    if(kitEverConnected&&kitFailureCount<KIT_FAILURE_LIMIT){
+      // v5.21 no-blink rule: 1–4 misses keep the visible state Connected.
+      return false;
+    }
+    badge($("kitStatus"),"Kit disconnected");
+    if(kitFailureCount===KIT_FAILURE_LIMIT&&reason&&!kitCommandErrorShown){
+      log("Kit connection lost after 5 consecutive checks. Program is kept running; ESP outputs fail safe after 10 s without heartbeat.");
+      kitCommandErrorShown=true;
+    }
+    return true;
+  }
+
+  async function resumeRunSessionAfterReconnect(){
+    if(!running||!currentRunUsesKit)return;
+    try{await kitClient.pingRun();markKitSuccess(kitClient.status);}
+    catch(e){
+      if(e?.status===409){await kitClient.beginRun();markKitSuccess(kitClient.status);}
+      else throw e;
+    }
+  }
+
+  function scheduleSilentReconnect(){
+    if(prefs.demoMode||!kitClient||kitReconnectBusy||!(prefs.kitName||prefs.kitId))return;
+    kitReconnectBusy=true;
+    Promise.resolve().then(async()=>{
+      try{
+        if(!kitClient.name)kitClient.name=prefs.kitName||prefs.kitId||"";
+        kitClient.ipHint=prefs.kitIp||kitClient.ipHint||"";
+        kitClient.chipId=String(prefs.kitChipId||kitClient.chipId||"");
+        const st=await kitClient.reconnect(2);
+        markKitSuccess(st);
+        if(running&&currentRunUsesKit)await resumeRunSessionAfterReconnect();
+      }catch(_){/* failure counter is driven by health/heartbeat cycles, not every fallback address */}
+      finally{kitReconnectBusy=false;}
+    });
+  }
+
+  function stopKitHeartbeat(){if(kitHeartbeatTimer){clearInterval(kitHeartbeatTimer);kitHeartbeatTimer=null;}kitHeartbeatPingBusy=false;}
+
+  async function heartbeatTick(){
+    if(!running||!currentRunUsesKit||prefs.demoMode||kitHeartbeatPingBusy)return;
+    if(!kitClient?.base){markKitFailure("heartbeat");scheduleSilentReconnect();return;}
+    kitHeartbeatPingBusy=true;
+    try{await kitClient.pingRun();markKitSuccess(kitClient.status);}
+    catch(e){
+      if(e?.status===409){
+        try{await kitClient.beginRun();markKitSuccess(kitClient.status);}
+        catch(_){markKitFailure("heartbeat");scheduleSilentReconnect();}
+      }else{markKitFailure("heartbeat");scheduleSilentReconnect();}
+    }finally{kitHeartbeatPingBusy=false;}
+  }
 
   async function beginHardwareRun(){
     if(prefs.demoMode||!kitClient?.connected){currentRunUsesKit=false;return true;}
-    await kitClient.beginRun();
+    await kitClient.beginRun();markKitSuccess(kitClient.status);
     currentRunUsesKit=true;stopKitHeartbeat();
-    kitHeartbeatTimer=setInterval(()=>{
-      if(!running||!currentRunUsesKit||kitReconnectBusy)return;
-      kitClient.pingRun().catch(async()=>{
-        if(kitReconnectBusy)return;kitReconnectBusy=true;badge($("kitStatus"),"Reconnecting kit…","warn");
-        try{await kitClient.reconnect(4);await kitClient.beginRun();badge($("kitStatus"),"Kit connected","ok");kitCommandErrorShown=false;}
-        catch(_){badge($("kitStatus"),"Kit disconnected");}
-        finally{kitReconnectBusy=false;}
-      });
-    },1000);
+    kitHeartbeatTimer=setInterval(heartbeatTick,1000);
     return true;
   }
 
@@ -1293,7 +1365,7 @@ while True:
             else throw e;
           }
           if(!result?.skipped)applyDemo(p); // Mirror only after ESP32 acknowledges: screen and kit stay synchronized.
-          kitCommandErrorShown=false;
+          markKitSuccess(kitClient.status);
         }else if(ws?.readyState===WebSocket.OPEN){
           ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
           applyDemo(p);
@@ -1301,8 +1373,8 @@ while True:
           applyDemo(p);
         }
       }catch(e){
-        badge($("kitStatus"),"Kit error");
-        if(!kitCommandErrorShown){log("Kit command error: "+(e?.message||e));kitCommandErrorShown=true;}
+        // A temporary API miss must not stop the Python program or blink the UI.
+        scheduleSilentReconnect();
       }
       return;
     }
@@ -1310,28 +1382,27 @@ while True:
     if(ws?.readyState===WebSocket.OPEN){
       ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
       applyDemo(p);
-    }
+    }else scheduleSilentReconnect();
   }
 
-  async function ensureKitConnected(showError=true){
+  async function ensureKitConnected(showError=true,{silent=false}={}){
     if(prefs.demoMode)return true;
     const name=(prefs.kitName||prefs.kitId||"").trim();
     if(!name||!kitClient){if(showError)log("No physical kit selected. Open Settings → Kit Connection.");return false;}
     try{
-      badge($("kitStatus"),kitClient.connected?"Checking kit…":"Connecting kit…","warn");
+      if(!silent&&!kitEverConnected)badge($("kitStatus"),"Connecting kit…","warn");
+      kitClient.name=name;kitClient.ipHint=prefs.kitIp||kitClient.ipHint||"";kitClient.chipId=String(prefs.kitChipId||kitClient.chipId||"");
       let st;
-      if(kitClient.connected)st=await kitClient.ensureLive();
+      if(kitClient.connected)st=await kitClient.refresh();
       else{
-        kitClient.name=name;kitClient.ipHint=prefs.kitIp||"";
         try{st=await kitClient.connect(name,prefs.kitIp||"");}
-        catch(_){st=await kitClient.reconnect(4);}
+        catch(_){st=await kitClient.reconnect(2);}
       }
-      prefs.kitName=st.name||name;prefs.kitId=prefs.kitName;prefs.kitIp=st.ip||prefs.kitIp||"";
-      localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
-      $("kitNameText").textContent=prefs.kitName;badge($("kitStatus"),"Kit connected","ok");kitCommandErrorShown=false;return true;
+      markKitSuccess(st);return true;
     }catch(e){
-      badge($("kitStatus"),"Kit disconnected");
-      if(showError)log("Kit connection failed: "+(e?.message||e)+" Auto-reconnect was attempted. Check kit power and Wi-Fi.");
+      markKitFailure("health");scheduleSilentReconnect();
+      if(!kitEverConnected)badge($("kitStatus"),"Kit disconnected");
+      if(showError)log("Kit connection failed: "+(e?.message||e)+" Background reconnect will continue. Check kit power and Wi-Fi.");
       return false;
     }
   }
@@ -1339,10 +1410,13 @@ while True:
   function startKitHealthMonitor(){
     if(kitHealthTimer)clearInterval(kitHealthTimer);
     kitHealthTimer=setInterval(async()=>{
-      if(prefs.demoMode||running||kitReconnectBusy||!(prefs.kitName||prefs.kitId))return;
-      kitReconnectBusy=true;
-      try{await ensureKitConnected(false);}catch(_){}
-      finally{kitReconnectBusy=false;}
+      if(prefs.demoMode||running||!(prefs.kitName||prefs.kitId))return;
+      if(kitClient?.connected){
+        try{const st=await kitClient.refresh();markKitSuccess(st);}
+        catch(_){markKitFailure("health");scheduleSilentReconnect();}
+      }else{
+        markKitFailure("health");scheduleSilentReconnect();
+      }
     },4000);
   }
 
@@ -1353,9 +1427,9 @@ while True:
       if(!prefs.wsUrl?.startsWith("wss://"))return;
       try{
         ws=new WebSocket(prefs.wsUrl);
-        ws.onopen=()=>{ws.send(JSON.stringify({type:"hello",kitId:prefs.kitName||prefs.kitId}));badge($("kitStatus"),"Kit connected","ok");};
+        ws.onopen=()=>{ws.send(JSON.stringify({type:"hello",kitId:prefs.kitName||prefs.kitId}));markKitSuccess(kitClient?.status||null);};
         ws.onmessage=e=>{try{const d=JSON.parse(e.data);if(d.type==="sensor"||d.type==="sensors")updateSensorPacket(d);}catch(_){}};
-        ws.onclose=()=>badge($("kitStatus"),"Kit disconnected");
+        ws.onclose=()=>{markKitFailure("websocket");scheduleSilentReconnect();};
       }catch(_){/* optional legacy connection */}
     });
   }
@@ -1375,6 +1449,7 @@ while True:
   });
 
   $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.ledBasic);
+  $("newProjectBtn").onclick=newProject;
   $("resetBtn").onclick=()=>setCode(examples.ledBasic);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
   updateRunControls();
   $("cameraToggleBtn").onclick=()=>cameraRunning?stopCamera():startCamera();

@@ -1,4 +1,4 @@
-# ZEBJUS Universal Input Test Guide — v5.20
+# ZEBJUS Universal Input Test Guide — v5.21
 
 ## 1. Analog input / potentiometer
 

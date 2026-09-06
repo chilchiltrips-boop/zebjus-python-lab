@@ -76,7 +76,7 @@
     return payload||{};
   }
 
-  async function connect(name,ipHint=""){
+  async function connect(name,ipHint="",expectedChipId=""){
     const clean=normalizeKitName(name);
     if(clean.length<3)throw new Error("Enter a valid kit name (minimum 3 characters).");
     const bases=[];
@@ -90,9 +90,10 @@
       try{
         const status=await requestBase(base,"/api/status",{timeout:1800});
         if(status.kit!=="ZEBJUS")throw new Error("This device is not a ZEBJUS kit.");
-        if(normalizeKitName(status.name)!==clean && !base.includes(status.ip||"__none__")){
-          // The requested host may have been renamed. Accept verified ZEBJUS response and use returned name.
-        }
+        const actualChip=String(status.chipId||"");
+        const expectedChip=String(expectedChipId||"");
+        if(expectedChip&&actualChip!==expectedChip)throw new Error("Kit ID mismatch: cached address belongs to a different kit.");
+        if(!expectedChip&&normalizeKitName(status.name)!==clean)throw new Error("Kit name mismatch: cached address belongs to another kit.");
         rememberKit(status,base);
         return {status,base};
       }catch(e){lastErr=e;}
@@ -138,8 +139,7 @@
     }
     async connect(name,ipHint=""){
       const requested=normalizeKitName(name||this.name);
-      const r=await connect(requested,ipHint||this.ipHint);
-      if(this.chipId&&r.status?.chipId&&String(r.status.chipId)!==String(this.chipId))throw new Error("A different kit is using that network name. Re-scan kits in Settings.");
+      const r=await connect(requested,ipHint||this.ipHint,this.chipId);
       return this._accept(r.status,r.base);
     }
     disconnect({forgetIdentity=false}={}){
@@ -150,7 +150,7 @@
       if(!this.base)throw new Error("Kit not connected.");
       try{
         const st=await requestBase(this.base,"/api/status",{timeout:1400});
-        if(this.chipId&&st?.chipId&&String(st.chipId)!==String(this.chipId))throw new Error("Connected device identity changed.");
+        if(this.chipId&&String(st?.chipId||"")!==String(this.chipId))throw new Error("Connected device identity changed.");
         rememberKit(st,this.base);return this._accept(st,this.base);
       }catch(e){this.base="";this.status=null;throw e;}
     }
@@ -164,8 +164,7 @@
         for(let i=0;i<Math.max(1,retries);i++){
           if(waits[i])await new Promise(r=>setTimeout(r,waits[i]));
           try{
-            const r=await connect(name,ip);
-            if(this.chipId&&r.status?.chipId&&String(r.status.chipId)!==String(this.chipId))throw new Error("A different kit is using the saved name.");
+            const r=await connect(name,ip,this.chipId);
             return this._accept(r.status,r.base);
           }catch(e){last=e;}
         }
@@ -189,7 +188,7 @@
       await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();
       return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
     }
-    async pingRun(){return this._request("/api/run/ping",{method:"POST",data:{ping:1},timeout:1400},false);}
+    async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900});}
     async endRun(){
       if(!this.base)return {ok:true};
       this._commandEpoch++;this._commandChain=Promise.resolve();

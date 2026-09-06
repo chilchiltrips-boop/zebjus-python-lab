@@ -1,4 +1,4 @@
-# Current Student Projects — v5.20
+# Current Student Projects — v5.21
 
 Old placeholder projects have been removed from the Learning Example menu. New examples are added only when the corresponding hardware feature is implemented.
 

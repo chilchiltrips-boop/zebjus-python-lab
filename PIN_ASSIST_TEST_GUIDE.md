@@ -1,4 +1,4 @@
-# ZEBJUS Pin Assist Test Guide — v5.20
+# ZEBJUS Pin Assist Test Guide — v5.21
 
 ## 1. RGB suggestions
 
