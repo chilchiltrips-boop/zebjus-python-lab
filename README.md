@@ -1,162 +1,164 @@
-# ZEBJUS Python Lab v5.27 — Dynamic Sensor Dashboard
+# ZEBJUS Python Lab v6.0 — Universal Hardware Bridge
 
-v5.27 keeps the v5.21 stable kit connection architecture and the v5.22/v5.23 sensor features, then reorganizes the browser UI into a coding-first dark gradient grid. The editor receives most of the desktop viewport while live camera, plotting and upload tools remain visible in a narrow utility column.
+v6.0 changes the kit from a fixed list of sensor APIs into a **universal hardware-interface platform**. Existing RGB, LED, OLED, DHT11, Ultrasonic, AnalogInput, Switch, RotaryEncoder, Camera/MediaPipe, OpenCV, Serial Plotter, reconnect/heartbeat and dynamic sensor dashboard features are retained.
 
-## v5.27 additions
+## Main architecture
 
-## v5.27 component selector + import autocomplete
+The ESP32 firmware v2.0 exposes reusable low-level interfaces instead of requiring a new firmware route for every sensor:
 
-- `from zebjus import ...` now shows member suggestions after `import`, after commas, and for partial names. Matching is case-insensitive.
-- **Kit Output / Sensors** has an **Add component to main.py** selector. Selecting a supported component and pressing **+ Add** automatically adds the class to `from zebjus import ...`, inserts a starter constructor, chooses free supported GPIOs, and numbers repeated instances (`sw1`, `sw2`, `dht1`, `dht2`, `ultra1`, `ultra2`, etc.).
-- Selector labels show interface type and the current maximum when the component is used alone. Mixed projects may reach limits earlier because components share GPIOs.
-- Current limits shown by the UI: RGB LED 1 active, OLED 1 active, DHT11 up to 15 GPIO slots, Ultrasonic up to 10 GPIO pairs, Analog/Potentiometer 6 ADC1 inputs, Digital/Switch 19 inputs, Rotary Encoder 4 firmware slots.
-- Servo, Motor Driver, PWM Signal Sensor and true multi-LED Digital Output are visible as **planned** entries but are disabled until direct ESP firmware APIs exist. Existing bridge/demo `Motor`/`Servo` classes are retained for backward compatibility.
-- Supported hardware cards also show their interface badge (PWM, I²C, ADC1, Digital IN, etc.).
+- Digital GPIO input/output
+- ADC1 analog input
+- Generic LEDC PWM output
+- 2 × I²C buses
+- 2 × UART hardware ports
+- 2 × SPI buses
+- Pulse width input/output and frequency measurement
+- Local microsecond GPIO/pulse transaction VM
+- Existing OLED / DHT11 / Ultrasonic / Rotary / RGB / LED compatibility APIs
 
+This means future modules can normally be added with a Python driver only.
 
-- Serial Plotter moved to the lower data column and enlarged.
-- Output / Terminal is directly below Serial Plotter in the same column.
-- OpenCV / imshow output is enlarged for dashboards and vision projects.
-- Kit Output / Sensors is now generated dynamically from `main.py`.
-- `from zebjus import ...` order controls the dashboard card order.
-- Multiple `Switch`, `Potentiometer`, `AnalogInput`, `Ultrasonic`, `DHT11`, and `RotaryEncoder` instances receive separate live cards.
-- Sensor cards use live visual animations: switch toggle, rotary dial, analog knob, ultrasonic beam, DHT gauges, RGB glow, servo/motor motion.
-- OLED preview is enlarged to make 128x64 text readable while keeping pixel-crisp scaling.
-- When no supported hardware is referenced, the complete default dashboard remains visible.
-- In real-kit mode an unread sensor shows `WAITING` rather than a misleading demo value.
-
-
-## Stable kit connection retained
-
-- Cached IP primary → physical Kit ID verification → mDNS fallback.
-- 5 consecutive failures are required before the UI becomes Disconnected.
-- Failures 1–4 keep the visible state Connected.
-- Silent background reconnect; no routine Connecting ↔ Connected blinking.
-- Successful reconnect/API/heartbeat resets the failure counter.
-- New DHCP IP automatically updates the cached IP.
-- Run heartbeat every 1 second.
-- ESP output failsafe after 10 seconds without heartbeat.
-- Temporary Wi-Fi/API misses do not immediately stop the Python program.
-- `+ New Project` opens a blank editor; custom draft auto-save/restore is retained.
-
-## v5.23 sensor features retained
-
-- Physical `DHT11(pin=13)` API using `/api/input/dht11`.
-- Direct temperature °C and humidity %RH methods.
-- Legacy `get_values()` compatibility returns `[humidity×10, temperature×10]` so old projects that divide by 10 continue to work.
-- DHT11 card in **Kit Output / Sensors**.
-- Generic Python Serial Plotter: `plot(Temperature=t, Humidity=h)`.
-- `SerialPlotter().plot(...)` and `clear_plot()` helpers.
-- Serial Plotter works with future sensors too: ultrasonic, analog, light, gas, IMU values, etc.
-- 5 DHT11 examples added; current Learning Example menu has **25 examples**.
-- GPIO12 is additionally accepted for **Ultrasonic ECHO only** for users already using TRIG=14/ECHO=12. GPIO12 is a boot-strapping pin, so another ECHO GPIO is preferable for new builds.
-
-## v5.27 coding-first layout
-
-Desktop:
-
-1. Project controls
-2. Main workspace: large `main.py` editor (~80%+) + compact right utility column
-   - Camera / MediaPipe
-   - Image Upload
-3. Full-width dynamic Kit Output / Sensors dashboard
-4. Lower results workspace
-   - Large OpenCV / `imshow` output at left
-   - Serial Plotter above Output / Terminal in the right data column
-5. Compact Quick Tools / Project Reference
-
-The editor stays neutral/dark for comfortable coding. Gradient accents are restricted to dashboard panels, borders and controls. Tablet/mobile layouts keep the editor first and stack the remaining tools progressively.
-
-## DHT11 Python API
+## Python universal APIs
 
 ```python
-from zebjus import DHT11, sleep
-
-dht = DHT11(13)
-
-while True:
-    print(dht.temperature(), "C", dht.humidity(), "%")
-    sleep(1)
+from zebjus import (
+    DigitalOutput, GPIOInput, ADC, PWM,
+    I2C, I2CDevice, UART, SPI,
+    PulseInput, PulseOutput, HardwareTransaction,
+    PWMServo, MotorDriver, GPS, MPU6050,
+    dashboard, plot, sleep
+)
 ```
 
-Legacy project style:
+### I²C custom sensor
 
 ```python
-from zebjus import DHT11, sleep
+from zebjus import I2CDevice, dashboard, sleep
 
-b = DHT11(13)
+sensor = I2CDevice(0x76, 21, 22)
 
 while True:
-    vals = b.get_values()
-    humidity = vals[0] / 10.0
-    temperature = vals[1] / 10.0
-    print(f"Humidity: {humidity:.1f}% | Temp: {temperature:.1f} °C")
-    sleep(1)
+    data = sensor.read_registers(0xD0, 1)
+    chip_id = data[0] if data else 0
+    dashboard("My I2C Sensor", Chip_ID=hex(chip_id))
+    sleep(0.5)
 ```
 
-Serial Plotter:
+### UART / GPS
 
 ```python
-from zebjus import DHT11, plot, sleep
+from zebjus import GPS, sleep
 
-dht = DHT11(13)
+gps = GPS(rx=34, tx=16, baud=9600, port=1)
 
 while True:
-    t = dht.temperature()
-    h = dht.humidity()
-    plot(Temperature=t, Humidity=h)
-    sleep(1)
+    d = gps.read()
+    print(d)
+    sleep(0.2)
 ```
 
-## Recommended wiring
+### SPI
 
-- RGB LED: GPIO25 / GPIO26 / GPIO27
-- DHT11 DATA: GPIO13
-- Ultrasonic: TRIG GPIO14 / ECHO GPIO12 is supported for the current user setup; TRIG GPIO18 / ECHO GPIO19 remains a safer general default.
-- OLED: SDA GPIO21 / SCL GPIO22 / address `0x3C`
+```python
+from zebjus import SPI
 
-### DHT11 electrical note
+spi = SPI(sck=18, miso=19, mosi=23, cs=4, frequency=1000000, mode=0, bus=1)
+rx = spi.transfer([0x00, 0x00])
+```
 
-Prefer powering a DHT11 module from **3.3V** when its DATA pull-up is tied to VCC. If a module is powered from 5V and its DATA line is pulled up to 5V, do not feed that directly into ESP32 GPIO; use a 3.3V pull-up or suitable level shifting.
+### PWM servo
 
-### HC-SR04 electrical note
+```python
+from zebjus import PWMServo
 
-HC-SR04 ECHO is normally 5V. Use a voltage divider or level shifter before the ESP32 ECHO GPIO.
+servo = PWMServo(18)
+servo.write(90)
+```
+
+### Motor driver
+
+```python
+from zebjus import MotorDriver
+
+motor = MotorDriver(16, 17, 18)
+motor.forward(60)
+```
+
+## Live resource allocator
+
+The editor tracks both pins and hardware buses.
+
+Safe classic ESP32 DevKit pool used by this project:
+
+- Output / PWM: GPIO 4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33
+- Digital input: the above plus GPIO 34, 35, 36, 39; GPIO12 is permitted for selected input/pulse uses
+- Wi-Fi-safe ADC1: GPIO 32, 33, 34, 35, 36, 39
+- I²C controllers: 2
+- UART hardware ports exposed: 1 and 2
+- SPI buses exposed: 1 and 2
+
+I²C and SPI shared bus lines are counted once. Example: OLED and MPU6050 can both use SDA21/SCL22 on I²C bus 0 without consuming four pins. Assigning different SDA/SCL pairs to the same I²C bus number produces an editor `InterfaceConflictError`.
+
+## Custom sensor dashboard
+
+Any Python driver can publish values to **Kit Output / Sensors** without adding browser code:
+
+```python
+from zebjus import dashboard
+
+dashboard("Air Quality", CO2=612, Temperature=28.4, Status="OK")
+```
+
+The card is generated dynamically. The same values can also be graphed with `plot(...)`.
+
+## Timing-sensitive custom modules
+
+`HardwareTransaction` runs GPIO and pulse operations locally on the ESP32, so microsecond delays are not executed over Wi-Fi:
+
+```python
+from zebjus import HardwareTransaction
+
+txn = HardwareTransaction("sensor")
+result = txn.run([
+    ("MODE", 34, "IN"),
+    ("PULSEIN", 34, 1, 100000),
+])
+```
+
+Supported transaction operations in firmware v2.0: `MODE`, `WRITE`, `READ`, `ADC`, `DELAYUS`, `DELAYMS`, `PULSEIN`, `PULSEOUT`.
+
+## Important runtime model
+
+Browser Python is isolated in a Pyodide worker. Generic read calls use a non-blocking cached-response model: the Python call requests the next ESP32 read and returns the most recent value. In `while True` live projects, the next browser cycle receives the new result. This avoids freezing the editor/UI because of Wi-Fi latency. Existing dedicated DHT11/Ultrasonic/Analog/Digital APIs continue using their optimized polling path.
+
+## Connection safety retained
+
+- Cached IP primary
+- Physical Kit ID verification
+- mDNS fallback
+- 5 consecutive failures before UI becomes disconnected
+- Silent background reconnect
+- No Connecting ↔ Connected blink during temporary misses
+- 1-second browser heartbeat while a hardware run is active
+- 10-second ESP32 failsafe
+- Registered PWM/digital/RGB outputs safe OFF on heartbeat timeout
+- Bridge UART/SPI/I²C run resources released as applicable
+- OLED cleared on heartbeat timeout
 
 ## Firmware
 
-Upload:
+Use:
 
-`esp32_firmware/ZEBJUS_Kit_MultiGPIO_RGB_LED_Input_OLED_Ultrasonic_DHT11_WiFi_v1_7.ino`
+`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_0.ino`
 
-Required Arduino libraries for OLED:
+Required Arduino libraries for the retained OLED API:
 
 - Adafruit SSD1306
 - Adafruit GFX Library
 - Adafruit BusIO
 
-DHT11 support is implemented directly in the firmware, so no additional DHT library is required.
+Target: classic ESP32 / ESP32-WROOM-32 style DevKit with Arduino-ESP32 3.x.
 
+## Examples
 
-
-## v5.27 Live GPIO Allocator + numbered outputs
-
-The editor, Add Component selector, Pin Assist and Kit Output/Sensors now share the same GPIO resource model. The classic ESP32 DevKit profile exposes 15 safe output/PWM pins (`4,13,14,16,17,18,19,21,22,23,25,26,27,32,33`), 19 normal digital-input pins, six Wi-Fi-safe ADC1 pins (`32,33,34,35,36,39`), plus GPIO12 only as the special HC-SR04 ECHO option.
-
-Numbered output APIs are available for multi-device projects:
-
-```python
-from zebjus import LED1, LED2, RGBLED1, RGBLED2
-
-led1 = LED1(4)
-led2 = LED2(13)
-rgb1 = RGBLED1(25, 26, 27)
-rgb2 = RGBLED2(32, 33, 14)
-
-led1.on()
-led2.brightness(120)
-rgb1.red()
-rgb2.blue()
-```
-
-Autocomplete proposes the next free sequence (`LED1`, then `LED2`, etc.) and Add Component allocates conflict-free pins. Two RGB LEDs consume six output pins; every subsequent output-side component is calculated from the remaining output pool. Input-only pins are preferred for compatible sensors where practical to preserve output capacity. Firmware v1.7 tracks all active PWM pins and the 10-second heartbeat failsafe turns every registered LED/RGB/PWM output off.
+v6.0 contains 38 selectable examples, including legacy projects plus Universal Digital Output, ADC plotting, PWM Servo, Motor Driver, I²C scanner, custom I²C register device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and custom timing transaction projects.

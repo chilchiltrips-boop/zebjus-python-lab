@@ -8,7 +8,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
-  <link rel="stylesheet" href="./styles.css?v=5.27">
+  <link rel="stylesheet" href="./styles.css?v=6.0">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v5.27</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.0</span>
       <p>Python • OpenCV • MediaPipe • RGB • DHT11 • Ultrasonic • OLED • Inputs • Plotter</p>
     </div>
     <div class="top-actions">
@@ -66,6 +66,21 @@
               <option value="ultrasonicOled">Ultrasonic → OLED Text</option>
               <option value="ultrasonicRadar">Ultrasonic Radar Animation</option>
               <option value="ultrasonicDistanceBar">Ultrasonic Distance Bar</option>
+            </optgroup>
+            <optgroup label="Universal Hardware Bridge">
+              <option value="universalDigitalOutput">Digital Output / Relay</option>
+              <option value="universalAdcPlot">Any Analog Sensor → Plotter</option>
+              <option value="pwmServo">Physical Servo via PWM</option>
+              <option value="motorDriverUniversal">Motor Driver via GPIO + PWM</option>
+              <option value="i2cScan">I²C Bus Scanner</option>
+              <option value="customI2cDevice">Custom I²C Register Device</option>
+              <option value="gpsUniversal">GPS / GNSS via UART</option>
+              <option value="mpu6050Universal">MPU6050 IMU via I²C</option>
+              <option value="uartUniversal">Generic UART Module</option>
+              <option value="spiUniversal">Generic SPI Module</option>
+              <option value="pulseFrequency">Pulse / Frequency Sensor</option>
+              <option value="counterInput">Interrupt Counter / Flow / RPM</option>
+              <option value="customTransaction">Custom Timing Transaction</option>
             </optgroup>
           </select>
         </label>
@@ -194,9 +209,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=5.27"></script>
-  <script src="./kit-client.js?v=5.27"></script>
-  <script src="./ai.js?v=5.27"></script>
-  <script src="./app.js?v=5.27"></script>
+  <script src="./config.js?v=6.0"></script>
+  <script src="./kit-client.js?v=6.0"></script>
+  <script src="./ai.js?v=6.0"></script>
+  <script src="./app.js?v=6.0"></script>
 </body>
 </html>

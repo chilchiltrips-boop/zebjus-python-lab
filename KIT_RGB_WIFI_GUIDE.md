@@ -1,4 +1,4 @@
-# ZEBJUS Kit v1.7 — Wi-Fi, RGB, Universal Inputs, Ultrasonic and OLED
+# ZEBJUS Kit v2.0 — Wi-Fi, RGB, Universal Inputs, Ultrasonic and OLED
 
 ## Firmware
 
@@ -9,7 +9,7 @@ Upload:
 Expected Serial header:
 
 ```text
-ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC + DHT11 WiFi v1.7
+ZEBJUS KIT RGB + INPUT + OLED + ULTRASONIC + DHT11 WiFi v2.0
 ```
 
 The existing kit Wi-Fi workflow remains the same:

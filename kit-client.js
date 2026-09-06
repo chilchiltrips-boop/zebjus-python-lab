@@ -45,6 +45,10 @@
     return p.toString();
   }
 
+  function queryString(data){
+    const q=formBody(data);return q?"?"+q:"";
+  }
+
   async function fetchLocal(url,options={},timeoutMs=2200){
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
@@ -272,6 +276,39 @@
       };
       this._commandChain=this._commandChain.then(task,task);return this._commandChain;
     }
+    // Universal Hardware Bridge v2.0. These methods are interface-level, not sensor-specific.
+    async bridgeInfo(){return this._request("/api/bridge/info",{timeout:1800});}
+    async gpioRead(pin,{mode="input"}={}){
+      pin=Number(pin);return this._request("/api/bridge/gpio"+queryString({op:"read",pin,mode}),{timeout:1400});
+    }
+    async gpioWrite(pin,value){
+      return this._request("/api/bridge/gpio",{method:"POST",data:{op:"write",pin:Number(pin),value:value?1:0},timeout:1400});
+    }
+    async adc(pin){return this._request("/api/bridge/adc"+queryString({pin:Number(pin)}),{timeout:1400});}
+    async pwm(pin,duty,{frequency=1000,resolution=8}={}){
+      return this._request("/api/bridge/pwm",{method:"POST",data:{pin:Number(pin),duty:Number(duty),frequency:Number(frequency),resolution:Number(resolution)},timeout:1600});
+    }
+    async i2c({op="scan",bus=0,sda=21,scl=22,frequency=400000,address=null,reg=null,regWidth=1,length=null,data=null,stop=true}={}){
+      const payload={op,bus,sda,scl,frequency,address,reg,regWidth,length,stop:stop?1:0};
+      if(data!==null)payload.data=Array.isArray(data)?data.join(","):String(data);
+      const isRead=["scan","read","readreg"].includes(String(op).toLowerCase());
+      return isRead?this._request("/api/bridge/i2c"+queryString(payload),{timeout:2200}):this._request("/api/bridge/i2c",{method:"POST",data:payload,timeout:2200});
+    }
+    async uart({op="read",port=1,rx=16,tx=17,baud=9600,max=128,waitMs=0,data=null,text=null}={}){
+      const payload={op,port,rx,tx,baud,max,waitMs};if(data!==null)payload.data=Array.isArray(data)?data.join(","):String(data);if(text!==null)payload.text=String(text);
+      const read=["read","readline"].includes(String(op).toLowerCase());return read?this._request("/api/bridge/uart"+queryString(payload),{timeout:1800}):this._request("/api/bridge/uart",{method:"POST",data:payload,timeout:1800});
+    }
+    async spi({bus=1,sck=18,miso=19,mosi=23,cs=4,frequency=1000000,mode=0,lsbFirst=false,activeLow=true,data=[]}={}){
+      return this._request("/api/bridge/spi",{method:"POST",data:{bus,sck,miso,mosi,cs,frequency,mode,lsbFirst:lsbFirst?1:0,activeLow:activeLow?1:0,data:Array.from(data||[]).join(",")},timeout:2200});
+    }
+    async pulse({op="in",pin,state=1,timeoutUs=100000,widthUs=10}={}){
+      const payload={op,pin:Number(pin),state:state?1:0,timeoutUs:Number(timeoutUs),widthUs:Number(widthUs)};const isRead=["in","frequency"].includes(String(op).toLowerCase());return isRead?this._request("/api/bridge/pulse"+queryString(payload),{timeout:2200}):this._request("/api/bridge/pulse",{method:"POST",data:payload,timeout:2200});
+    }
+    async counter({op="read",pin,edge="rising",pullup=false}={}){
+      const payload={op,pin:Number(pin),edge:String(edge||"rising"),pullup:pullup?1:0};const read=String(op).toLowerCase()!=="reset";return read?this._request("/api/bridge/counter"+queryString(payload),{timeout:1600}):this._request("/api/bridge/counter",{method:"POST",data:payload,timeout:1600});
+    }
+    async transaction(ops){return this._request("/api/bridge/transaction",{method:"POST",data:{ops:String(ops||"")},timeout:3500});}
+
     async rename(name){
       if(!this.base)await this.reconnect(4);const clean=normalizeKitName(name);if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");
       return this._request("/api/name",{method:"POST",data:{name:clean},timeout:4500},false);
@@ -286,6 +323,6 @@
   }
 
   global.ZebjusKit={
-    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS,SAFE_ADC_PINS,SAFE_DIGITAL_PINS
+    KitClient,normalizeKitName,hostFromName,baseFromName,scanDefaultKits,loadKnown,rememberKit,SAFE_RGB_PINS,SAFE_ADC_PINS,SAFE_DIGITAL_PINS,SAFE_ULTRASONIC_ECHO_PINS
   };
 })(window);

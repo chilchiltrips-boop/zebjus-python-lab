@@ -22,6 +22,8 @@ _face_state=[]
 _hand_landmarks=[]
 _sensor_state={"ultrasonic_cm":45.0,"dht_temperature":28.0,"dht_humidity":65.0,"dht_pin":13,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
 _input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
+_bridge_state={"gpio":{},"adc":{},"pwm":{},"i2c":{},"uart":{},"spi":{},"pulse":{},"counter":{},"transaction":{}}
+_gps_state={}
 _current_frame=None
 _loaded_image=None
 
@@ -298,6 +300,237 @@ class RotaryEncoder:
     @property
     def value(self): return self.position()
 
+
+# ---------------- UNIVERSAL HARDWARE BRIDGE v2 ----------------
+def _bridge_get(group,key,default=None):
+    try: return _bridge_state.get(group,{}).get(str(key),default)
+    except Exception: return default
+
+def _bridge_cmd(command,key,**kwargs):
+    _send(command,key=str(key),**kwargs)
+
+def _bytes(v):
+    if v is None: return []
+    if isinstance(v,(bytes,bytearray)): return [int(x)&255 for x in v]
+    if isinstance(v,str): return [ord(x)&255 for x in v]
+    return [int(x)&255 for x in list(v)]
+
+def dashboard(name,**values):
+    clean={}
+    for k,v in values.items():
+        if isinstance(v,(int,float,bool,str)): clean[str(k)]=v
+        else: clean[str(k)]=str(v)
+    postMessage(to_js({"type":"sensor-card","name":str(name),"json":json.dumps(clean)},dict_converter=js.Object.fromEntries))
+    return clean
+
+class DigitalOutput:
+    __zebjus_ui__={"type":"digital_output"}
+    def __init__(self,pin,active_high=True,initial=False):
+        self.pin=int(pin);self.active_high=bool(active_high)
+        if self.pin not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"DigitalOutput pin {self.pin} must be one of {SUPPORTED_OUTPUT_PINS}")
+        self.write(initial)
+    def write(self,value):
+        logical=bool(value);physical=logical if self.active_high else not logical
+        _bridge_cmd("BRIDGE_GPIO_WRITE",f"gpio:{self.pin}",pin=self.pin,value=1 if physical else 0)
+        return logical
+    def on(self): return self.write(True)
+    def off(self): return self.write(False)
+    def toggle(self):
+        d=_bridge_get("gpio",f"gpio:{self.pin}",{}) or {};return self.write(not bool(d.get("value",0)))
+
+class Relay(DigitalOutput): pass
+
+class GPIOInput:
+    __zebjus_ui__={"type":"digital_input"}
+    def __init__(self,pin,pull=None,active_low=False):
+        self.pin=int(pin);self.pull=str(pull or "input").lower();self.active_low=bool(active_low)
+        if self.pin not in SUPPORTED_ULTRASONIC_ECHO_PINS: raise ValueError("Unsupported GPIO input pin")
+    def state(self):
+        key=f"gpio:{self.pin}";_bridge_cmd("BRIDGE_GPIO_READ",key,pin=self.pin,mode=self.pull)
+        d=_bridge_get("gpio",key,{}) or {};return int(d.get("value",0))
+    def read(self):
+        v=bool(self.state());return not v if self.active_low else v
+    @property
+    def value(self): return self.read()
+
+class ADC:
+    __zebjus_ui__={"type":"analog"}
+    def __init__(self,pin):
+        self.pin=int(pin)
+        if self.pin not in SUPPORTED_ADC_PINS: raise ValueError(f"ADC pin must be one of {SUPPORTED_ADC_PINS}")
+    def _read(self):
+        key=f"adc:{self.pin}";_bridge_cmd("BRIDGE_ADC_READ",key,pin=self.pin);return _bridge_get("adc",key,{}) or {}
+    def raw(self): return int(self._read().get("raw",0))
+    def millivolts(self): return int(self._read().get("millivolts",0))
+    def read(self): return self.raw()
+    def percent(self): return max(0.0,min(100.0,self.raw()*100.0/4095.0))
+    @property
+    def value(self): return self.raw()
+
+class PWM:
+    __zebjus_ui__={"type":"pwm_output"}
+    def __init__(self,pin,frequency=1000,resolution=8,duty=0):
+        self.pin=int(pin);self.frequency=int(frequency);self.resolution=max(1,min(14,int(resolution)))
+        if self.pin not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"PWM pin must be one of {SUPPORTED_OUTPUT_PINS}")
+        self.write(duty)
+    @property
+    def max_duty(self): return (1<<self.resolution)-1
+    def write(self,duty):
+        duty=max(0,min(self.max_duty,int(duty)));_bridge_cmd("BRIDGE_PWM_SET",f"pwm:{self.pin}",pin=self.pin,duty=duty,frequency=self.frequency,resolution=self.resolution);return duty
+    def duty(self,value): return self.write(value)
+    def percent(self,value): return self.write(round(self.max_duty*max(0,min(100,float(value)))/100.0))
+    def off(self): return self.write(0)
+
+class PWMServo:
+    __zebjus_ui__={"type":"servo"}
+    def __init__(self,pin,min_us=500,max_us=2500,frequency=50):
+        self.pin=int(pin);self.min_us=int(min_us);self.max_us=int(max_us);self.frequency=int(frequency);self.pwm=PWM(pin,frequency,14,0)
+    def write(self,angle=90):
+        angle=max(0.0,min(180.0,float(angle)));us=self.min_us+(self.max_us-self.min_us)*(angle/180.0);period=1000000.0/self.frequency;duty=round(self.pwm.max_duty*us/period);self.pwm.write(duty);return angle
+    def angle(self,value): return self.write(value)
+    def write_us(self,microseconds):
+        period=1000000.0/self.frequency;duty=round(self.pwm.max_duty*max(0,float(microseconds))/period);return self.pwm.write(duty)
+    def detach(self): self.pwm.off()
+
+class MotorDriver:
+    __zebjus_ui__={"type":"motor"}
+    def __init__(self,in1,in2,pwm_pin,frequency=18000):
+        self.in1=DigitalOutput(in1);self.in2=DigitalOutput(in2);self.pwm=PWM(pwm_pin,frequency,8,0)
+    def forward(self,speed=100): self.in1.on();self.in2.off();self.pwm.percent(speed)
+    def backward(self,speed=100): self.in1.off();self.in2.on();self.pwm.percent(speed)
+    def stop(self): self.pwm.off();self.in1.off();self.in2.off()
+    def brake(self): self.pwm.off();self.in1.on();self.in2.on()
+
+class I2C:
+    __zebjus_ui__={"type":"i2c"}
+    def __init__(self,sda=21,scl=22,frequency=400000,bus=0):
+        self.sda=int(sda);self.scl=int(scl);self.frequency=int(frequency);self.bus=1 if int(bus)==1 else 0
+        if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS or self.sda==self.scl: raise ValueError("I2C SDA/SCL must be different safe GPIO pins")
+    def _key(self,op,address=0,reg=-1,length=0): return f"i2c:{self.bus}:{self.sda}:{self.scl}:{op}:{int(address)}:{int(reg)}:{int(length)}"
+    def scan(self):
+        key=self._key("scan");_bridge_cmd("BRIDGE_I2C",key,op="scan",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency);d=_bridge_get("i2c",key,{}) or {};return list(d.get("addresses",[]))
+    def writeto(self,address,data,stop=True):
+        key=self._key("write",address);_bridge_cmd("BRIDGE_I2C",key,op="write",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency,address=int(address),data=_bytes(data),stop=bool(stop));return True
+    def readfrom(self,address,length):
+        key=self._key("read",address,-1,length);_bridge_cmd("BRIDGE_I2C",key,op="read",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency,address=int(address),length=int(length));d=_bridge_get("i2c",key,{}) or {};return bytes(int(x)&255 for x in d.get("data",[]))
+    def write_register(self,address,register,value,reg_width=1):
+        data=_bytes(value if isinstance(value,(list,tuple,bytes,bytearray)) else [value]);key=self._key("writereg",address,register,len(data));_bridge_cmd("BRIDGE_I2C",key,op="writereg",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency,address=int(address),reg=int(register),regWidth=int(reg_width),data=data,stop=True);return True
+    def read_registers(self,address,register,length,reg_width=1):
+        key=self._key("readreg",address,register,length);_bridge_cmd("BRIDGE_I2C",key,op="readreg",bus=self.bus,sda=self.sda,scl=self.scl,frequency=self.frequency,address=int(address),reg=int(register),regWidth=int(reg_width),length=int(length));d=_bridge_get("i2c",key,{}) or {};return [int(x)&255 for x in d.get("data",[])]
+
+class I2CDevice:
+    def __init__(self,address,sda=21,scl=22,frequency=400000,bus=0): self.address=int(address);self.bus=I2C(sda,scl,frequency,bus)
+    def read(self,length): return self.bus.readfrom(self.address,length)
+    def write(self,data): return self.bus.writeto(self.address,data)
+    def read_registers(self,register,length,reg_width=1): return self.bus.read_registers(self.address,register,length,reg_width)
+    def write_register(self,register,value,reg_width=1): return self.bus.write_register(self.address,register,value,reg_width)
+
+class UART:
+    __zebjus_ui__={"type":"uart"}
+    def __init__(self,rx=16,tx=17,baud=9600,port=1):
+        self.rx=int(rx);self.tx=int(tx);self.baud=int(baud);self.port=2 if int(port)==2 else 1
+        if self.rx not in SUPPORTED_ULTRASONIC_ECHO_PINS or self.tx not in SUPPORTED_OUTPUT_PINS or self.rx==self.tx: raise ValueError("UART needs different valid RX/TX GPIO pins")
+    @property
+    def key(self): return f"uart:{self.port}:{self.rx}:{self.tx}"
+    def write(self,data): _bridge_cmd("BRIDGE_UART",self.key,op="write",port=self.port,rx=self.rx,tx=self.tx,baud=self.baud,data=_bytes(data));return True
+    def print(self,text): _bridge_cmd("BRIDGE_UART",self.key,op="write",port=self.port,rx=self.rx,tx=self.tx,baud=self.baud,text=str(text));return True
+    def read(self,max_bytes=128):
+        _bridge_cmd("BRIDGE_UART",self.key,op="read",port=self.port,rx=self.rx,tx=self.tx,baud=self.baud,max=int(max_bytes));d=_bridge_get("uart",self.key,{}) or {};return bytes(int(x)&255 for x in d.get("data",[]))
+    def readline(self,max_bytes=160):
+        _bridge_cmd("BRIDGE_UART",self.key,op="readline",port=self.port,rx=self.rx,tx=self.tx,baud=self.baud,max=int(max_bytes),waitMs=5);d=_bridge_get("uart",self.key,{}) or {};return str(d.get("text",""))
+    def available(self): return int((_bridge_get("uart",self.key,{}) or {}).get("available",0))
+
+class SPI:
+    __zebjus_ui__={"type":"spi"}
+    def __init__(self,sck=18,miso=19,mosi=23,cs=4,frequency=1000000,mode=0,bus=1,lsb_first=False,active_low=True):
+        self.sck=int(sck);self.miso=int(miso);self.mosi=int(mosi);self.cs=int(cs);self.frequency=int(frequency);self.mode=int(mode);self.bus=2 if int(bus)==2 else 1;self.lsb_first=bool(lsb_first);self.active_low=bool(active_low)
+    @property
+    def key(self): return f"spi:{self.bus}:{self.sck}:{self.miso}:{self.mosi}:{self.cs}"
+    def transfer(self,data):
+        payload=_bytes(data);_bridge_cmd("BRIDGE_SPI",self.key,bus=self.bus,sck=self.sck,miso=self.miso,mosi=self.mosi,cs=self.cs,frequency=self.frequency,mode=self.mode,lsbFirst=self.lsb_first,activeLow=self.active_low,data=payload);d=_bridge_get("spi",self.key,{}) or {};return bytes(int(x)&255 for x in d.get("data",[]))
+    def write(self,data): self.transfer(data);return True
+
+class PulseInput:
+    __zebjus_ui__={"type":"pulse_input"}
+    def __init__(self,pin,state=1,timeout_us=100000): self.pin=int(pin);self.state=1 if state else 0;self.timeout_us=int(timeout_us)
+    @property
+    def key(self): return f"pulse:{self.pin}:{self.state}"
+    def read_us(self): _bridge_cmd("BRIDGE_PULSE",self.key,op="in",pin=self.pin,state=self.state,timeoutUs=self.timeout_us);return int((_bridge_get("pulse",self.key,{}) or {}).get("microseconds",0))
+    def frequency(self): _bridge_cmd("BRIDGE_PULSE",self.key,op="frequency",pin=self.pin,state=self.state,timeoutUs=self.timeout_us);return float((_bridge_get("pulse",self.key,{}) or {}).get("hz",0.0))
+
+class PulseOutput:
+    def __init__(self,pin): self.pin=int(pin)
+    def pulse_us(self,width_us,state=1): _bridge_cmd("BRIDGE_PULSE",f"pulseout:{self.pin}",op="out",pin=self.pin,state=1 if state else 0,widthUs=int(width_us));return True
+
+class CounterInput:
+    """Interrupt-backed pulse counter for flow, Hall/RPM, reed and frequency-output sensors."""
+    __zebjus_ui__={"type":"counter_input"}
+    def __init__(self,pin,edge="rising",pullup=False):
+        self.pin=int(pin);self.edge=str(edge).lower();self.pullup=bool(pullup);self.key=f"counter:{self.pin}:{self.edge}";self._last_request=0.0
+    def _sample(self):
+        now=time.time()
+        if now-self._last_request>0.03:
+            _bridge_cmd("BRIDGE_COUNTER",self.key,op="read",pin=self.pin,edge=self.edge,pullup=self.pullup);self._last_request=now
+        return _bridge_get("counter",self.key,{}) or {}
+    def snapshot(self): return dict(self._sample())
+    def read(self): return int(self._sample().get("count",0))
+    def count(self): return self.read()
+    def frequency(self): return float(self._sample().get("hz",0.0))
+    def delta(self): return int(self._sample().get("delta",0))
+    def reset(self): _bridge_cmd("BRIDGE_COUNTER",self.key,op="reset",pin=self.pin,edge=self.edge,pullup=self.pullup);self._last_request=0.0;return True
+
+class HardwareTransaction:
+    """Run compact GPIO/pulse timing operations locally on ESP32. Results arrive on the next live cycle."""
+    def __init__(self,key="custom"): self.key=str(key)
+    def run(self,ops):
+        if isinstance(ops,(list,tuple)): ops=";".join(",".join(str(x) for x in row) if isinstance(row,(list,tuple)) else str(row) for row in ops)
+        _bridge_cmd("BRIDGE_TRANSACTION",self.key,ops=str(ops));return list((_bridge_get("transaction",self.key,{}) or {}).get("results",[]))
+
+class GPS:
+    """Generic NMEA GPS driver over UART. Works with NEO-6M/7M/M8N and similar NMEA modules."""
+    __zebjus_ui__={"type":"gps"}
+    def __init__(self,rx=16,tx=17,baud=9600,port=1): self.uart=UART(rx,tx,baud,port);self.key=self.uart.key
+    @staticmethod
+    def _coord(raw,hemi):
+        try:
+            v=float(raw);deg=int(v//100);mins=v-deg*100;out=deg+mins/60.0;return -out if hemi in ("S","W") else out
+        except Exception:return None
+    def read(self):
+        text=self.uart.readline(220);st=_gps_state.setdefault(self.key,{"latitude":None,"longitude":None,"altitude":None,"speed":0.0,"course":0.0,"satellites":0,"hdop":None,"fix":False,"utc":""})
+        for line in str(text).replace("\\r","\r").replace("\\n","\n").splitlines():
+            parts=line.strip().split(",");
+            if not parts: continue
+            typ=parts[0][-3:]
+            try:
+                if typ=="GGA" and len(parts)>9:
+                    st.update(latitude=self._coord(parts[2],parts[3]),longitude=self._coord(parts[4],parts[5]),fix=parts[6] not in ("","0"),satellites=int(parts[7] or 0),hdop=float(parts[8]) if parts[8] else None,altitude=float(parts[9]) if parts[9] else None,utc=parts[1])
+                elif typ=="RMC" and len(parts)>8:
+                    st.update(latitude=self._coord(parts[3],parts[4]),longitude=self._coord(parts[5],parts[6]),fix=parts[2]=="A",speed=float(parts[7] or 0)*1.852,course=float(parts[8] or 0),utc=parts[1])
+            except Exception: pass
+        dashboard("GPS",Latitude=st.get("latitude"),Longitude=st.get("longitude"),Satellites=st.get("satellites",0),Speed_kmh=round(float(st.get("speed",0)),2),Fix=st.get("fix",False))
+        return dict(st)
+    @property
+    def latitude(self): return self.read().get("latitude")
+    @property
+    def longitude(self): return self.read().get("longitude")
+
+class MPU6050:
+    """Common MPU6050 I2C IMU driver using the universal I2C bridge."""
+    __zebjus_ui__={"type":"imu"}
+    def __init__(self,sda=21,scl=22,address=0x68,bus=0): self.dev=I2CDevice(address,sda,scl,400000,bus);self.dev.write_register(0x6B,0)
+    @staticmethod
+    def _s16(a,b):
+        v=(int(a)<<8)|int(b);return v-65536 if v&0x8000 else v
+    def read(self):
+        d=self.dev.read_registers(0x3B,14);d=(d+[0]*14)[:14];ax=self._s16(d[0],d[1])/16384.0;ay=self._s16(d[2],d[3])/16384.0;az=self._s16(d[4],d[5])/16384.0;temp=self._s16(d[6],d[7])/340.0+36.53;gx=self._s16(d[8],d[9])/131.0;gy=self._s16(d[10],d[11])/131.0;gz=self._s16(d[12],d[13])/131.0
+        out={"accel_x":ax,"accel_y":ay,"accel_z":az,"gyro_x":gx,"gyro_y":gy,"gyro_z":gz,"temperature":temp};dashboard("MPU6050",AccX=round(ax,3),AccY=round(ay,3),AccZ=round(az,3),GyroX=round(gx,2),GyroY=round(gy,2),GyroZ=round(gz,2));return out
+
+# Common analog modules can share one generic ADC driver without firmware changes.
+class LDR(ADC): pass
+class SoilMoisture(ADC): pass
+class GasSensor(ADC): pass
+class VoltageSensor(ADC): pass
+
 def sleep(seconds): time.sleep(float(seconds))
 
 def _close_cv_windows():
@@ -495,11 +728,12 @@ sys.modules["HandTrackingModule"]=htm_mod;sys.modules["zebjus_wifi"]=wifi_mod
 z=types.ModuleType("zebjus")
 for k,v in {
     "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
-    "plot":plot,"clear_plot":clear_plot,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,"sleep":sleep
+    "plot":plot,"clear_plot":clear_plot,"dashboard":dashboard,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,
+    "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"sleep":sleep
 }.items(): setattr(z,k,v)
 for i,c in LED_CLASSES.items(): setattr(z,f"LED{i}",c)
 for i,c in RGBLED_CLASSES.items(): setattr(z,f"RGBLED{i}",c)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
@@ -613,6 +847,7 @@ cv2.destroyAllWindows=_close_cv_windows
   pyodide.globals.set("__pot_percent",Math.max(0,Math.min(100,Number(m.sensorState?.potPercent)||0)));
   pyodide.globals.set("__pot_mv",Math.max(0,Number(m.sensorState?.potMillivolts)||0));
   pyodide.globals.set("__inputs_json",JSON.stringify(m.sensorState?.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}}));
+  pyodide.globals.set("__bridge_json",JSON.stringify(m.sensorState?.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},transaction:{}}));
 
   await pyodide.runPythonAsync(`
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
@@ -623,6 +858,7 @@ _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
 _sensor_state={"ultrasonic_cm":float(__ultra),"dht_temperature":float(__dht_t),"dht_humidity":float(__dht_h),"dht_pin":int(__dht_pin),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
 _input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
+_bridge_state=json.loads(str(__bridge_json)) if str(__bridge_json) else {"gpio":{},"adc":{},"pwm":{},"i2c":{},"uart":{},"spi":{},"pulse":{},"counter":{},"transaction":{}}
 _current_frame=None
 _loaded_image=None
   `);
@@ -634,7 +870,7 @@ if(Array.isArray(m.uploadedFiles)&&m.uploadedFiles.length)await syncUploadedFile
   }
 
   let execCode=code;
-  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:DHT11|Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(code);
+  const legacyLoop=/\bwhile\s+True\s*:/.test(code)&&/\bcv2\.VideoCapture\s*\(|\bSerialObject\s*\(|\bHandTrackingModule\b|\bWifiBridge\s*\(|\bHandDetector\s*\(|\bFaceDetector\s*\(|\b(?:DHT11|Potentiometer|AnalogInput|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(code);
   if(legacyLoop){
     execCode=code.replace(/\bwhile\s+True\s*:/,"for __zebjus_browser_cycle in range(1):");
   }

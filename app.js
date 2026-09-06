@@ -15,7 +15,8 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}}};
+  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}}};
+  const customDashboardCards=new Map();
   const plotter={series:new Map(),maxPoints:180,seq:0};
 
   const defaults={
@@ -421,7 +422,167 @@ oled = OLED()
 while True:
     cm = ultra.read()
     oled.distance_bar(cm, max_cm=400, title="ULTRASONIC")
-    sleep(0.12)`
+    sleep(0.12)`,
+
+    universalDigitalOutput:`# Universal Digital Output / Relay
+from zebjus import DigitalOutput, sleep
+
+out = DigitalOutput(4)
+
+while True:
+    out.on()
+    sleep(0.5)
+    out.off()
+    sleep(0.5)`,
+
+    universalAdcPlot:`# Any Analog Sensor -> Serial Plotter
+from zebjus import ADC, plot, sleep
+
+sensor = ADC(34)
+
+while True:
+    raw = sensor.raw()
+    mv = sensor.millivolts()
+    plot(Raw=raw, Millivolts=mv)
+    print("ADC:", raw, "|", mv, "mV")
+    sleep(0.15)`,
+
+    pwmServo:`# Physical Servo through Universal PWM
+from zebjus import PWMServo, sleep
+
+servo = PWMServo(18)
+
+while True:
+    servo.write(20)
+    sleep(0.7)
+    servo.write(90)
+    sleep(0.7)
+    servo.write(160)
+    sleep(0.7)`,
+
+    motorDriverUniversal:`# L298N / TB6612-style Motor Driver
+from zebjus import MotorDriver, sleep
+
+motor = MotorDriver(16, 17, 18)
+
+while True:
+    motor.forward(65)
+    sleep(1)
+    motor.stop()
+    sleep(0.5)
+    motor.backward(45)
+    sleep(1)
+    motor.stop()
+    sleep(0.5)`,
+
+    i2cScan:`# Universal I2C Scanner
+from zebjus import I2C, sleep
+
+bus = I2C(21, 22, 400000, 0)
+
+while True:
+    addresses = bus.scan()
+    print("I2C addresses:", [hex(x) for x in addresses])
+    sleep(1)`,
+
+    customI2cDevice:`# Custom I2C Register Device
+# Change ADDRESS / registers using your sensor datasheet.
+from zebjus import I2CDevice, dashboard, sleep
+
+ADDRESS = 0x76
+sensor = I2CDevice(ADDRESS, 21, 22)
+
+while True:
+    # Example: read one identification register.
+    chip_id = sensor.read_registers(0xD0, 1)
+    value = chip_id[0] if chip_id else 0
+    print("Chip ID:", hex(value))
+    dashboard("Custom I2C Sensor", Address=hex(ADDRESS), Chip_ID=hex(value))
+    sleep(0.5)`,
+
+    gpsUniversal:`# GPS / GNSS over UART (NEO-6M / NEO-7M / M8N NMEA)
+from zebjus import GPS, plot, sleep
+
+# GPS TX -> ESP32 RX34, GPS RX -> ESP32 TX16
+gps = GPS(rx=34, tx=16, baud=9600, port=1)
+
+while True:
+    data = gps.read()
+    print("Fix:", data["fix"], "Lat:", data["latitude"], "Lon:", data["longitude"], "Sats:", data["satellites"])
+    plot(Satellites=data["satellites"], Speed_kmh=data["speed"])
+    sleep(0.2)`,
+
+    mpu6050Universal:`# MPU6050 IMU over Universal I2C
+from zebjus import MPU6050, plot, sleep
+
+imu = MPU6050(21, 22, 0x68, 0)
+
+while True:
+    d = imu.read()
+    print("Accel:", round(d["accel_x"], 3), round(d["accel_y"], 3), round(d["accel_z"], 3))
+    plot(AccX=d["accel_x"], AccY=d["accel_y"], AccZ=d["accel_z"])
+    sleep(0.08)`,
+
+    uartUniversal:`# Generic UART Serial Module
+from zebjus import UART, sleep
+
+serial = UART(rx=34, tx=16, baud=9600, port=1)
+
+while True:
+    line = serial.readline()
+    if line:
+        print("UART:", line)
+    sleep(0.1)`,
+
+    spiUniversal:`# Generic SPI Transfer
+# Edit pins, mode, frequency and command bytes for your module datasheet.
+from zebjus import SPI, sleep
+
+spi = SPI(sck=18, miso=19, mosi=23, cs=4, frequency=1000000, mode=0, bus=1)
+
+while True:
+    response = spi.transfer([0x00, 0x00])
+    print("SPI RX:", list(response))
+    sleep(0.5)`,
+
+    pulseFrequency:`# Pulse Width / Frequency Sensor
+from zebjus import PulseInput, plot, sleep
+
+pulse = PulseInput(34, state=1, timeout_us=100000)
+
+while True:
+    width = pulse.read_us()
+    hz = pulse.frequency()
+    print("Pulse:", width, "us |", round(hz, 2), "Hz")
+    plot(Pulse_us=width, Frequency=hz)
+    sleep(0.15)`,
+
+    counterInput:`# Interrupt Counter - Flow / Hall / RPM Sensor
+from zebjus import CounterInput, plot, sleep
+
+counter = CounterInput(34, edge="rising", pullup=False)
+
+while True:
+    count = counter.read()
+    hz = counter.frequency()
+    print("Count:", count, "| Frequency:", round(hz, 2), "Hz")
+    plot(Count=count, Frequency=hz)
+    sleep(0.25)`,
+
+    customTransaction:`# Custom Timing Sensor - Local ESP32 Transaction VM
+from zebjus import HardwareTransaction, sleep
+
+txn = HardwareTransaction("my_sensor")
+
+while True:
+    # Operations run locally on ESP32, so microsecond timing is not affected by Wi-Fi.
+    result = txn.run([
+        ("MODE", 34, "IN"),
+        ("PULSEIN", 34, 1, 100000),
+    ])
+    if result:
+        print("Captured pulse:", result[0], "us")
+    sleep(0.15)`
   };
 
   const libraries=[
@@ -440,7 +601,11 @@ while True:
   const moduleMembers={
     zebjus:[
       ["RGBLED","class","RGBLED","Legacy/default RGB LED API"],["LED","class","LED","Legacy RGB-white compatibility API"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
-      ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],["Motor","class","Motor","Bridge API only; direct ESP motor-driver route planned"],["Servo","class","Servo","Bridge API only; direct ESP servo route planned"],["sleep","function","sleep","Delay"]
+      ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],
+      ["DigitalOutput","class","DigitalOutput","Universal digital output"],["Relay","class","Relay","Relay / digital output"],["GPIOInput","class","GPIOInput","Universal GPIO input"],["ADC","class","ADC","Raw ADC1 interface"],["PWM","class","PWM","Generic LEDC PWM output"],["PWMServo","class","PWMServo","Physical servo using generic PWM"],["MotorDriver","class","MotorDriver","2 direction pins + PWM"],
+      ["I2C","class","I2C","Generic I²C bus; custom sensor drivers"],["I2CDevice","class","I2CDevice","Generic addressed I²C device"],["UART","class","UART","Generic UART for GPS/RFID/serial modules"],["SPI","class","SPI","Generic SPI bus"],["PulseInput","class","PulseInput","Pulse width / frequency sensor"],["PulseOutput","class","PulseOutput","Precise pulse output"],["CounterInput","class","CounterInput","Interrupt-backed pulse counter / flow / RPM"],["HardwareTransaction","class","HardwareTransaction","Local GPIO/pulse transaction VM"],
+      ["GPS","class","GPS","NMEA GPS over UART"],["MPU6050","class","MPU6050","I²C IMU driver"],["LDR","class","LDR","ADC light sensor alias"],["SoilMoisture","class","SoilMoisture","ADC soil sensor alias"],["GasSensor","class","GasSensor","ADC gas sensor alias"],["VoltageSensor","class","VoltageSensor","ADC voltage sensor alias"],["dashboard","function","dashboard","Show custom live sensor card"],
+      ["Motor","class","Motor","Legacy bridge API"],["Servo","class","Servo","Legacy bridge API"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
     cvzone:[["putTextRect","function","putTextRect","Text box"],["cornerRect","function","cornerRect","Corner rectangle"],["FaceDetectionModule","module","FaceDetectionModule","Face detector module"]],
@@ -493,6 +658,23 @@ while True:
     RotaryEncoder:[["position()","method","position()","Accumulated rotary position"],["delta()","method","delta()","Change since latest read"],["direction()","method","direction()","CW / CCW / NONE"],["pressed()","method","pressed()","Rotary push switch"],["switch_state()","method","switch_state()","Raw switch 0/1"],["value","property","value","Same as position"]],
     Motor:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Backward"],["stop()","method","stop()","Stop"]],
     Servo:[["write()","method","write()","Angle"]],
+    DigitalOutput:[["on()","method","on()","HIGH / active"],["off()","method","off()","LOW / inactive"],["write()","method","write()","Write boolean"],["toggle()","method","toggle()","Toggle output"]],
+    Relay:[["on()","method","on()","Relay on"],["off()","method","off()","Relay off"],["write()","method","write()","Set relay"]],
+    GPIOInput:[["read()","method","read()","Boolean input"],["state()","method","state()","Raw 0/1"]],
+    ADC:[["raw()","method","raw()","0–4095"],["millivolts()","method","millivolts()","mV"],["percent()","method","percent()","0–100%"]],
+    PWM:[["write()","method","write()","Raw PWM duty"],["percent()","method","percent()","0–100%"],["off()","method","off()","PWM off"]],
+    PWMServo:[["write()","method","write()","Angle 0–180"],["angle()","method","angle()","Angle"],["write_us()","method","write_us()","Pulse microseconds"],["detach()","method","detach()","Output off"]],
+    MotorDriver:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Reverse"],["stop()","method","stop()","Coast/stop"],["brake()","method","brake()","Brake"]],
+    I2C:[["scan()","method","scan()","Find I²C addresses"],["readfrom()","method","readfrom()","Read bytes"],["writeto()","method","writeto()","Write bytes"],["read_registers()","method","read_registers()","Read register bytes"],["write_register()","method","write_register()","Write register"]],
+    I2CDevice:[["read()","method","read()","Read bytes"],["write()","method","write()","Write bytes"],["read_registers()","method","read_registers()","Read registers"],["write_register()","method","write_register()","Write register"]],
+    UART:[["read()","method","read()","Read bytes"],["readline()","method","readline()","Read serial line"],["write()","method","write()","Write bytes"],["print()","method","print()","Write text"],["available()","method","available()","Buffered bytes"]],
+    SPI:[["transfer()","method","transfer()","Full-duplex SPI transfer"],["write()","method","write()","SPI write"]],
+    PulseInput:[["read_us()","method","read_us()","Pulse width µs"],["frequency()","method","frequency()","Frequency Hz"]],
+    CounterInput:[["snapshot()","method","snapshot()","Count + delta + frequency"],["read()","method","read()","Total pulse count"],["count()","method","count()","Total pulse count"],["frequency()","method","frequency()","Recent pulse frequency Hz"],["delta()","method","delta()","Pulses since previous read"],["reset()","method","reset()","Reset counter"]],
+    PulseOutput:[["pulse_us()","method","pulse_us()","Output pulse"]],
+    HardwareTransaction:[["run()","method","run()","Run local timing operations"]],
+    GPS:[["read()","method","read()","GPS fix dictionary"],["latitude","property","latitude","Latitude"],["longitude","property","longitude","Longitude"]],
+    MPU6050:[["read()","method","read()","Accel/gyro/temp dictionary"]],
     HandDetector:[["read()","method","read()","Stable hand snapshot"]],
     HandResult:[["detected","property","detected","Detected"],["fingers","property","fingers","0–5"],["side","property","side","Side"]],
     Camera:[["read()","method","read()","Camera frame"]],
@@ -505,7 +687,7 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*LED\\d+\\s*\\(").test(code))return "SingleLED";
@@ -521,7 +703,7 @@ while True:
   function filterItems(items,prefix){const p=String(prefix||"").toLowerCase();return items.filter(x=>x[0].replace(/\(\)$/,"").toLowerCase().startsWith(p)).map(hintItem);}
 
   // ---------- GPIO pin assistance / validation ----------
-  // v5.27 uses one live resource model for autocomplete, Add Component, linting and dashboard order.
+  // v6.0 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
   // Classic ESP32 DevKit: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
@@ -543,7 +725,27 @@ while True:
     {className:"RotaryEncoder",label:"Rotary Encoder",group:"Inputs",interface:"2–3 × Digital IN",max:4,prefix:"encoder",status:"ready",pinCost:{input:3}},
     {className:"Servo",label:"Servo",group:"Future / bridge",interface:"PWM OUT",max:0,prefix:"servo",status:"planned",note:"Direct ESP firmware servo route not enabled yet"},
     {className:"Motor",label:"Motor Driver",group:"Future / bridge",interface:"PWM + DIR",max:0,prefix:"motor",status:"planned",note:"Direct ESP firmware motor-driver route not enabled yet"},
-    {className:"PWMInput",label:"PWM Signal Sensor",group:"Future / bridge",interface:"Pulse / Digital IN",max:0,prefix:"pwm",status:"planned",note:"Planned pulse-width input API"}
+    {className:"PWMInput",label:"PWM Signal Sensor",group:"Future / bridge",interface:"Pulse / Digital IN",max:0,prefix:"pwm",status:"planned",note:"Use PulseInput in v6"},
+    {className:"DigitalOutput",label:"Digital Output / LED / Relay",group:"Universal Bridge",interface:"1 × Digital OUT",max:15,prefix:"out",status:"ready",pinCost:{out:1}},
+    {className:"Relay",label:"Relay",group:"Universal Bridge",interface:"1 × Digital OUT",max:15,prefix:"relay",status:"ready",pinCost:{out:1}},
+    {className:"GPIOInput",label:"GPIO Input",group:"Universal Bridge",interface:"1 × Digital IN",max:20,prefix:"gin",status:"ready",pinCost:{input:1}},
+    {className:"ADC",label:"ADC Sensor",group:"Universal Bridge",interface:"ADC1 IN",max:6,prefix:"adc",status:"ready",pinCost:{adc:1}},
+    {className:"PWM",label:"PWM Output",group:"Universal Bridge",interface:"1 × PWM OUT",max:15,prefix:"pwm",status:"ready",pinCost:{out:1}},
+    {className:"PWMServo",label:"Servo",group:"Universal Bridge",interface:"1 × PWM OUT",max:15,prefix:"servo",status:"ready",pinCost:{out:1}},
+    {className:"MotorDriver",label:"Motor Driver",group:"Universal Bridge",interface:"2 DIR + 1 PWM OUT",max:5,prefix:"motor",status:"ready",pinCost:{out:3}},
+    {className:"I2C",label:"I²C Bus",group:"Universal Buses",interface:"2 shared GPIO · 2 buses",max:2,prefix:"i2c",status:"ready",pinCost:{out:2}},
+    {className:"UART",label:"UART Serial Bus",group:"Universal Buses",interface:"RX + TX · 2 ports",max:2,prefix:"uart",status:"ready",pinCost:{out:1,input:1}},
+    {className:"SPI",label:"SPI Bus",group:"Universal Buses",interface:"SCK/MISO/MOSI/CS · 2 buses",max:2,prefix:"spi",status:"ready",pinCost:{out:3,input:1}},
+    {className:"PulseInput",label:"Pulse / Frequency Input",group:"Universal Bridge",interface:"1 × Digital IN",max:20,prefix:"pulse",status:"ready",pinCost:{input:1}},
+    {className:"CounterInput",label:"Interrupt Counter / Flow / RPM",group:"Universal Bridge",interface:"1 × interrupt Digital IN",max:8,prefix:"counter",status:"ready",pinCost:{input:1}},
+    {className:"PulseOutput",label:"Pulse Output",group:"Universal Bridge",interface:"1 × Digital OUT",max:15,prefix:"pulseOut",status:"ready",pinCost:{out:1}},
+    {className:"HardwareTransaction",label:"Custom Timing Transaction",group:"Universal Buses",interface:"GPIO/pulse local VM",max:8,prefix:"txn",status:"ready",pinCost:{}},
+    {className:"GPS",label:"GPS / GNSS (NMEA)",group:"Ready Drivers",interface:"UART RX + TX",max:2,prefix:"gps",status:"ready",pinCost:{out:1,input:1}},
+    {className:"MPU6050",label:"MPU6050 IMU",group:"Ready Drivers",interface:"I²C shared bus",max:2,prefix:"imu",status:"ready",pinCost:{out:2}},
+    {className:"LDR",label:"LDR / Light Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"ldr",status:"ready",pinCost:{adc:1}},
+    {className:"SoilMoisture",label:"Soil Moisture",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"soil",status:"ready",pinCost:{adc:1}},
+    {className:"GasSensor",label:"Analog Gas Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"gas",status:"ready",pinCost:{adc:1}},
+    {className:"VoltageSensor",label:"Voltage Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"voltage",status:"ready",pinCost:{adc:1}}
   ];
   const PIN_HINT_ORDER={
     SingleLED:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
@@ -554,7 +756,10 @@ while True:
     RotaryEncoder:[32,33,14,27,26,25,4,13,16,17,18,19,21,22,23,34,35,36,39],
     Ultrasonic:[14,18,16,17,21,22,23,25,26,27,32,33,4,13,19],
     DHT11:[13,4,14,16,17,18,19,23,25,26,27,32,33,21,22],
-    OLED:[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14]
+    OLED:[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14],
+    DigitalOutput:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],Relay:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],PWM:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],PWMServo:[18,19,16,17,25,26,27,32,33,4,13,14,21,22,23],PulseOutput:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
+    ADC:[34,35,36,39,32,33],LDR:[34,35,36,39,32,33],SoilMoisture:[34,35,36,39,32,33],GasSensor:[34,35,36,39,32,33],VoltageSensor:[34,35,36,39,32,33],
+    GPIOInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],PulseInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],CounterInput:[34,35,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23]
   };
 
   function numberedTokenInfo(token){
@@ -563,7 +768,7 @@ while True:
   }
   function canonicalHardwareClass(token){
     const n=numberedTokenInfo(token);if(n)return n.base==="LED"?"SingleLED":"RGBLED";
-    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"].includes(token)?token:null;
+    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo"].includes(token)?token:null;
   }
   function sequenceNumbers(src,base){
     const nums=new Set();const re=new RegExp("\\b"+base+"(\\d+)\\b","g");let m;
@@ -573,7 +778,7 @@ while True:
     const used=sequenceNumbers(src,base);for(let i=1;i<=max;i++)if(!used.has(i))return i;return null;
   }
   function gpioResourceState(src){
-    const entries=pinEntries(src),used=new Set(entries.map(x=>x.pin));
+    const entries=allPinEntries(src),used=new Set(entries.map(x=>x.pin));
     const freeOut=RGB_OUTPUT_PINS.filter(p=>!used.has(p));
     const freeDigital=DIGITAL_INPUT_PINS.filter(p=>!used.has(p));
     const freeAdc=ANALOG_INPUT_PINS.filter(p=>!used.has(p));
@@ -618,8 +823,26 @@ while True:
     });return out;
   }
 
+  function allPinEntries(src){
+    const base=pinEntries(src),out=[...base],lines=String(src||"").split(/\r?\n/);
+    const add=(pin,line,role,kind,valid,offset=1,shareKey="",shareChannel="")=>{if(Number.isFinite(pin))out.push({pin:Number(pin),line,role,kind,valid,offset,shareKey,shareChannel});};
+    // Mark OLED as shareable I2C bus 0.
+    const oledByLine=new Map();for(const e of out.filter(x=>x.kind==="OLED")){if(!oledByLine.has(e.line))oledByLine.set(e.line,[]);oledByLine.get(e.line).push(e);}for(const arr of oledByLine.values()){const sda=arr.find(x=>/SDA/.test(x.role)),scl=arr.find(x=>/SCL/.test(x.role));if(sda&&scl){const key=`i2c:0:${sda.pin}:${scl.pin}`;sda.shareKey=scl.shareKey=key;sda.shareChannel="sda";scl.shareChannel="scl";}}
+    lines.forEach((text,i)=>{const clean=text.replace(/#.*$/,""),line=i+1;let m;
+      const dout=/\b(DigitalOutput|Relay|PWM|PWMServo|PulseOutput)\s*\(([^)]*)\)/g;while((m=dout.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" output",m[1],RGB_OUTPUT_PINS,m.index+1);}
+      const adc=/\b(ADC|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^)]*)\)/g;while((m=adc.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" ADC",m[1],ANALOG_INPUT_PINS,m.index+1);}
+      const gin=/\b(GPIOInput|PulseInput|CounterInput)\s*\(([^)]*)\)/g;while((m=gin.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" input",m[1],ULTRASONIC_ECHO_PINS,m.index+1);}
+      const motor=/\bMotorDriver\s*\(([^)]*)\)/g;while((m=motor.exec(clean))){const a=m[1],p1=parseNumberArg(a,"in1",0,null),p2=parseNumberArg(a,"in2",1,null),pwm=parseNumberArg(a,"pwm_pin",2,null);if(p1!==null)add(p1,line,"Motor IN1","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(p2!==null)add(p2,line,"Motor IN2","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(pwm!==null)add(pwm,line,"Motor PWM","MotorDriver",RGB_OUTPUT_PINS,m.index+1);}
+      const i2c=/\b(I2C|MPU6050)\s*\(([^)]*)\)/g;while((m=i2c.exec(clean))){const a=m[2],isImu=m[1]==="MPU6050",sda=parseNumberArg(a,"sda",0,21),scl=parseNumberArg(a,"scl",1,22),bus=parseNumberArg(a,"bus",isImu?3:3,0);const key=`i2c:${bus}:${sda}:${scl}`;add(sda,line,m[1]+" SDA",m[1],RGB_OUTPUT_PINS,m.index+1,key,"sda");add(scl,line,m[1]+" SCL",m[1],RGB_OUTPUT_PINS,m.index+1,key,"scl");}
+      const i2cd=/\bI2CDevice\s*\(([^)]*)\)/g;while((m=i2cd.exec(clean))){const a=m[1],sda=parseNumberArg(a,"sda",1,21),scl=parseNumberArg(a,"scl",2,22),bus=parseNumberArg(a,"bus",4,0),key=`i2c:${bus}:${sda}:${scl}`;add(sda,line,"I2CDevice SDA","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"sda");add(scl,line,"I2CDevice SCL","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"scl");}
+      const uart=/\b(UART|GPS)\s*\(([^)]*)\)/g;while((m=uart.exec(clean))){const a=m[2],rx=parseNumberArg(a,"rx",0,16),tx=parseNumberArg(a,"tx",1,17);add(rx,line,m[1]+" RX",m[1],ULTRASONIC_ECHO_PINS,m.index+1);add(tx,line,m[1]+" TX",m[1],RGB_OUTPUT_PINS,m.index+1);}
+      const spi=/\bSPI\s*\(([^)]*)\)/g;while((m=spi.exec(clean))){const a=m[1],sck=parseNumberArg(a,"sck",0,18),miso=parseNumberArg(a,"miso",1,19),mosi=parseNumberArg(a,"mosi",2,23),cs=parseNumberArg(a,"cs",3,4),bus=parseNumberArg(a,"bus",6,1),key=`spi:${bus}:${sck}:${miso}:${mosi}`;add(sck,line,"SPI SCK","SPI",RGB_OUTPUT_PINS,m.index+1,key,"sck");add(miso,line,"SPI MISO","SPI",ULTRASONIC_ECHO_PINS,m.index+1,key,"miso");add(mosi,line,"SPI MOSI","SPI",RGB_OUTPUT_PINS,m.index+1,key,"mosi");add(cs,line,"SPI CS","SPI",RGB_OUTPUT_PINS,m.index+1);}
+    });
+    return out;
+  }
+
   function hardwarePinValidation(src){
-    const entries=pinEntries(src);
+    const entries=allPinEntries(src);
     for(const e of entries){
       if(!e.valid.includes(e.pin)){
         const allowed=e.valid.map(p=>"GPIO"+p).join(", ");
@@ -630,20 +853,25 @@ while True:
     for(const e of entries){
       if(used.has(e.pin)){
         const first=used.get(e.pin);
-        return {errorType:"PinConflictError",line:e.line,offset:e.offset,message:`GPIO${e.pin} is already used by ${first.role} on line ${first.line}.`,suggestion:`Use a different GPIO for ${e.role}. The same physical pin cannot be assigned twice in one program.`};
-      }
-      used.set(e.pin,e);
+        const shared=first.shareKey&&e.shareKey&&first.shareKey===e.shareKey&&first.shareChannel===e.shareChannel;
+        if(!shared)return {errorType:"PinConflictError",line:e.line,offset:e.offset,message:`GPIO${e.pin} is already used by ${first.role} on line ${first.line}.`,suggestion:`Use a different GPIO for ${e.role}. I²C/SPI bus lines may be shared only when the bus and signal match.`};
+      }else used.set(e.pin,e);
     }
+    const busSeen=new Map();
+    for(const e of entries.filter(x=>x.shareKey)){const family=String(e.shareKey).split(":")[0],bus=String(e.shareKey).split(":")[1],k=`${family}:${bus}`,cfg=e.shareKey;if(busSeen.has(k)&&busSeen.get(k).cfg!==cfg){const first=busSeen.get(k);return {errorType:"InterfaceConflictError",line:e.line,offset:e.offset,message:`${family.toUpperCase()} bus ${bus} is already configured with different pins on line ${first.line}.`,suggestion:`Reuse the same ${family.toUpperCase()} bus pins for multiple devices, or select the other hardware bus.`};}if(!busSeen.has(k))busSeen.set(k,{cfg,line:e.line});}
+    const uartSeen=new Map(),lines=String(src||"").split(/\r?\n/);
+    lines.forEach((text,i)=>{let m;const re=/\b(UART|GPS)\s*\(([^)]*)\)/g,clean=text.replace(/#.*$/,"");while((m=re.exec(clean))){const a=m[2],rx=parseNumberArg(a,"rx",0,16),tx=parseNumberArg(a,"tx",1,17),port=parseNumberArg(a,"port",3,1),cfg=`${rx}:${tx}`;if(uartSeen.has(port)&&uartSeen.get(port).cfg!==cfg)uartSeen.set(`conflict:${i+1}`,{port,first:uartSeen.get(port),line:i+1,offset:m.index+1});else if(!uartSeen.has(port))uartSeen.set(port,{cfg,line:i+1});}});
+    for(const [k,v] of uartSeen)if(String(k).startsWith("conflict:"))return {errorType:"InterfaceConflictError",line:v.line,offset:v.offset,message:`UART port ${v.port} is already assigned to different RX/TX pins on line ${v.first.line}.`,suggestion:"Use UART port 1 and 2 for two independent serial modules, or share one UART object when devices use the same connection."};
     return null;
   }
 
   function pinHintContext(cm){
     const cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
-    const m=left.match(/\b(RGBLED(?:\d+)?|LED\d+|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED)\s*\(([^()]*)$/);if(!m)return null;
+    const m=left.match(/\b(RGBLED(?:\d+)?|LED\d+|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|PulseInput|PulseOutput|CounterInput|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^()]*)$/);if(!m)return null;
     const token=m[1],type=/^LED\d+$/.test(token)?"SingleLED":/^RGBLED\d+$/.test(token)?"RGBLED":token,args=m[2],parts=args.split(","),argIndex=Math.max(0,parts.length-1);
-    if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;
+    if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;if(["DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","PulseInput","PulseOutput","CounterInput","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(type)&&argIndex>0)return null;
     const currentPart=parts[parts.length-1]||"",prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];if(prefix===undefined)return null;
-    const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1])),usedElsewhere=pinEntries(full).map(x=>x.pin);
+    const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1])),usedElsewhere=allPinEntries(full).map(x=>x.pin);
     let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
     pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
     const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — free ${type} pin · ${pins.length} compatible free`,className:"hint-constant"}));
@@ -839,7 +1067,7 @@ while True:
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    // v5.27: import-member completion also works after commas and with partial names.
+    // v6.0: import-member completion also works after commas and with partial names.
     m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cv2|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s*(.*)$/);
     if(m){
       const moduleName=m[1],tail=m[2]||"",segment=(tail.split(",").pop()||"").replace(/^\s*\(?\s*/,"");
@@ -996,7 +1224,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=5.27",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.0",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1056,6 +1284,7 @@ while True:
       else if(m.type==="kit-command")handleKit(m.payload);
       else if(m.type==="plot")handlePlotPacket(m);
       else if(m.type==="plot-clear")clearPlotter();
+      else if(m.type==="sensor-card"){updateCustomSensorCard(m.name,m.json);}
       else if(m.type==="image"){
         // Keep Camera / MediaPipe as the live camera panel. cv2.imshow()/show() belongs in the dedicated output panel below Terminal.
         showImage(m.dataUrl);
@@ -1180,6 +1409,14 @@ while True:
     if(item.className==="AnalogInput"||item.className==="Potentiometer"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="Switch"||item.className==="DigitalInput"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="RotaryEncoder"){const free=PIN_HINT_ORDER.RotaryEncoder.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
+    if(["DigitalOutput","Relay","PWM","PWMServo","PulseOutput"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||RGB_OUTPUT_PINS,used);return p==null?null:String(p);}
+    if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||ANALOG_INPUT_PINS,used);return p==null?null:String(p);}
+    if(["GPIOInput","PulseInput","CounterInput"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||DIGITAL_INPUT_PINS,used);return p==null?null:String(p);}
+    if(item.className==="MotorDriver"){const free=RGB_OUTPUT_PINS.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
+    if(item.className==="I2C"||item.className==="MPU6050"){const existing=allPinEntries(src).find(e=>e.shareKey&&String(e.shareKey).startsWith("i2c:0:"));if(item.className==="MPU6050"&&existing){const parts=existing.shareKey.split(":");return `${parts[2]}, ${parts[3]}, 0x68, 0`;}if(item.className==="I2C"&&constructorCount(src,"I2C")===0&&existing){const parts=existing.shareKey.split(":");return `${parts[2]}, ${parts[3]}, 400000, 0`;}const free=PIN_HINT_ORDER.OLED.filter(p=>!used.has(p));if(free.length<2)return null;const bus=item.className==="I2C"&&constructorCount(src,"I2C")>0?1:0;return item.className==="MPU6050"?`${free[0]}, ${free[1]}, 0x68, ${bus}`:`${free[0]}, ${free[1]}, 400000, ${bus}`; }
+    if(item.className==="UART"||item.className==="GPS"){const rx=firstFree([34,35,36,39,32,33,19,18,16,17,14,13,4,21,22,23,25,26,27],used);if(rx==null)return null;const u2=new Set(used);u2.add(rx);const tx=firstFree(RGB_OUTPUT_PINS,u2);if(tx==null)return null;const port=Math.min(2,constructorCount(src,"UART")+constructorCount(src,"GPS")+1);return `${rx}, ${tx}, 9600, ${port}`;}
+    if(item.className==="SPI"){const freeOut=RGB_OUTPUT_PINS.filter(p=>!used.has(p));if(freeOut.length<3)return null;const sck=freeOut[0],mosi=freeOut[1],cs=freeOut[2],u2=new Set(used);u2.add(sck);u2.add(mosi);u2.add(cs);const miso=firstFree([34,35,36,39,19,18,32,33,14,13,4,16,17,21,22,23,25,26,27],u2);if(miso==null)return null;const bus=Math.min(2,constructorCount(src,"SPI")+1);return `${sck}, ${miso}, ${mosi}, ${cs}, 1000000, 0, ${bus}`;}
+    if(item.className==="HardwareTransaction")return `"custom${constructorCount(src,"HardwareTransaction")+1}"`;
     return "1";
   }
   function importTokenForComponent(item,src){
@@ -1193,7 +1430,7 @@ while True:
   }
   function insertHardwareConstructor(src,line){
     const lines=String(src||"").split("\n");let lastImport=-1;for(let i=0;i<lines.length;i++)if(/^\s*(?:from\s+\S+\s+import\b|import\s+\S+)/.test(lines[i]))lastImport=i;let at=lastImport+1;while(at<lines.length&&lines[at].trim()==="")at++;
-    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Motor|Servo)\s*\(/.test(lines[at]))at++;
+    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|Motor|Servo)\s*\(/.test(lines[at]))at++;
     lines.splice(at,0,line);if(at+1<lines.length&&lines[at+1].trim()!=="")lines.splice(at+1,0,"");return lines.join("\n");
   }
   function allocatorSummary(src){const st=gpioResourceState(src);return `GPIO free · OUT ${st.freeOut.length}/${RGB_OUTPUT_PINS.length} · Digital ${st.freeDigital.length}/${DIGITAL_INPUT_PINS.length} · ADC1 ${st.freeAdc.length}/${ANALOG_INPUT_PINS.length}`;}
@@ -1208,11 +1445,11 @@ while True:
   }
 
 
-  // v5.27: Build the Kit Output / Sensors dashboard
+  // v6.0: Build the Kit Output / Sensors dashboard
 
-  // v5.27: Build the Kit Output / Sensors dashboard from the student's source code.
+  // v6.0: Build the Kit Output / Sensors dashboard from the student's source code.
   // Import order controls card order. Multiple constructor instances become separate cards.
-  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","Motor","Servo"]);
+  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo"]);
   const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder"];
 
   function parseCtorNumber(args,name,index,defaultValue=null){
@@ -1254,6 +1491,15 @@ while True:
       spec.type="motor";spec.title="Motor";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
     }else if(c==="Servo"){
       spec.type="servo";spec.title="Servo";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
+    }else if(c==="DigitalOutput"||c==="Relay"||c==="PWM"||c==="PulseOutput"){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(c==="GPIOInput"||c==="PulseInput"||c==="CounterInput"){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(c)){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`ADC GPIO${spec.pin}`;
+    }else if(c==="PWMServo"){spec.type="servo";spec.title="PWM Servo";spec.pin=parseCtorNumber(args,"pin",0,null);spec.id=spec.pin;spec.identity=String(spec.pin);
+    }else if(c==="MotorDriver"){spec.type="motor";spec.title="Motor Driver";spec.in1=parseCtorNumber(args,"in1",0,null);spec.in2=parseCtorNumber(args,"in2",1,null);spec.pwm=parseCtorNumber(args,"pwm_pin",2,null);spec.id=spec.pwm;spec.identity=`${spec.in1},${spec.in2},${spec.pwm}`;
+    }else if(c==="I2C"||c==="I2CDevice"||c==="MPU6050"){spec.type="bridge";spec.title=c==="MPU6050"?"MPU6050 IMU":c;const off=c==="I2CDevice"?1:0;spec.sda=parseCtorNumber(args,"sda",off,21);spec.scl=parseCtorNumber(args,"scl",off+1,22);spec.bus=parseCtorNumber(args,"bus",c==="MPU6050"?3:(c==="I2CDevice"?4:3),0);spec.identity=`${spec.bus}:${spec.sda},${spec.scl}`;spec.detail=`I²C bus ${spec.bus} · SDA ${spec.sda} · SCL ${spec.scl}`;
+    }else if(c==="UART"||c==="GPS"){spec.type="bridge";spec.title=c==="GPS"?"GPS / GNSS":"UART";spec.rx=parseCtorNumber(args,"rx",0,16);spec.tx=parseCtorNumber(args,"tx",1,17);spec.port=parseCtorNumber(args,"port",3,1);spec.identity=`${spec.port}:${spec.rx},${spec.tx}`;spec.detail=`UART${spec.port} · RX ${spec.rx} · TX ${spec.tx}`;
+    }else if(c==="SPI"){spec.type="bridge";spec.title="SPI";spec.sck=parseCtorNumber(args,"sck",0,18);spec.miso=parseCtorNumber(args,"miso",1,19);spec.mosi=parseCtorNumber(args,"mosi",2,23);spec.cs=parseCtorNumber(args,"cs",3,4);spec.bus=parseCtorNumber(args,"bus",6,1);spec.identity=`${spec.bus}:${spec.sck},${spec.miso},${spec.mosi},${spec.cs}`;spec.detail=`SPI${spec.bus} · SCK ${spec.sck} · MISO ${spec.miso} · MOSI ${spec.mosi} · CS ${spec.cs}`;
+    }else if(c==="HardwareTransaction"){spec.type="bridge";spec.title="Custom Hardware Transaction";spec.identity=variable||"custom";spec.detail="Local GPIO / pulse timing VM";
     }else return null;
     return spec;
   }
@@ -1316,7 +1562,8 @@ while True:
     if(sp.type==="digital")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="digital"><div class="switch-visual" data-role="switch-visual"><i></i></div><div class="demo-grow">${head}<span class="sensor-primary switch-state-text" data-role="switch-label">WAITING</span><span class="sensor-secondary">GPIO${sp.pin}</span></div></div>`;
     if(sp.type==="rotary")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="rotary"><div class="rotary-visual"><div class="rotary-dial" data-role="rotary-dial"></div><div class="rotary-press" data-role="rotary-press"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rotary-label">Position 0</span><span class="sensor-secondary" data-role="rotary-detail">CLK ${sp.clk} · DT ${sp.dt}${sp.sw>=0?` · SW ${sp.sw}`:""}</span></div></div>`;
     if(sp.type==="motor")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="motor"><div class="motor-visual" data-role="motor-visual">M</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="motor-label">Stopped</span><div class="analog-bar"><i data-role="motor-fill"></i></div><span class="sensor-secondary">Motor ID ${sp.id}</span></div></div>`;
-    if(sp.type==="servo")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="servo"><div class="servo-visual"><i data-role="servo-needle"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="servo-label">90°</span><span class="sensor-secondary">Servo ID ${sp.id}</span></div></div>`;
+    if(sp.type==="servo")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="servo"><div class="servo-visual"><i data-role="servo-needle"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="servo-label">90°</span><span class="sensor-secondary">${sp.pin!=null?`GPIO${sp.pin}`:`Servo ID ${sp.id}`}</span></div></div>`;
+    if(sp.type==="bridge")return `<div class="demo-card hardware-card bridge-card" data-hw-key="${key}" data-hw-type="bridge"><div class="bridge-icon">↔</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="bridge-label">READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"Universal hardware interface")}</span></div></div>`;
     return "";
   }
 
@@ -1331,7 +1578,7 @@ while True:
     if(signature===hardwareLayoutSignature)return;
     hardwareLayoutSignature=signature;activeHardwareCards=cards;
     grid.innerHTML=cards.map((sp,i)=>hardwareCardHtml(sp,i)).join("");
-    initOledPreview();updateSensorGraphics();
+    initOledPreview();updateSensorGraphics();renderCustomDashboardCards();
     // Re-apply current per-output RGB states after a layout refresh.
     if(sensorState.rgbOutputs)Object.values(sensorState.rgbOutputs).forEach(updateRgbCommand);else if(sensorState.rgb)updateRgb(sensorState.rgb.r,sensorState.rgb.g,sensorState.rgb.b);
   }
@@ -1499,7 +1746,7 @@ while True:
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
-    if(!prefs.demoMode&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(liveCode)){
+    if(!prefs.demoMode&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(liveCode)){
       const ok=await refreshInputsFromKit(liveCode,false);if(!ok)scheduleSilentReconnect();
     }
     const frame=await refreshLiveAI();
@@ -1515,6 +1762,7 @@ while True:
 
 
   async function runCode(){
+    customDashboardCards.clear();renderCustomDashboardCards();
     if(running){log("Program already running. Press Stop first.");return;}
 
     const src=getCode();
@@ -1528,7 +1776,7 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder)\s*\(/.test(src);
+    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src);
     const inputSpecs=requestedInputs(src),rgbPins=requestedRgbPins(src);
     const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo]),...inputSpecs.dht11.map(x=>x.pin)];
     const conflict=inputPins.find(pin=>rgbPins.includes(pin));
@@ -1547,7 +1795,7 @@ while True:
 
     terminal.textContent="";clearPlotter();
     running=true;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1633,7 +1881,7 @@ while True:
     if(needsPhysicalKit&&!prefs.demoMode){
       try{
         await beginHardwareRun();
-        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic)\s*\(/.test(src))await refreshInputsFromKit(src,true);
+        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src))await refreshInputsFromKit(src,true);
       }
       catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
     }else{currentRunUsesKit=false;}
@@ -1905,6 +2153,7 @@ while True:
   }
 
   function applyDemo(p){
+    if(String(p.command||"").startsWith("BRIDGE_")){const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"};const group=map[p.command]||"gpio",key=String(p.key||p.command);let d={ok:true};if(p.command==="BRIDGE_GPIO_READ")d.value=0;if(p.command==="BRIDGE_ADC_READ")d={...d,raw:2048,millivolts:1650};if(p.command==="BRIDGE_I2C"&&p.op==="scan")d.addresses=[60,104];if(p.command==="BRIDGE_UART")d={...d,text:"",data:[],available:0};if(p.command==="BRIDGE_SPI")d.data=Array.isArray(p.data)?p.data:[];if(p.command==="BRIDGE_PULSE")d={...d,microseconds:1000,hz:50};if(p.command==="BRIDGE_COUNTER")d={...d,count:120,delta:3,hz:12.0};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;}
     if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
     if(p.command==="RGB_LED_SET")updateRgbCommand(p);
     if(p.command==="LED_SET"){
@@ -1926,6 +2175,15 @@ while True:
       }
     }
   }
+
+  function renderCustomDashboardCards(){
+    const grid=$("sensorGrid");if(!grid)return;
+    grid.querySelectorAll(".custom-dashboard-card").forEach(x=>x.remove());
+    for(const [name,values] of customDashboardCards){const card=document.createElement("div");card.className="demo-card hardware-card bridge-card custom-dashboard-card live";const rows=Object.entries(values||{}).slice(0,8).map(([k,v])=>`<span class="custom-sensor-row"><b>${escapeHtml(k)}</b><em>${escapeHtml(v===null||v===undefined?"—":v)}</em></span>`).join("");card.innerHTML=`<div class="bridge-icon">◆</div><div class="demo-grow"><div class="card-title-row"><span class="sensor-status-dot"></span><strong>${escapeHtml(name)}</strong><span class="interface-badge">Python driver</span></div><div class="custom-sensor-values">${rows||'<span class="sensor-secondary">Waiting for values…</span>'}</div></div>`;grid.appendChild(card);}
+  }
+  function updateCustomSensorCard(name,jsonText){let values={};try{values=JSON.parse(String(jsonText||"{}"));}catch(_){values={value:String(jsonText||"")};}customDashboardCards.set(String(name||"Sensor"),values);renderCustomDashboardCards();}
+  function ensureBridgeState(){sensorState.bridge=sensorState.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}};for(const k of ["gpio","adc","pwm","i2c","uart","spi","pulse","counter","transaction"])sensorState.bridge[k]=sensorState.bridge[k]||{};return sensorState.bridge;}
+  function updateBridgeState(group,key,data){const b=ensureBridgeState();b[group][String(key||group)]={...(data||{})};updateSensorGraphics();}
 
   function updateSensorPacket(data){
     const sensor=String(data.sensor||data.name||"").toUpperCase();
@@ -1960,13 +2218,30 @@ while True:
     if(text!==lastHardwareWarning||now-lastHardwareWarningAt>3000){log("Kit hardware error: "+text);lastHardwareWarning=text;lastHardwareWarningAt=now;}
   }
 
+  async function handleUniversalBridge(p){
+    const key=String(p.key||p.command||"bridge");let r=null,group="gpio";
+    if(p.command==="BRIDGE_GPIO_READ"){group="gpio";r=await kitClient.gpioRead(p.pin,{mode:p.mode||"input"});}
+    else if(p.command==="BRIDGE_GPIO_WRITE"){group="gpio";r=await kitClient.gpioWrite(p.pin,p.value);}
+    else if(p.command==="BRIDGE_ADC_READ"){group="adc";r=await kitClient.adc(p.pin);}
+    else if(p.command==="BRIDGE_PWM_SET"){group="pwm";r=await kitClient.pwm(p.pin,p.duty,{frequency:p.frequency,resolution:p.resolution});}
+    else if(p.command==="BRIDGE_I2C"){group="i2c";r=await kitClient.i2c(p);}
+    else if(p.command==="BRIDGE_UART"){group="uart";r=await kitClient.uart(p);}
+    else if(p.command==="BRIDGE_SPI"){group="spi";r=await kitClient.spi(p);}
+    else if(p.command==="BRIDGE_PULSE"){group="pulse";r=await kitClient.pulse(p);}
+    else if(p.command==="BRIDGE_COUNTER"){group="counter";r=await kitClient.counter(p);}
+    else if(p.command==="BRIDGE_TRANSACTION"){group="transaction";r=await kitClient.transaction(p.ops);}
+    else return false;
+    updateBridgeState(group,key,r||{});markKitSuccess(kitClient.status);return true;
+  }
+
   async function handleKit(p){
     if(!p)return;
     if(prefs.demoMode){applyDemo(p);return;}
 
     if(kitClient?.connected){
       try{
-        if(p.command==="LED_SET"){
+        if(String(p.command||"").startsWith("BRIDGE_")){await handleUniversalBridge(p);}
+        else if(p.command==="LED_SET"){
           let result;try{result=await kitClient.led(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.led(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
         }else if(p.command==="RGB_LED_SET"){
           let result;
