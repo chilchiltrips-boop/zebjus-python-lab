@@ -1190,6 +1190,7 @@ cv2.destroyAllWindows=_browser_close_windows
   pyodide.globals.set("__bridge_json",JSON.stringify(m.sensorState?.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}}));
 
   await pyodide.runPythonAsync(`
+import sys, io, json
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
 sys.stdout=_zebjus_stdout
 sys.stderr=_zebjus_stderr

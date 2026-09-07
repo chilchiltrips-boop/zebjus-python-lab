@@ -1,6 +1,9 @@
-# ZEBJUS Python Lab v6.4.0 — Display FX + Robust Hardware Preview
+# ZEBJUS Python Lab v6.4.1 — Display FX + Robust Hardware Preview
 
-## v6.4.0 display/output update
+## v6.4.1 runtime hotfix
+`py-worker.js` now self-imports `sys`, `io`, and `json` on every execution refresh. This prevents `io.StringIO` NameError even if student code or a previous live cycle changes global names. Firmware remains v2.4.0.
+
+## v6.4.1 display/output update
 
 - TM1637 **Kit Output / Sensors** preview now binds by actual CLK/DIO pins, fixing cases where the physical HW-069 worked but the browser card stayed at `----`.
 - LCD1602 preview now binds by I2C bus/address and mirrors rows, backlight, display state, cursor/blink and active effect.

@@ -1,4 +1,9 @@
-# ZEBJUS Python Lab v6.4.0 FINAL
+# ZEBJUS Python Lab v6.4.1 FINAL
+
+## v6.4.1 Runtime IO hotfix
+- Fixes `NameError: name 'io' is not defined` in Run/LIVE MODE.
+- The per-cycle stdin/runtime refresh now imports `sys`, `io`, and `json` locally before use.
+- Browser cache-busters are v6.4.1. ESP32 firmware remains v2.4.0; no reflashing is required for this hotfix.
 
 ## Display preview / sync fixes
 - TM1637 **Kit Output / Sensors** card now matches commands by actual CLK/DIO pins, with a single-card fallback for expression-based constructors.
@@ -27,7 +32,7 @@
 - Buzzer: `beep()`, `sweep()`.
 
 ## Versions / tooling
-- Browser/UI: **v6.4.0**.
+- Browser/UI: **v6.4.1**.
 - ESP32 firmware: **v2.4.0**.
 - Arduino sketch folder, root compile helper, GitHub Actions workflow and visible workflow copy all target v2.4.0.
 - `VERIFY_RELEASE.py` and `TEST_SENSOR_RUNTIME.py` cover the new display effects and long-text behavior.

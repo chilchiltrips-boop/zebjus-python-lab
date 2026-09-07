@@ -1,6 +1,6 @@
 {
-  "release": "ZEBJUS Python Lab v6.4.0 Display FX + Robust Preview FINAL",
-  "ui_version": "6.4.0",
+  "release": "ZEBJUS Python Lab v6.4.1 Runtime IO Hotfix FINAL",
+  "ui_version": "6.4.1",
   "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 40,
@@ -49,5 +49,6 @@
     "display_fx_runtime_tests": "pass: TM1637 ordered scroll/decimal + LCD long-text scroll/cursor",
     "display_preview_binding_static_checks": "pass: pin/bus DOM identity fallback",
     "firmware": "v2.4.0 cursor/display control + visible-row write boundary"
-  }
+  },
+  "runtime_io_hotfix": "Per-cycle self-import of sys/io/json prevents io.StringIO NameError after globals are modified."
 }
