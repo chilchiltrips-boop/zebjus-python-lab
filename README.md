@@ -1,6 +1,10 @@
-# ZEBJUS Python Lab v6.2.2 — Real Hardware Sync + Offline Simulation + Sensor Studio + Optional Secure Mode
+# ZEBJUS Python Lab v6.3 — TM1637 + LCD1602 Display Bridge
 
-v6.2.2 keeps the Universal Hardware Bridge architecture and adds three major upgrades: **offline hardware simulation**, **automatic sensor/module visual cards**, and **optional per-kit Secure Mode**. The v6.1 safety/runtime fixes remain in place, including active-low failsafe handling, persistent top-level `while True` state, shared I²C buses, central pin/resource ownership, 5-failure reconnect logic and the 10-second ESP32 output failsafe.
+This release extends v6.2.2 with native **TM1637/HW-069 4-digit display** support and **LCD1602 16x2 PCF8574 I2C** support across firmware, Python library, browser animation, Add Component, autocomplete, offline simulation and GitHub release tooling.
+
+See `TM1637_LCD1602_GUIDE.md` and `GITHUB_UPLOAD_GUIDE.md`.
+
+The retained v6.2.2 base keeps the Universal Hardware Bridge architecture and adds three major upgrades: **offline hardware simulation**, **automatic sensor/module visual cards**, and **optional per-kit Secure Mode**. The v6.1 safety/runtime fixes remain in place, including active-low failsafe handling, persistent top-level `while True` state, shared I²C buses, central pin/resource ownership, 5-failure reconnect logic and the 10-second ESP32 output failsafe.
 
 ## Run with or without a physical kit
 
@@ -15,7 +19,7 @@ This is especially useful for RGB effects, LEDs, servos, motors and classroom pr
 
 ## DHT11 real-hardware behavior in v6.2.2
 
-DHT11 no longer uses a `pulseIn()` response sequence that can miss the first sensor response pulse. Firmware 2.2.2 uses direct microsecond transition timing for the full 40-bit frame, validates the checksum and enforces a 1.2-second minimum hardware-read interval.
+DHT11 no longer uses a `pulseIn()` response sequence that can miss the first sensor response pulse. Firmware 2.3.0 retains the direct microsecond transition timing for the full 40-bit frame, validates the checksum and enforces a 1.2-second minimum hardware-read interval.
 
 - **Kit connected + valid DHT11:** terminal and **Kit Output / Sensors** show the same real temperature/humidity.
 - **Kit connected + failed read:** the card shows `READ ERROR` plus a diagnostic such as `sensor did not pull DATA low`, `checksum mismatch` or `bit timeout`; no demo temperature/humidity is substituted.
@@ -176,7 +180,7 @@ Secure Mode can also be disabled again from Settings using the saved token.
 
 Use:
 
-`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_2.ino`
+`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_3.ino`
 
 Target: classic ESP32 / ESP32-WROOM-32 style DevKit with Arduino-ESP32 3.x.
 
@@ -200,7 +204,7 @@ The packaging environment used to build this ZIP did not contain Arduino CLI, so
 
 ## Examples
 
-The package retains the 38 selectable examples from v6.1, including RGB, camera/AI, OLED, DHT11, ultrasonic, analog/digital inputs, PWM Servo, Motor Driver, I²C scanner/device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and hardware transaction projects.
+The package now contains 40 selectable examples, including RGB, camera/AI, OLED, DHT11, ultrasonic, analog/digital inputs, PWM Servo, Motor Driver, I²C scanner/device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and hardware transaction projects.
 
 
 ## v6.2.2 sensor-source rule

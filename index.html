@@ -8,7 +8,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
-  <link rel="stylesheet" href="./styles.css?v=6.2.2">
+  <link rel="stylesheet" href="./styles.css?v=6.3.0">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
@@ -17,7 +17,7 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.2.2</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.3.0</span>
       <p>Python • OpenCV • MediaPipe • RGB • DHT11 • Ultrasonic • OLED • Inputs • Plotter</p>
     </div>
     <div class="top-actions">
@@ -58,6 +58,10 @@
               <option value="dht11Oled">DHT11 → OLED Monitor</option>
               <option value="dht11Rgb">DHT11 → RGB Temperature Alert</option>
               <option value="dht11Dashboard">DHT11 OpenCV Gauge Dashboard</option>
+            </optgroup>
+            <optgroup label="Displays">
+              <option value="tm1637Display">TM1637 / HW-069 4-Digit Display</option>
+              <option value="lcd1602Display">LCD1602 16×2 I²C Display</option>
             </optgroup>
             <optgroup label="OLED 128×64">
               <option value="oledText">OLED Text Display</option>
@@ -113,6 +117,7 @@
           <summary>Quick Reference</summary>
           <div class="help-grid">
             <code>RGBLED(25,26,27)</code><code>DHT11(13)</code><code>Ultrasonic(14,12)</code><code>OLED(21,22,0x3C)</code>
+            <code>TM1637(13,14)</code><code>LCD1602(21,22,0x27)</code>
             <code>AnalogInput(34)</code><code>Switch(32)</code><code>RotaryEncoder(32,33,14)</code><code>plot(Temperature=t)</code>
             <code>dht.temperature()</code><code>dht.humidity()</code><code>dht.get_values()</code><code>oled.display_text("Hello")</code>
           </div>
@@ -209,9 +214,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=6.2.2"></script>
-  <script src="./kit-client.js?v=6.2.2"></script>
-  <script src="./ai.js?v=6.2.2"></script>
-  <script src="./app.js?v=6.2.2"></script>
+  <script src="./config.js?v=6.3.0"></script>
+  <script src="./kit-client.js?v=6.3.0"></script>
+  <script src="./ai.js?v=6.3.0"></script>
+  <script src="./app.js?v=6.3.0"></script>
 </body>
 </html>

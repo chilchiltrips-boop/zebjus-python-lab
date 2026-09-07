@@ -285,6 +285,70 @@ class OLED:
         for x in positions:
             self.display_text(text,x,y,size,True);time.sleep(speed)
 
+# ---------------- 4-DIGIT TM1637 + LCD1602 I2C ----------------
+_TM1637_CHARS={
+    "0":0x3F,"1":0x06,"2":0x5B,"3":0x4F,"4":0x66,"5":0x6D,"6":0x7D,"7":0x07,"8":0x7F,"9":0x6F,
+    "A":0x77,"B":0x7C,"C":0x39,"D":0x5E,"E":0x79,"F":0x71,"H":0x76,"L":0x38,"P":0x73,"U":0x3E,
+    "-":0x40,"_":0x08," ":0x00
+}
+
+class TM1637:
+    """HW-069 / TM1637 4-digit seven-segment display."""
+    __zebjus_ui__={"type":"tm1637"}
+    def __init__(self,clk=13,dio=14,brightness=7):
+        self.clk=int(clk);self.dio=int(dio);self._brightness=max(0,min(7,int(brightness)));self._segments=[0,0,0,0]
+        if self.clk not in SUPPORTED_OUTPUT_PINS or self.dio not in SUPPORTED_OUTPUT_PINS or self.clk==self.dio: raise ValueError(f"TM1637 CLK/DIO must be different safe pins: {SUPPORTED_OUTPUT_PINS}")
+        self._send("display")
+    def _send(self,action="display"):
+        _send("TM1637_SET",action=str(action),clk=self.clk,dio=self.dio,brightness=self._brightness,segments=list(self._segments))
+        return self
+    def segments(self,values):
+        vals=[int(x)&255 for x in list(values)]
+        if len(vals)!=4: raise ValueError("TM1637 segments() needs exactly 4 bytes")
+        self._segments=vals;return self._send("segments")
+    def brightness(self,level=None):
+        if level is None:return self._brightness
+        self._brightness=max(0,min(7,int(level)));return self._send("brightness")
+    def clear(self): self._segments=[0,0,0,0];return self._send("clear")
+    def text(self,text,colon=False):
+        txt=str(text).upper()[:4].ljust(4);self._segments=[_TM1637_CHARS.get(ch,0x00) for ch in txt]
+        if colon:self._segments[1]|=0x80
+        return self._send("display")
+    def number(self,value,leading_zero=False,colon=False):
+        n=int(value);n=max(-999,min(9999,n))
+        if n<0: txt=("-"+str(abs(n))).rjust(4)
+        else: txt=(str(n).zfill(4) if leading_zero else str(n).rjust(4))
+        return self.text(txt,colon=colon)
+    def show(self,value,colon=False):
+        if isinstance(value,(int,float)) and float(value).is_integer():return self.number(int(value),colon=colon)
+        return self.text(value,colon=colon)
+
+class LCD1602:
+    """16x2 HD44780 LCD with common PCF8574 I2C backpack (usually 0x27 or 0x3F)."""
+    __zebjus_ui__={"type":"lcd1602"}
+    def __init__(self,sda=None,scl=None,address=0x27,bus=0,backlight=True):
+        self.bus=1 if int(bus)==1 else 0;known=_i2c_bus_claimed.get(self.bus,_i2c_bus_defaults[self.bus])
+        self.sda=int(known[0] if sda is None else sda);self.scl=int(known[1] if scl is None else scl);self.address=int(address);self._backlight=bool(backlight)
+        if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS or self.sda==self.scl: raise ValueError("LCD1602 SDA/SCL must be different safe GPIO pins")
+        if not 1<=self.address<=127: raise ValueError("LCD1602 I2C address must be 0x01..0x7F")
+        claimed=_i2c_bus_claimed.get(self.bus)
+        if claimed is not None and tuple(claimed)!=(self.sda,self.scl): raise ValueError(f"I2C bus {self.bus} already uses SDA{claimed[0]}/SCL{claimed[1]}; LCD1602 requested SDA{self.sda}/SCL{self.scl}")
+        if self.bus not in _i2c_bus_claimed:_i2c_bus_claimed[self.bus]=(self.sda,self.scl)
+        self._cmd("init")
+    def _cmd(self,action,**kwargs):
+        _send("LCD1602_SET",action=str(action),bus=self.bus,sda=self.sda,scl=self.scl,address=self.address,backlight=self._backlight,**kwargs);return self
+    def clear(self): return self._cmd("clear")
+    def home(self): return self._cmd("home")
+    def set_cursor(self,col=0,row=0): return self._cmd("cursor",col=max(0,min(15,int(col))),row=max(0,min(1,int(row))))
+    def write(self,text,col=0,row=0): return self._cmd("write",text=str(text)[:32],col=max(0,min(15,int(col))),row=max(0,min(1,int(row))))
+    def print(self,text,col=0,row=0): return self.write(text,col,row)
+    def line(self,row,text):
+        row=max(0,min(1,int(row)));return self.write(str(text)[:16].ljust(16),0,row)
+    def center(self,row,text):
+        txt=str(text)[:16];return self.line(row,txt.center(16))
+    def backlight(self,enabled=True): self._backlight=bool(enabled);return self._cmd("backlight")
+    def display(self,enabled=True): return self._cmd("display",enabled=bool(enabled))
+
 class AnalogInput:
     def __init__(self,pin=34):
         pin=int(pin)
@@ -861,13 +925,13 @@ sys.modules["HandTrackingModule"]=htm_mod;sys.modules["zebjus_wifi"]=wifi_mod
 
 z=types.ModuleType("zebjus")
 for k,v in {
-    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
+    "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"TM1637":TM1637,"LCD1602":LCD1602,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
     "plot":plot,"clear_plot":clear_plot,"dashboard":dashboard,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,
     "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"SoundSensor":SoundSensor,"RainSensor":RainSensor,"WaterLevelSensor":WaterLevelSensor,"Thermistor":Thermistor,"PIRSensor":PIRSensor,"ReedSwitch":ReedSwitch,"TouchSensor":TouchSensor,"FlameSensor":FlameSensor,"FlowSensor":FlowSensor,"RPMSensor":RPMSensor,"Buzzer":Buzzer,"Joystick":Joystick,"sleep":sleep
 }.items(): setattr(z,k,v)
 for i,c in LED_CLASSES.items(): setattr(z,f"LED{i}",c)
 for i,c in RGBLED_CLASSES.items(): setattr(z,f"RGBLED{i}",c)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","TM1637","LCD1602","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")

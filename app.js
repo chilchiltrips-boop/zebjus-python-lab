@@ -574,6 +574,28 @@ while True:
     plot(Count=count, Frequency=hz)
     sleep(0.25)`,
 
+    tm1637Display:`# HW-069 / TM1637 4-Digit Display
+from zebjus import TM1637, sleep
+
+display = TM1637(clk=13, dio=14, brightness=6)
+
+while True:
+    for n in range(10000):
+        display.number(n)
+        print("Display:", n)
+        sleep(0.1)`,
+
+    lcd1602Display:`# LCD1602 16x2 with I2C backpack
+from zebjus import LCD1602, sleep
+
+lcd = LCD1602(sda=21, scl=22, address=0x27, bus=0)
+lcd.clear()
+lcd.center(0, "ZEBJUS")
+lcd.center(1, "Python Lab")
+
+while True:
+    sleep(1)`,
+
     customTransaction:`# Custom Timing Sensor - Local ESP32 Transaction VM
 from zebjus import HardwareTransaction, sleep
 
@@ -598,14 +620,14 @@ while True:
   const base=[
     ["and","keyword"],["as","keyword"],["break","keyword"],["class","keyword"],["continue","keyword"],["def","keyword"],["elif","keyword"],["else","keyword"],["except","keyword"],["False","keyword"],["for","keyword"],["from","keyword"],["if","keyword"],["import","keyword"],["in","keyword"],["None","keyword"],["not","keyword"],["or","keyword"],["pass","keyword"],["return","keyword"],["True","keyword"],["try","keyword"],["while","keyword"],["with","keyword"],
     ["print()","function","print()","Output"],["input()","function","input()","Program input"],["range()","function","range()","Range"],["len()","function","len()","Length"],["int()","function","int()","Integer"],["float()","function","float()","Float"],["str()","function","str()","String"],
-    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["DHT11()","class","DHT11(13)","Temperature + humidity sensor"],["SerialPlotter()","class","SerialPlotter()","Live graph helper"],["plot()","function","plot(Temperature=t)","Send values to Serial Plotter"],["LED()","class","LED()","White compatibility LED"],["OLED()","class","OLED(21,22,0x3C)","SSD1306 128x64 I2C display"],["Ultrasonic()","class","Ultrasonic(18,19)","HC-SR04 distance cm"],["AnalogInput()","class","AnalogInput(34)","Generic analog ADC1 input"],["Potentiometer()","class","Potentiometer(34)","Analog knob alias"],["DigitalInput()","class","DigitalInput(32)","Generic digital sensor input"],["Switch()","class","Switch(32)","Digital push switch input"],["RotaryEncoder()","class","RotaryEncoder(32,33,14)","Rotary encoder CLK/DT/SW"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
+    ["RGBLED()","class","RGBLED(25,26,27)","RGB LED pins + 0–255 color"],["TM1637()","class","TM1637(13,14)","HW-069 4-digit 7-segment display"],["LCD1602()","class","LCD1602(21,22,0x27,0)","16x2 LCD with I2C backpack"],["DHT11()","class","DHT11(13)","Temperature + humidity sensor"],["SerialPlotter()","class","SerialPlotter()","Live graph helper"],["plot()","function","plot(Temperature=t)","Send values to Serial Plotter"],["LED()","class","LED()","White compatibility LED"],["OLED()","class","OLED(21,22,0x3C)","SSD1306 128x64 I2C display"],["Ultrasonic()","class","Ultrasonic(18,19)","HC-SR04 distance cm"],["AnalogInput()","class","AnalogInput(34)","Generic analog ADC1 input"],["Potentiometer()","class","Potentiometer(34)","Analog knob alias"],["DigitalInput()","class","DigitalInput(32)","Generic digital sensor input"],["Switch()","class","Switch(32)","Digital push switch input"],["RotaryEncoder()","class","RotaryEncoder(32,33,14)","Rotary encoder CLK/DT/SW"],["Motor()","class","Motor()","Motor"],["Servo()","class","Servo()","Servo"],["Camera()","class","Camera()","Camera"],["HandDetector()","class","HandDetector()","MediaPipe Hand"],["FaceDetector()","class","FaceDetector()","MediaPipe Face"],["sleep()","function","sleep()","Delay"],["load_image()","function","load_image()","Loaded image"],["show()","function","show()","Show image"],["draw_rgb_led()","function","draw_rgb_led()","Draw RGB LED"],["draw_potentiometer()","function","draw_potentiometer()","Draw pot"],["draw_ultrasonic()","function","draw_ultrasonic()","Draw distance bar"],
     ["cv2","module","cv2","OpenCV"],["mp","module","mp","MediaPipe"],["cvzone","module","cvzone","CVZone"],["np","module","np","NumPy"],
     ["SerialObject()","class","SerialObject()","VISION AI serial bridge"],["handDetector()","class","handDetector()","VISION AI hand tracker"],["WifiBridge()","class","WifiBridge()","ZEBJUS Wi-Fi bridge"]
   ];
 
   const moduleMembers={
     zebjus:[
-      ["RGBLED","class","RGBLED","Legacy/default RGB LED API"],["LED","class","LED","Legacy RGB-white compatibility API"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
+      ["RGBLED","class","RGBLED","Legacy/default RGB LED API"],["LED","class","LED","Legacy RGB-white compatibility API"],["TM1637","class","TM1637","HW-069 / TM1637 4-digit display"],["LCD1602","class","LCD1602","16x2 I2C LCD backpack"],["DHT11","class","DHT11","DHT11: DHT11(13)"],["SerialPlotter","class","SerialPlotter","Live graph helper"],["plot","function","plot","Serial Plotter values"],["clear_plot","function","clear_plot","Clear Serial Plotter"],["OLED","class","OLED","SSD1306 OLED: OLED(21,22,0x3C)"],["Ultrasonic","class","Ultrasonic","HC-SR04: Ultrasonic(18,19)"],
       ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],
       ["DigitalOutput","class","DigitalOutput","Universal digital output"],["Relay","class","Relay","Relay / digital output"],["GPIOInput","class","GPIOInput","Universal GPIO input"],["ADC","class","ADC","Raw ADC1 interface"],["PWM","class","PWM","Generic LEDC PWM output"],["PWMServo","class","PWMServo","Physical servo using generic PWM"],["MotorDriver","class","MotorDriver","2 direction pins + PWM"],
       ["I2C","class","I2C","Generic I²C bus; custom sensor drivers"],["I2CDevice","class","I2CDevice","Generic addressed I²C device"],["UART","class","UART","Generic UART for GPS/RFID/serial modules"],["SPI","class","SPI","Generic SPI bus"],["PulseInput","class","PulseInput","Pulse width / frequency sensor"],["PulseOutput","class","PulseOutput","Precise pulse output"],["CounterInput","class","CounterInput","Interrupt-backed pulse counter / flow / RPM"],["HardwareTransaction","class","HardwareTransaction","Local GPIO/pulse transaction VM"],
@@ -653,6 +675,8 @@ while True:
     LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
     SingleLED:[["on()","method","on()","On"],["off()","method","off()","Off"],["write()","method","write()","Brightness 0–255"],["brightness()","method","brightness()","Brightness 0–255"],["blink()","method","blink()","Blink"],["pin","property","pin","Selected GPIO"]],
     OLED:[["clear()","method","clear()","Clear OLED buffer"],["show()","method","show()","Display buffered drawing"],["text()","method","text()","Draw text"],["display_text()","method","display_text()","Clear + show text"],["line()","method","line()","Draw line"],["rect()","method","rect()","Draw rectangle"],["circle()","method","circle()","Draw circle"],["pixel()","method","pixel()","Draw pixel"],["scroll_text()","method","scroll_text()","Scrolling text animation"],["distance_bar()","method","distance_bar()","Distance gauge"],["radar()","method","radar()","Ultrasonic radar frame"],["invert()","method","invert()","Invert display"],["contrast()","method","contrast()","Set contrast"]],
+    TM1637:[["number()","method","number()","Display integer -999..9999"],["text()","method","text()","Display four supported characters"],["segments()","method","segments()","Write four raw segment bytes"],["brightness()","method","brightness()","Brightness 0–7"],["clear()","method","clear()","Blank all digits"],["show()","method","show()","Show number or text"]],
+    LCD1602:[["write()","method","write()","Write text at col,row"],["line()","method","line()","Replace one 16-character row"],["center()","method","center()","Center text on a row"],["clear()","method","clear()","Clear LCD"],["home()","method","home()","Cursor home"],["set_cursor()","method","set_cursor()","Set cursor col,row"],["backlight()","method","backlight()","Backlight on/off"],["display()","method","display()","Display on/off"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["centimeters()","method","centimeters()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"],["trig","property","trig","TRIG GPIO"],["echo","property","echo","ECHO GPIO"]],
     DHT11:[["read()","method","read()","Return temperature/humidity object"],["temperature()","method","temperature()","Temperature °C"],["humidity()","method","humidity()","Relative humidity %"],["get_values()","method","get_values()","Legacy [humidity×10,temp×10]"],["pin","property","pin","DATA GPIO"]],
     SerialPlotter:[["plot()","method","plot()","Plot named values"],["clear()","method","clear()","Clear graph"]],
@@ -692,13 +716,13 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","TM1637","LCD1602","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*LED\\d+\\s*\\(").test(code))return "SingleLED";
     if(new RegExp("\\b"+esc+"\\s*=\\s*RGBLED\\d+\\s*\\(").test(code))return "RGBLED";
     if(new RegExp("\\b"+esc+"\\s*=\\s*(?:HandDetector\\s*\\(\\s*\\)|\\w+)\\.read\\s*\\(").test(code))return "HandResult";
-    if(name==="rgb")return "RGBLED";if(name==="dht"||name==="dht11")return "DHT11";if(name==="plotter")return "SerialPlotter";if(name==="led")return "LED";if(name==="oled"||name==="display")return "OLED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
+    if(name==="tm"||name==="tm1637")return "TM1637";if(name==="lcd"||name==="lcd1602")return "LCD1602";if(name==="rgb")return "RGBLED";if(name==="dht"||name==="dht11")return "DHT11";if(name==="plotter")return "SerialPlotter";if(name==="led")return "LED";if(name==="oled"||name==="display")return "OLED";if(name==="ultra")return "Ultrasonic";if(name==="analog")return "AnalogInput";if(name==="pot")return "Potentiometer";if(name==="sensor"||name==="din")return "DigitalInput";if(name==="button"||name==="sw")return "Switch";if(name==="encoder"||name==="rotary")return "RotaryEncoder";
     if(name==="motor")return "Motor";if(name==="servo")return "Servo";if(name==="cam")return "Camera";if(name==="hand")return "HandDetector";if(name==="result")return "HandResult";
     if(name==="cv2")return "cv2";
     return null;
@@ -721,6 +745,8 @@ while True:
   const COMPONENT_CATALOG=[
     {className:"SingleLED",label:"Single LED",group:"Outputs",interface:"1 × PWM/Digital OUT",max:15,prefix:"led",status:"ready",numberedBase:"LED",pinCost:{out:1}},
     {className:"RGBLED",label:"RGB LED",group:"Outputs",interface:"3 × PWM OUT",max:5,prefix:"rgb",status:"ready",numberedBase:"RGBLED",pinCost:{out:3}},
+    {className:"TM1637",label:"4-Digit 7-Segment (TM1637 / HW-069)",group:"Displays",interface:"CLK + bidirectional DIO",max:4,prefix:"tm",status:"ready",pinCost:{out:2}},
+    {className:"LCD1602",label:"LCD1602 16×2 + I²C Backpack",group:"Displays",interface:"I²C · SDA/SCL shared",max:4,prefix:"lcd",status:"ready",pinCost:{out:2}},
     {className:"OLED",label:"OLED 128×64",group:"I²C",interface:"I²C · 2 GPIO",max:1,prefix:"oled",status:"ready",pinCost:{out:2}},
     {className:"DHT11",label:"DHT11",group:"Sensors",interface:"1 × bidirectional DATA GPIO",max:15,prefix:"dht",status:"ready",pinCost:{out:1}},
     {className:"Ultrasonic",label:"Ultrasonic HC-SR04",group:"Sensors",interface:"1 OUT + 1 IN",max:10,prefix:"ultra",status:"ready",pinCost:{out:1,input:1}},
@@ -768,6 +794,8 @@ while True:
   const PIN_HINT_ORDER={
     SingleLED:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
     RGBLED:[25,26,27,32,33,4,13,14,16,17,18,19,21,22,23],
+    TM1637:[13,14,18,19,16,17,25,26,27,32,33,4,21,22,23],
+    LCD1602:[21,22,25,26,18,19,16,17,23,27,32,33,4,13,14],
     AnalogInput:[34,35,36,39,32,33],Potentiometer:[34,35,36,39,32,33],
     DigitalInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],
     Switch:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],
@@ -786,7 +814,7 @@ while True:
   }
   function canonicalHardwareClass(token){
     const n=numberedTokenInfo(token);if(n)return n.base==="LED"?"SingleLED":"RGBLED";
-    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"].includes(token)?token:null;
+    return ["RGBLED","LED","TM1637","LCD1602","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"].includes(token)?token:null;
   }
   function sequenceNumbers(src,base){
     const nums=new Set();const re=new RegExp("\\b"+base+"(\\d+)\\b","g");let m;
@@ -828,6 +856,8 @@ while True:
           if(r!==null)add(r,i+1,`${token} red`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);if(g!==null)add(g,i+1,`${token} green`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);if(b!==null)add(b,i+1,`${token} blue`,"RGBLED",RGB_OUTPUT_PINS,m.index+1);
         }
       }
+      const tm1637=/\bTM1637\s*\(([^)]*)\)/g;
+      while((m=tm1637.exec(clean))){const a=m[1],clk=parseNumberArg(a,"clk",0,13),dio=parseNumberArg(a,"dio",1,14);add(clk,i+1,"TM1637 CLK","TM1637",RGB_OUTPUT_PINS,m.index+1);add(dio,i+1,"TM1637 DIO","TM1637",RGB_OUTPUT_PINS,m.index+1);}
       const analog=/\b(AnalogInput|Potentiometer)\s*\(([^)]*)\)/g;
       while((m=analog.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,34);add(pin,i+1,m[1]+" input",m[1],ANALOG_INPUT_PINS,m.index+1);}
       const digital=/\b(DigitalInput|Switch)\s*\(([^)]*)\)/g;
@@ -863,6 +893,7 @@ while True:
       const joystick=/\bJoystick\s*\(([^)]*)\)/g;while((m=joystick.exec(clean))){const a=m[1],xp=parseNumberArg(a,"x_pin",0,34),yp=parseNumberArg(a,"y_pin",1,35),sw=parseNumberArg(a,"switch_pin",2,-1);add(xp,line,"Joystick X","Joystick",ANALOG_INPUT_PINS,m.index+1);add(yp,line,"Joystick Y","Joystick",ANALOG_INPUT_PINS,m.index+1);if(sw>=0)add(sw,line,"Joystick switch","Joystick",DIGITAL_INPUT_PINS,m.index+1);}
       const motor=/\bMotorDriver\s*\(([^)]*)\)/g;while((m=motor.exec(clean))){const a=m[1],p1=parseNumberArg(a,"in1",0,null),p2=parseNumberArg(a,"in2",1,null),pwm=parseNumberArg(a,"pwm_pin",2,null);if(p1!==null)add(p1,line,"Motor IN1","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(p2!==null)add(p2,line,"Motor IN2","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(pwm!==null)add(pwm,line,"Motor PWM","MotorDriver",RGB_OUTPUT_PINS,m.index+1);}
 
+      const lcd1602=/\bLCD1602\s*\(([^)]*)\)/g;while((m=lcd1602.exec(clean))){const a=m[1],bus=parseNumberArg(a,"bus",3,0)===1?1:0,pins=i2cPins(a,bus,0,1),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,"LCD1602 SDA","LCD1602",RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,"LCD1602 SCL","LCD1602",RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
       const i2c=/\b(I2C|MPU6050)\s*\(([^)]*)\)/g;while((m=i2c.exec(clean))){const a=m[2],bus=parseNumberArg(a,"bus",3,0)===1?1:0,pins=i2cPins(a,bus,0,1),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,m[1]+" SDA",m[1],RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,m[1]+" SCL",m[1],RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
       const i2cd=/\bI2CDevice\s*\(([^)]*)\)/g;while((m=i2cd.exec(clean))){const a=m[1],bus=parseNumberArg(a,"bus",4,0)===1?1:0,pins=i2cPins(a,bus,1,2),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,"I2CDevice SDA","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,"I2CDevice SCL","I2CDevice",RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
       const uart=/\b(UART|GPS)\s*\(([^)]*)\)/g;while((m=uart.exec(clean))){const a=m[2],rx=parseNumberArg(a,"rx",0,16),tx=parseNumberArg(a,"tx",1,17);add(rx,line,m[1]+" RX",m[1],ULTRASONIC_ECHO_PINS,m.index+1);add(tx,line,m[1]+" TX",m[1],RGB_OUTPUT_PINS,m.index+1);}
@@ -903,12 +934,12 @@ while True:
 
   function pinHintContext(cm){
     const cur=cm.getCursor(),left=cm.getLine(cur.line).slice(0,cur.ch),full=cm.getValue();
-    const m=left.match(/\b(RGBLED(?:\d+)?|LED\d+|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|PulseInput|PulseOutput|CounterInput|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^()]*)$/);if(!m)return null;
+    const m=left.match(/\b(RGBLED(?:\d+)?|LED\d+|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|OLED|TM1637|LCD1602|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|PulseInput|PulseOutput|CounterInput|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^()]*)$/);if(!m)return null;
     const token=m[1],type=/^LED\d+$/.test(token)?"SingleLED":/^RGBLED\d+$/.test(token)?"RGBLED":token,args=m[2],parts=args.split(","),argIndex=Math.max(0,parts.length-1);
-    if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;if(["DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","PulseInput","PulseOutput","CounterInput","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(type)&&argIndex>0)return null;
+    if(type==="SingleLED"&&argIndex>0)return null;if((type==="OLED"||type==="Ultrasonic"||type==="TM1637"||type==="LCD1602")&&argIndex>1)return null;if(type==="DHT11"&&argIndex>0)return null;if(["DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","PulseInput","PulseOutput","CounterInput","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(type)&&argIndex>0)return null;
     const currentPart=parts[parts.length-1]||"",prefix=(currentPart.match(/(?:^|=)\s*(\d*)$/)||[])[1];if(prefix===undefined)return null;
     const alreadyHere=[...args.matchAll(/\b(\d+)\b/g)].map(x=>Number(x[1])),usedElsewhere=allPinEntries(full).map(x=>x.pin);
-    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="CounterInput")pins=COUNTER_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
+    let pins=PIN_HINT_ORDER[type]||DIGITAL_INPUT_PINS;if(type==="CounterInput")pins=COUNTER_INPUT_PINS;if(type==="Ultrasonic"&&argIndex===1)pins=ULTRASONIC_ECHO_PINS;if(type==="Ultrasonic"&&argIndex===0)pins=RGB_OUTPUT_PINS;if(type==="OLED"||type==="LCD1602"||type==="TM1637"||type==="DHT11"||type==="SingleLED")pins=RGB_OUTPUT_PINS;
     pins=pins.filter(p=>!alreadyHere.includes(p)&&!usedElsewhere.includes(p));
     const list=pins.filter(p=>String(p).startsWith(prefix)).map(p=>({text:String(p),displayText:`GPIO${p}   — free ${type} pin · ${pins.length} compatible free`,className:"hint-constant"}));
     return {list,from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};
@@ -1260,7 +1291,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.2.2",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.3.0",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1441,6 +1472,8 @@ while True:
     if(item.className==="SingleLED"){const p=firstFree(PIN_HINT_ORDER.SingleLED,used);return p==null?null:String(p);}
     if(item.className==="RGBLED"){const pref=PIN_HINT_ORDER.RGBLED.filter(p=>!used.has(p));return pref.length>=3?`${pref[0]}, ${pref[1]}, ${pref[2]}`:null;}
     if(item.className==="OLED"){const pref=PIN_HINT_ORDER.OLED.filter(p=>!used.has(p));return pref.length>=2?`${pref[0]}, ${pref[1]}, 0x3C`:null;}
+    if(item.className==="TM1637"){const pref=PIN_HINT_ORDER.TM1637.filter(p=>!used.has(p));return pref.length>=2?`${pref[0]}, ${pref[1]}, 6`:null;}
+    if(item.className==="LCD1602"){const existing=allPinEntries(src).find(e=>e.shareKey&&String(e.shareKey).startsWith("i2c:0:"));if(existing){const parts=existing.shareKey.split(":");return `${parts[2]}, ${parts[3]}, 0x27, 0`;}const pref=PIN_HINT_ORDER.LCD1602.filter(p=>!used.has(p));return pref.length>=2?`${pref[0]}, ${pref[1]}, 0x27, 0`:null;}
     if(item.className==="DHT11"){const p=firstFree(PIN_HINT_ORDER.DHT11,used);return p==null?null:String(p);}
     if(item.className==="Ultrasonic"){const trig=firstFree(PIN_HINT_ORDER.Ultrasonic,used);if(trig==null)return null;const used2=new Set(used);used2.add(trig);const echo=firstFree([34,35,36,39,19,18,17,16,33,32,27,26,25,23,22,21,14,13,4,12],used2);return echo==null?null:`${trig}, ${echo}`;}
     if(item.className==="AnalogInput"||item.className==="Potentiometer"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
@@ -1468,7 +1501,7 @@ while True:
   }
   function insertHardwareConstructor(src,line){
     const lines=String(src||"").split("\n");let lastImport=-1;for(let i=0;i<lines.length;i++)if(/^\s*(?:from\s+\S+\s+import\b|import\s+\S+)/.test(lines[i]))lastImport=i;let at=lastImport+1;while(at<lines.length&&lines[at].trim()==="")at++;
-    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick|Motor|Servo)\s*\(/.test(lines[at]))at++;
+    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|TM1637|LCD1602|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick|Motor|Servo)\s*\(/.test(lines[at]))at++;
     lines.splice(at,0,line);if(at+1<lines.length&&lines[at+1].trim()!=="")lines.splice(at+1,0,"");return lines.join("\n");
   }
   function allocatorSummary(src){const st=gpioResourceState(src);return `GPIO free · OUT ${st.freeOut.length}/${RGB_OUTPUT_PINS.length} · Digital ${st.freeDigital.length}/${DIGITAL_INPUT_PINS.length} · ADC1 ${st.freeAdc.length}/${ANALOG_INPUT_PINS.length}`;}
@@ -1487,7 +1520,7 @@ while True:
 
   // v6.2: Build the Kit Output / Sensors dashboard from the student's source code.
   // Import order controls card order. Multiple constructor instances become separate cards.
-  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"]);
+  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","TM1637","LCD1602","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"]);
   const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder"];
 
   function parseCtorNumber(args,name,index,defaultValue=null){
@@ -1509,6 +1542,10 @@ while True:
       spec.r=parseCtorNumber(args,"red",0,numbered?null:25);spec.g=parseCtorNumber(args,"green",1,numbered?null:26);spec.b=parseCtorNumber(args,"blue",2,numbered?null:27);
       if(c==="LED"){spec.r=25;spec.g=26;spec.b=27;}else if(!numbered&&String(args).split(",").filter(x=>x.trim()).length<=1){spec.r=25;spec.g=26;spec.b=27;}
       spec.identity=`${spec.r??"?"},${spec.g??"?"},${spec.b??"?"}`;
+    }else if(c==="TM1637"){
+      spec.type="tm1637";spec.title="TM1637 4-Digit Display";spec.clk=parseCtorNumber(args,"clk",0,13);spec.dio=parseCtorNumber(args,"dio",1,14);spec.brightness=parseCtorNumber(args,"brightness",2,7);spec.identity=`${spec.clk},${spec.dio}`;spec.detail=`CLK ${spec.clk} · DIO ${spec.dio}`;
+    }else if(c==="LCD1602"){
+      spec.type="lcd1602";spec.title="LCD1602 16×2";spec.sda=parseCtorNumber(args,"sda",0,21);spec.scl=parseCtorNumber(args,"scl",1,22);spec.address=parseCtorNumber(args,"address",2,0x27);spec.bus=parseCtorNumber(args,"bus",3,0)===1?1:0;spec.identity=`${spec.bus}:${spec.sda},${spec.scl},${spec.address}`;spec.detail=`I²C${spec.bus} · SDA ${spec.sda} · SCL ${spec.scl} · 0x${Number(spec.address).toString(16).toUpperCase()}`;
     }else if(c==="DHT11"){
       spec.type="dht11";spec.title="DHT11";spec.pin=parseCtorNumber(args,"pin",0,13);spec.identity=String(spec.pin);
     }else if(c==="Ultrasonic"){
@@ -1598,6 +1635,8 @@ while True:
     const head=`<div class="card-title-row"><span class="sensor-status-dot"></span><strong>${title}</strong><span class="instance-name">${name}</span>${iface?`<span class="interface-badge">${iface}</span>`:""}</div>`;
     if(sp.type==="led")return `<div class="demo-card hardware-card single-led-card" data-hw-key="${key}" data-hw-type="led"><div class="single-led-visual"><i data-role="single-led-glow"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="single-led-label">${sp.pin==null?"PIN NOT ASSIGNED":"OFF"}</span><div class="analog-bar"><i data-role="single-led-fill"></i></div><span class="sensor-secondary">${sp.pin==null?`Use ${escapeHtml(sp.token||"LED1")}(GPIO)`:`GPIO${sp.pin}`}</span></div></div>`;
     if(sp.type==="rgb")return `<div class="demo-card hardware-card rgb-card" data-hw-key="${key}" data-hw-type="rgb"><div class="rgb-shell"><div class="rgb-led" data-role="rgb-led"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rgb-label">R0 G0 B0</span><span class="sensor-secondary">${sp.r==null||sp.g==null||sp.b==null?`Assign 3 pins in ${escapeHtml(sp.token||"RGBLED1")}(R,G,B)`:`GPIO ${sp.r}/${sp.g}/${sp.b}`}</span></div></div>`;
+    if(sp.type==="tm1637")return `<div class="demo-card hardware-card tm1637-card" data-hw-key="${key}" data-hw-type="tm1637"><div class="tm-display" data-role="tm-display">${[0,1,2,3].map(i=>`<span class="tm-digit" data-role="tm-digit-${i}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i><i class="f"></i><i class="g"></i><i class="dp"></i></span>`).join("")}<b class="tm-colon" data-role="tm-colon">:</b></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="tm-label">---- · brightness ${sp.brightness}</span><span class="sensor-secondary">CLK ${sp.clk} · DIO ${sp.dio} · native ACK driver</span></div></div>`;
+    if(sp.type==="lcd1602")return `<div class="demo-card hardware-card lcd1602-card" data-hw-key="${key}" data-hw-type="lcd1602"><div class="lcd1602-screen" data-role="lcd-screen"><pre data-role="lcd-line-0">                </pre><pre data-role="lcd-line-1">                </pre></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="lcd-label">16×2 LCD · READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"")}</span></div></div>`;
     if(sp.type==="dht11")return `<div class="demo-card hardware-card dht-card" data-hw-key="${key}" data-hw-type="dht11"><div class="dht-visual"><div class="thermo"><i data-role="temp-fill"></i></div><div class="humidity-gauge"><i data-role="hum-fill"></i><b data-role="hum-mini">--%</b></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="dht-main">--.- °C · --.- %RH</span><span class="sensor-secondary" data-role="dht-detail">DATA GPIO${sp.pin}</span></div></div>`;
     if(sp.type==="ultrasonic")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="ultrasonic"><div class="ultra-visual"><div class="ultra-face"><i></i><i></i></div><div class="ultra-beam" data-role="ultra-beam"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="ultra-label">--.- cm</span><div class="ultra-range"><i data-role="ultra-fill"></i></div><span class="sensor-secondary">TRIG ${sp.trig} · ECHO ${sp.echo}</span></div></div>`;
     if(sp.type==="oled")return `<div class="demo-card hardware-card oled-card" data-hw-key="${key}" data-hw-type="oled"><canvas ${index===0?'id="oledCanvas" ':''}class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas><div class="demo-grow">${head}<span class="sensor-primary">Live OLED Preview</span><span class="sensor-secondary" data-role="oled-label">SDA ${sp.sda} · SCL ${sp.scl} · 0x${Number(sp.address).toString(16).toUpperCase()}</span></div></div>`;
@@ -1633,6 +1672,8 @@ while True:
     initOledPreview();updateSensorGraphics();renderCustomDashboardCards();
     // Re-apply current per-output RGB states after a layout refresh.
     if(sensorState.rgbOutputs)Object.values(sensorState.rgbOutputs).forEach(updateRgbCommand);else if(sensorState.rgb)updateRgb(sensorState.rgb.r,sensorState.rgb.g,sensorState.rgb.b);
+    if(sensorState.special?.tm1637)Object.values(sensorState.special.tm1637).forEach(paintTM1637);
+    if(sensorState.special?.lcd1602)Object.values(sensorState.special.lcd1602).forEach(paintLCD1602);
   }
 
   function scheduleHardwareCards(src){
@@ -1810,7 +1851,7 @@ while True:
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
-    if(!prefs.demoMode&&kitClient?.connected&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(liveCode)){
+    if(!prefs.demoMode&&kitClient?.connected&&/\b(?:TM1637|LCD1602|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(liveCode)){
       const ok=await refreshInputsFromKit(liveCode,false);if(!ok)scheduleSilentReconnect();
     }else if(!prefs.demoMode&&!kitClient?.connected){scheduleSilentReconnect();}
     const frame=await refreshLiveAI();
@@ -1840,7 +1881,7 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src);
+    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|TM1637|LCD1602|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src);
     currentRunNeedsKit=needsPhysicalKit;
     const inputSpecs=requestedInputs(src),rgbPins=requestedRgbPins(src);
     const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo]),...inputSpecs.dht11.map(x=>x.pin)];
@@ -1861,7 +1902,7 @@ while True:
 
     terminal.textContent="";clearPlotter();
     running=true;liveSessionId++;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:TM1637|LCD1602|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1947,7 +1988,7 @@ while True:
     if(needsPhysicalKit&&!prefs.demoMode&&kitClient?.connected){
       try{
         await beginHardwareRun();
-        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src))await refreshInputsFromKit(src,false);
+        if(/\b(?:TM1637|LCD1602|DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src))await refreshInputsFromKit(src,false);
       }
       catch(e){currentRunUsesKit=false;log("Physical kit session unavailable — continuing in Offline Simulation: "+(e?.message||e));scheduleSilentReconnect();}
     }else{currentRunUsesKit=false;}
@@ -2052,6 +2093,8 @@ while True:
     for(const sp of activeHardwareCards.filter(x=>x.type==="rgb"))applyDemo({command:"RGB_LED_SET",id:Number((String(sp.token||"").match(/RGBLED(\d+)/)||[])[1]||1),rPin:sp.r,gPin:sp.g,bPin:sp.b,r:0,g:0,b:0});
     for(const sp of activeHardwareCards.filter(x=>x.type==="led"&&x.pin!=null))applyDemo({command:"LED_SET",pin:sp.pin,value:0});
     applyDemo({command:"MOTOR_SET",id:1,speed:0});
+    for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"))applyDemo({command:"TM1637_SET",action:"clear",clk:sp.clk,dio:sp.dio,brightness:sp.brightness??7,segments:[0,0,0,0]});
+    for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"))applyDemo({command:"LCD1602_SET",action:"clear",bus:sp.bus,sda:sp.sda,scl:sp.scl,address:sp.address,backlight:true});
   }
 
   async function stopProgram(){
@@ -2065,14 +2108,16 @@ while True:
     updateRunControls();
     await endHardwareRun();
     createWorker();
-    log("Stopped. RGB/motor outputs are OFF; OLED animation is stopped.");
+    log("Stopped. Outputs are safe; TM1637/LCD/OLED animations are stopped.");
   }
 
   function updateSensorGraphics(){
     for(const sp of activeHardwareCards){
       const card=findHardwareCard(sp);if(!card)continue;
       const role=n=>card.querySelector(`[data-role="${n}"]`);
-      if(sp.type==="analog"){
+      if(sp.type==="tm1637"){const d=sensorState.special?.tm1637?.[`${sp.clk},${sp.dio}`];if(d)paintTM1637(d);
+      }else if(sp.type==="lcd1602"){const d=sensorState.special?.lcd1602?.[`${sp.bus}:${sp.address}`];if(d)paintLCD1602(d);
+      }else if(sp.type==="analog"){
         const d=sensorState.inputs?.analog?.[String(sp.pin)]||{},hasData=Object.keys(d).length>0;
         const fallback=prefs.demoMode&&sp.pin===(sensorState.potPin||34);
         const value=Math.max(0,Math.min(255,Number(d.value255??d.value??(fallback?sensorState.potValue:0))||0));
@@ -2250,6 +2295,22 @@ while True:
     if(show)commitOledPreview();
   }
 
+  function tmSegmentBits(card,index,bits){
+    const digit=card?.querySelector(`[data-role="tm-digit-${index}"]`);if(!digit)return;const names=["a","b","c","d","e","f","g"];
+    names.forEach((name,bit)=>{const el=digit.querySelector(`.${name}`);if(el)el.classList.toggle("on",!!(Number(bits)&(1<<bit)));});const dp=digit.querySelector(".dp");if(dp)dp.classList.toggle("on",!!(Number(bits)&0x80));
+  }
+  function paintTM1637(p={}){
+    const key=`${Number(p.clk??13)},${Number(p.dio??14)}`;sensorState.special=sensorState.special||{};sensorState.special.tm1637=sensorState.special.tm1637||{};sensorState.special.tm1637[key]={...sensorState.special.tm1637[key],...p};const state=sensorState.special.tm1637[key],seg=Array.isArray(state.segments)?state.segments.map(Number):[0,0,0,0];
+    for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&`${sp.clk},${sp.dio}`===key)){const card=findHardwareCard(sp);if(!card)continue;for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]');if(label)label.textContent=`4 digits · brightness ${Number(state.brightness??sp.brightness??7)}${state.simulated?" · SIMULATION":""}`;card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
+  }
+  function lcdBlank(){return " ".repeat(16);}
+  function paintLCD1602(p={}){
+    const bus=Number(p.bus??0)===1?1:0,address=Number(p.address??0x27),key=`${bus}:${address}`;sensorState.special=sensorState.special||{};sensorState.special.lcd1602=sensorState.special.lcd1602||{};const prev=sensorState.special.lcd1602[key]||{lines:[lcdBlank(),lcdBlank()],backlight:true,enabled:true};let lines=Array.isArray(prev.lines)?prev.lines.slice(0,2):[lcdBlank(),lcdBlank()];while(lines.length<2)lines.push(lcdBlank());const action=String(p.action||"").toLowerCase();
+    if(action==="clear")lines=[lcdBlank(),lcdBlank()];else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");}
+    const state={...prev,...p,bus,address,lines,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled};sensorState.special.lcd1602[key]=state;
+    for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const card=findHardwareCard(sp);if(!card)continue;for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);}const label=card.querySelector('[data-role="lcd-label"]');if(label)label.textContent=`16×2 LCD · ${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"}${state.simulated?" · SIM":""}`;card.classList.add("live");}
+  }
+
   function applyDemo(p){
     if(String(p.command||"").startsWith("BRIDGE_")){
       const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"},group=map[p.command]||"gpio",key=String(p.key||p.command),prev=sensorState.bridge?.[group]?.[key]||{},phase=Date.now()/1000+Number(p.pin||0)*.17;let d={ok:true,valid:true,simulated:true};
@@ -2262,6 +2323,8 @@ while True:
       if(p.command==="BRIDGE_PULSE")d={...d,microseconds:Math.round(900+250*Math.sin(phase)),hz:Number((12+4*Math.sin(phase*.6)).toFixed(2)),pin:Number(p.pin)};
       if(p.command==="BRIDGE_COUNTER")d={...d,count:Number(prev.count??0)+2,delta:2,hz:Number((8+3*Math.sin(phase*.5)).toFixed(2)),pin:Number(p.pin)};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;
     }
+    if(p.command==="TM1637_SET"){paintTM1637(p);return;}
+    if(p.command==="LCD1602_SET"){paintLCD1602(p);return;}
     if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
     if(p.command==="RGB_LED_SET")updateRgbCommand(p);
     if(p.command==="LED_SET"){
@@ -2366,6 +2429,10 @@ while True:
           }
           if(!result?.skipped)applyDemo(p); // Mirror only after ESP32 acknowledges: screen and kit stay synchronized.
           markKitSuccess(kitClient.status);
+        }else if(p.command==="TM1637_SET"){
+          let result;try{result=await kitClient.tm1637(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.tm1637(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
+        }else if(p.command==="LCD1602_SET"){
+          let result;try{result=await kitClient.lcd1602(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.lcd1602(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
         }else if(String(p.command||"").startsWith("OLED_")){
           let result;
           try{result=await kitClient.oled(p);}

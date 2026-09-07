@@ -736,3 +736,22 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
 .joystick-pad{width:58px;height:58px;border-radius:50%;position:relative;flex:0 0 auto;background:radial-gradient(circle,#152a43 0 28%,#0b1626 30% 58%,#263d58 60% 63%,#09111e 65%);border:1px solid #2c4968}.joystick-pad i{position:absolute;left:50%;top:50%;width:17px;height:17px;border-radius:50%;background:#90dfff;border:2px solid #d7f7ff;box-shadow:0 4px 10px #0007;transform:translate(0,0);margin:-10px 0 0 -10px;transition:transform .12s linear}
 .bus-card .bridge-icon{font-size:11px;letter-spacing:-.4px}.bus-card.live .bridge-icon{box-shadow:0 0 18px rgba(90,220,255,.18)}
 @media(max-width:520px){.studio-icon,.imu-scene,.joystick-pad{width:44px;height:44px}.imu-cube{width:30px;height:23px}}
+
+/* v6.3 native display studio: TM1637/HW-069 + LCD1602 I2C */
+.tm1637-card,.lcd1602-card{align-items:center;gap:16px}
+.tm-display{position:relative;display:flex;gap:5px;align-items:center;justify-content:center;background:#130b0b;border:1px solid #5a2929;border-radius:10px;padding:10px 12px;min-width:188px;box-shadow:inset 0 0 20px #000}
+.tm-digit{position:relative;width:34px;height:58px;display:block}
+.tm-digit i{position:absolute;display:block;background:#4d1717;opacity:.28;border-radius:4px;transition:opacity .08s,filter .08s,background .08s}
+.tm-digit i.on{background:#ff3b2f;opacity:1;filter:drop-shadow(0 0 5px #ff3b2f)}
+.tm-digit .a,.tm-digit .g,.tm-digit .d{left:7px;width:21px;height:5px;transform:skewX(-12deg)}
+.tm-digit .a{top:2px}.tm-digit .g{top:27px}.tm-digit .d{bottom:2px}
+.tm-digit .b,.tm-digit .c,.tm-digit .e,.tm-digit .f{width:5px;height:21px;transform:skewY(-12deg)}
+.tm-digit .f{left:2px;top:7px}.tm-digit .b{right:2px;top:7px}.tm-digit .e{left:2px;bottom:7px}.tm-digit .c{right:2px;bottom:7px}
+.tm-digit .dp{width:6px;height:6px;right:-1px;bottom:1px;border-radius:50%;transform:none}
+.tm-colon{position:absolute;left:50%;top:21px;transform:translateX(-50%);font:700 25px/1 monospace;color:#4d1717;opacity:.3;text-shadow:none;pointer-events:none}
+.tm-colon.on{color:#ff3b2f;opacity:1;text-shadow:0 0 7px #ff3b2f}
+.lcd1602-screen{min-width:252px;background:#86b63d;border:9px solid #263d2f;border-radius:8px;padding:10px 13px;box-shadow:inset 0 0 18px #263d2f88,0 3px 12px #0004;transition:filter .15s,opacity .15s}
+.lcd1602-screen pre{margin:0;white-space:pre;font:700 17px/1.38 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:1px;color:#142515;text-shadow:0 1px #b8dc77;overflow:hidden;width:16ch}
+.lcd1602-screen.backlight-off{filter:brightness(.48) saturate(.55)}
+.lcd1602-screen.display-off pre{opacity:.05}
+@media(max-width:700px){.tm-display{min-width:158px;transform:scale(.88);transform-origin:left center}.lcd1602-screen{min-width:220px;transform:scale(.9);transform-origin:left center}}
