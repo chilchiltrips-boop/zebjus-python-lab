@@ -25,9 +25,9 @@ for h in ROOT.glob('*.html'):
         if r and not (ROOT/r).exists(): raise SystemExit(f'Missing local ref in {h.name}: {r}')
 for h in ('index.html','settings.html','camera-bridge.html'):
     text=(ROOT/h).read_text(errors='ignore')
-    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1'):
+    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1'):
         if stale in text: raise SystemExit(f'Stale cache-buster remains in {h}: {stale}')
-    if '?v=6.4.1' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
+    if '?v=6.4.2' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
 
 # Generated Pyodide Python blocks
 s=(ROOT/'py-worker.js').read_text();blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
@@ -87,7 +87,12 @@ for marker in ('cursor_mode','visible=(size_t)(16-col)','display-effects-v2'):
     if marker not in fw: raise SystemExit('Missing firmware display-FX marker: '+marker)
 
 subprocess.check_call([sys.executable,str(ROOT/'TEST_SENSOR_RUNTIME.py')])
-if 'import sys, io, json' not in (ROOT/'py-worker.js').read_text(): raise SystemExit('Per-cycle io import hotfix missing')
+subprocess.check_call([sys.executable,str(ROOT/'TEST_RUNTIME_NAMESPACE.py')])
+worker_text=(ROOT/'py-worker.js').read_text()
+if 'import sys, io, json' not in worker_text: raise SystemExit('Per-cycle io import hotfix missing')
+for marker in ('def _zebjus_new_student_namespace():','def _zebjus_ensure_terminal_streams():','_zebjus_student_globals, _zebjus_student_globals'):
+    if marker not in worker_text: raise SystemExit('Protected runtime marker missing: '+marker)
+if 'globals(), globals())' in worker_text: raise SystemExit('Student code still executes in runtime globals')
 bc=json.loads((ROOT/'BUILD_CHECK.json').read_text())
-assert bc['ui_version']=='6.4.1' and bc['firmware']=='2.4.0' and bc['examples_count']==40
-print(f'ZEBJUS v6.4.1 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')
+assert bc['ui_version']=='6.4.2' and bc['firmware']=='2.4.0' and bc['examples_count']==40
+print(f'ZEBJUS v6.4.2 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')

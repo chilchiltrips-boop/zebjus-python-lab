@@ -1300,7 +1300,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.4.1",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.4.2",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};

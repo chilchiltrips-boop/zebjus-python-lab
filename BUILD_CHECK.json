@@ -1,6 +1,6 @@
 {
-  "release": "ZEBJUS Python Lab v6.4.1 Runtime IO Hotfix FINAL",
-  "ui_version": "6.4.1",
+  "release": "ZEBJUS Python Lab v6.4.2 Protected Runtime FINAL",
+  "ui_version": "6.4.2",
   "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 40,
@@ -25,7 +25,9 @@
     "lcd1602_alignment_and_effects": true,
     "lcd1602_cursor_blink": true,
     "tm1637_scroll_count_decimal_effects": true,
-    "output_effect_helpers": true
+    "output_effect_helpers": true,
+    "protected_student_runtime_namespace": true,
+    "per_cycle_terminal_stream_self_heal": true
   },
   "retained_safety_fixes": {
     "active_low_digital_failsafe": true,
@@ -48,7 +50,8 @@
     "lcd1602_command_test": "pass: init + row0/row1 write command emission",
     "display_fx_runtime_tests": "pass: TM1637 ordered scroll/decimal + LCD long-text scroll/cursor",
     "display_preview_binding_static_checks": "pass: pin/bus DOM identity fallback",
-    "firmware": "v2.4.0 cursor/display control + visible-row write boundary"
+    "firmware": "v2.4.0 cursor/display control + visible-row write boundary",
+    "protected_runtime_namespace_test": "pass: user io/time/json/math/private helper names cannot overwrite runtime globals; LIVE state persists and resets per session"
   },
-  "runtime_io_hotfix": "Per-cycle self-import of sys/io/json prevents io.StringIO NameError after globals are modified."
+  "runtime_io_hotfix": "v6.4.2: main.py executes in an isolated persistent namespace; runtime streams are self-healed each cycle."
 }

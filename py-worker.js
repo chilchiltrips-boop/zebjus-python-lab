@@ -45,6 +45,32 @@ class _ZebjusTerminalStream:
 _zebjus_stdout=_ZebjusTerminalStream("stdout")
 _zebjus_stderr=_ZebjusTerminalStream("stderr")
 
+# Student code executes in its own persistent namespace. This prevents common
+# names such as io/time/json/math and private runtime helpers from being
+# overwritten by main.py while preserving variables across LIVE MODE cycles.
+def _zebjus_new_student_namespace():
+    return {
+        "__name__":"__main__",
+        "__file__":"main.py",
+        "__package__":None,
+        "__builtins__":__builtins__
+    }
+
+_zebjus_student_globals=_zebjus_new_student_namespace()
+
+def _zebjus_reset_student_namespace():
+    global _zebjus_student_globals
+    _zebjus_student_globals=_zebjus_new_student_namespace()
+    return _zebjus_student_globals
+
+def _zebjus_ensure_terminal_streams():
+    global _zebjus_stdout,_zebjus_stderr
+    if not isinstance(globals().get("_zebjus_stdout"),_ZebjusTerminalStream):
+        _zebjus_stdout=_ZebjusTerminalStream("stdout")
+    if not isinstance(globals().get("_zebjus_stderr"),_ZebjusTerminalStream):
+        _zebjus_stderr=_ZebjusTerminalStream("stderr")
+    return _zebjus_stdout,_zebjus_stderr
+
 def _clamp255(v): return max(0,min(255,int(v)))
 
 def _send(command,**kwargs):
@@ -1191,6 +1217,7 @@ cv2.destroyAllWindows=_browser_close_windows
 
   await pyodide.runPythonAsync(`
 import sys, io, json
+_zebjus_ensure_terminal_streams()
 sys.stdin=io.StringIO(__stdin_text + ("\\n" if __stdin_text and not __stdin_text.endswith("\\n") else ""))
 sys.stdout=_zebjus_stdout
 sys.stderr=_zebjus_stderr
@@ -1288,7 +1315,7 @@ async function executeStudentCode(execCode){
 import json, traceback
 
 try:
-    exec(compile(str(__student_exec_code), "main.py", "exec"), globals(), globals())
+    exec(compile(str(__student_exec_code), "main.py", "exec"), _zebjus_student_globals, _zebjus_student_globals)
     json.dumps({"ok": True})
 except BaseException as e:
     frames = traceback.extract_tb(e.__traceback__)
@@ -1326,7 +1353,7 @@ self.onmessage=async e=>{
   try{
     await initialize();
     const session=String(m.liveSessionId||"default");
-    if(preparedRunSession!==session){preparedRunSession=session;await pyodide.runPythonAsync(`_i2c_bus_claimed={};_gps_state={}`);}
+    if(preparedRunSession!==session){preparedRunSession=session;await pyodide.runPythonAsync(`_zebjus_reset_student_namespace();_i2c_bus_claimed={};_gps_state={}`);}
     const execCode=await prepareRun(m);
     const liveParts=buildPersistentLiveParts(execCode);
     let result={ok:true};

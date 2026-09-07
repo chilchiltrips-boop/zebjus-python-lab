@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.4.1 — Display FX / Preview Sync Test
+# ZEBJUS Python Lab v6.4.2 — Display FX / Preview Sync Test
 
 Checks in `VERIFY_RELEASE.py` + `TEST_SENSOR_RUNTIME.py`:
 
