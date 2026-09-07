@@ -81,3 +81,7 @@ GPIO36 and GPIO39 are intentionally excluded from the interrupt-counter API in t
 ## 7. Wix / embedded connection fallback
 
 If the kit is powered and on the same Wi-Fi but the embedded Wix page cannot access the local kit, open the Python Lab page directly in a new browser tab and allow Local Network Access when the browser asks. The app now prints this fallback when an embedded connection attempt fails.
+
+## Arduino IDE compile-order hotfix
+- Added forward declarations for OutputSlot, I2CBusState, UartState, SpiState, RotarySlot and CounterSlot immediately after includes.
+- This prevents Arduino sketch preprocessor generated prototypes from referencing `CounterSlot` / `RotarySlot` before those types are known.
