@@ -67,4 +67,25 @@ assert any(x.get('action')=='init' and x.get('address')==0x27 for x in lcd_msgs)
 assert any(x.get('action')=='write' and x.get('row')==0 and str(x.get('text','')).startswith('ZEBJUS') for x in lcd_msgs), lcd_msgs
 assert any(x.get('action')=='write' and x.get('row')==1 and str(x.get('text','')).startswith('Python Lab') for x in lcd_msgs), lcd_msgs
 
-print('Sensor runtime regression PASS')
+
+# v6.4 Display FX: long text must not silently truncate; effect frames are ordered.
+orig_sleep=g['time'].sleep;g['time'].sleep=lambda _seconds: None
+try:
+    messages.clear();tm=g['TM1637'](13,14,6);tm.scroll('ZEBJUS',speed=.03,loops=1);tm.decimal(12.3)
+    payloads=[m.get('payload',{}) for m in messages if isinstance(m,dict) and m.get('type')=='kit-command']
+    fx=[x for x in payloads if x.get('command')=='TM1637_SET' and x.get('effect')=='scroll']
+    assert len(fx)>=6 and all(x.get('ordered') is True for x in fx), fx
+    dec=[x for x in payloads if x.get('command')=='TM1637_SET'][-1]
+    assert dec.get('segments',[0,0,0,0])[2]&0x80, dec
+
+    messages.clear();lcd=g['LCD1602'](21,22,0x27,0);lcd.center(1,'Python Lab BINU K JOSE',speed=.03,loops=1);lcd.cursor(True,True)
+    payloads=[m.get('payload',{}) for m in messages if isinstance(m,dict) and m.get('type')=='kit-command']
+    scroll=[x for x in payloads if x.get('command')=='LCD1602_SET' and x.get('effect')=='scroll']
+    assert len(scroll)>5 and all(x.get('ordered') is True for x in scroll), scroll[:3]
+    visible='|'.join(str(x.get('text','')) for x in scroll)
+    assert 'BINU' in visible and 'JOSE' in visible, visible
+    assert any(x.get('action')=='cursor_mode' and x.get('cursor') is True and x.get('blink') is True for x in payloads), payloads[-3:]
+finally:
+    g['time'].sleep=orig_sleep
+
+print('Sensor runtime regression PASS + Display FX PASS')

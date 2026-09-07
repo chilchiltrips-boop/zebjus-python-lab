@@ -575,28 +575,34 @@ while True:
     plot(Count=count, Frequency=hz)
     sleep(0.25)`,
 
-    tm1637Display:`# HW-069 / TM1637 4-Digit Display
+    tm1637Display:`# HW-069 / TM1637 4-Digit Display + Effects
 from zebjus import TM1637, sleep
 
 display = TM1637(clk=13, dio=14, brightness=6)
-n = 0
+
+display.scroll("ZEBJUS", speed=0.22, loops=1)
+display.clock(12, 34, colon=True)
+sleep(1)
+display.blink(2026, times=2, speed=0.2)
 
 while True:
-    display.number(n)
-    print("Display:", n)
-    n = (n + 1) % 10000
-    sleep(0.1)`,
+    display.count(0, 99, speed=0.08)
+    display.scroll("PYTHON", speed=0.2, loops=1)`,
 
-    lcd1602Display:`# LCD1602 16x2 with I2C backpack
+    lcd1602Display:`# LCD1602 16x2 I2C Display + Text Effects
 from zebjus import LCD1602, sleep
 
 lcd = LCD1602(sda=21, scl=22, address=0x27, bus=0)
 lcd.clear()
 lcd.center(0, "ZEBJUS")
-lcd.center(1, "Python Lab")
+# Text longer than 16 characters automatically scrolls.
+lcd.center(1, "Python Lab BINU K JOSE", speed=0.18, loops=1)
+lcd.typewriter(0, "Python Ready", speed=0.07, align="center")
+lcd.progress(1, 75, label="LOAD")
+sleep(1)
 
 while True:
-    sleep(1)`,
+    lcd.marquee(1, "ZEBJUS PYTHON LAB", speed=0.2, loops=1)`,
 
     customTransaction:`# Custom Timing Sensor - Local ESP32 Transaction VM
 from zebjus import HardwareTransaction, sleep
@@ -673,12 +679,12 @@ while True:
       ["FONT_HERSHEY_SIMPLEX","constant","FONT_HERSHEY_SIMPLEX","OpenCV font"],
       ["FILLED","constant","FILLED","Filled drawing"]
     ],
-    RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
-    LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"]],
-    SingleLED:[["on()","method","on()","On"],["off()","method","off()","Off"],["write()","method","write()","Brightness 0–255"],["brightness()","method","brightness()","Brightness 0–255"],["blink()","method","blink()","Blink"],["pin","property","pin","Selected GPIO"]],
+    RGBLED:[["write()","method","write()","write(r,g,b) 0–255"],["set()","method","set()","set(r,g,b)"],["color()","method","color()","Named color: red, green, blue, purple…"],["fade()","method","fade()","Smooth RGB fade"],["pulse()","method","pulse()","Pulse a named color"],["rainbow()","method","rainbow()","Rainbow animation"],["red()","method","red()","Red"],["green()","method","green()","Green"],["blue()","method","blue()","Blue"],["white()","method","white()","White"],["off()","method","off()","Off"]],
+    LED:[["on()","method","on()","On"],["off()","method","off()","Off"],["blink()","method","blink()","Blink"],["fade()","method","fade()","Smooth brightness fade"],["pulse()","method","pulse()","Brightness pulse"]],
+    SingleLED:[["on()","method","on()","On"],["off()","method","off()","Off"],["write()","method","write()","Brightness 0–255"],["brightness()","method","brightness()","Brightness 0–255"],["blink()","method","blink()","Blink"],["fade()","method","fade()","Smooth brightness fade"],["pulse()","method","pulse()","Brightness pulse"],["pin","property","pin","Selected GPIO"]],
     OLED:[["clear()","method","clear()","Clear OLED buffer"],["show()","method","show()","Display buffered drawing"],["text()","method","text()","Draw text"],["display_text()","method","display_text()","Clear + show text"],["line()","method","line()","Draw line"],["rect()","method","rect()","Draw rectangle"],["circle()","method","circle()","Draw circle"],["pixel()","method","pixel()","Draw pixel"],["scroll_text()","method","scroll_text()","Scrolling text animation"],["distance_bar()","method","distance_bar()","Distance gauge"],["radar()","method","radar()","Ultrasonic radar frame"],["invert()","method","invert()","Invert display"],["contrast()","method","contrast()","Set contrast"]],
-    TM1637:[["number()","method","number()","Display integer -999..9999"],["text()","method","text()","Display four supported characters"],["segments()","method","segments()","Write four raw segment bytes"],["brightness()","method","brightness()","Brightness 0–7"],["clear()","method","clear()","Blank all digits"],["show()","method","show()","Show number or text"]],
-    LCD1602:[["write()","method","write()","Write text at col,row"],["line()","method","line()","Replace one 16-character row"],["center()","method","center()","Center text on a row"],["clear()","method","clear()","Clear LCD"],["home()","method","home()","Cursor home"],["set_cursor()","method","set_cursor()","Set cursor col,row"],["backlight()","method","backlight()","Backlight on/off"],["display()","method","display()","Display on/off"]],
+    TM1637:[["number()","method","number()","Display integer -999..9999"],["text()","method","text()","Display up to four characters"],["clock()","method","clock()","Show HH:MM with colon"],["decimal()","method","decimal()","Show a decimal using the segment dot"],["scroll()","method","scroll()","Scroll long text across four digits"],["marquee()","method","marquee()","Left marquee text effect"],["blink()","method","blink()","Blink a value/text"],["count()","method","count()","Animated number counter"],["pulse()","method","pulse()","Brightness pulse effect"],["segments()","method","segments()","Write four raw segment bytes"],["brightness()","method","brightness()","Brightness 0–7"],["clear()","method","clear()","Blank all digits"],["show()","method","show()","Show number or text"]],
+    LCD1602:[["write()","method","write()","Write text at col,row"],["line()","method","line()","Replace one 16-character row"],["lines()","method","lines()","Write both LCD rows"],["align()","method","align()","Left/center/right alignment"],["center()","method","center()","Center short text; auto-scroll long text"],["left()","method","left()","Left-align text"],["right()","method","right()","Right-align text"],["scroll()","method","scroll()","Scroll long text"],["marquee()","method","marquee()","Marquee long text"],["bounce()","method","bounce()","Bounce text across the LCD"],["typewriter()","method","typewriter()","Typewriter text effect"],["blink_text()","method","blink_text()","Blink a line of text"],["progress()","method","progress()","16-char progress/status bar"],["spinner()","method","spinner()","Animated spinner"],["clear_line()","method","clear_line()","Clear one row"],["cursor()","method","cursor()","Cursor/blink mode"],["clear()","method","clear()","Clear LCD"],["home()","method","home()","Cursor home"],["set_cursor()","method","set_cursor()","Set cursor col,row"],["backlight()","method","backlight()","Backlight on/off"],["display()","method","display()","Display on/off"]],
     Ultrasonic:[["read()","method","read()","Distance cm"],["centimeters()","method","centimeters()","Distance cm"],["distance_cm","property","distance_cm","Distance cm"],["trig","property","trig","TRIG GPIO"],["echo","property","echo","ECHO GPIO"]],
     DHT11:[["read()","method","read()","Return temperature/humidity object"],["temperature()","method","temperature()","Temperature °C"],["humidity()","method","humidity()","Relative humidity %"],["get_values()","method","get_values()","Legacy [humidity×10,temp×10]"],["pin","property","pin","DATA GPIO"]],
     SerialPlotter:[["plot()","method","plot()","Plot named values"],["clear()","method","clear()","Clear graph"]],
@@ -694,8 +700,9 @@ while True:
     GPIOInput:[["read()","method","read()","Boolean input"],["state()","method","state()","Raw 0/1"]],
     ADC:[["raw()","method","raw()","0–4095"],["millivolts()","method","millivolts()","mV"],["percent()","method","percent()","0–100%"]],
     PWM:[["write()","method","write()","Raw PWM duty"],["percent()","method","percent()","0–100%"],["off()","method","off()","PWM off"]],
-    PWMServo:[["write()","method","write()","Angle 0–180"],["angle()","method","angle()","Angle"],["write_us()","method","write_us()","Pulse microseconds"],["detach()","method","detach()","Output off"]],
-    MotorDriver:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Reverse"],["stop()","method","stop()","Coast/stop"],["brake()","method","brake()","Brake"]],
+    PWMServo:[["write()","method","write()","Angle 0–180"],["angle()","method","angle()","Angle"],["sweep()","method","sweep()","Smooth servo sweep animation"],["write_us()","method","write_us()","Pulse microseconds"],["detach()","method","detach()","Output off"]],
+    MotorDriver:[["forward()","method","forward()","Forward"],["backward()","method","backward()","Reverse"],["ramp()","method","ramp()","Smooth speed ramp"],["stop()","method","stop()","Coast/stop"],["brake()","method","brake()","Brake"]],
+    Buzzer:[["tone()","method","tone()","Play a frequency"],["beep()","method","beep()","Timed beep"],["sweep()","method","sweep()","Frequency sweep effect"],["no_tone()","method","no_tone()","Stop sound"]],
     I2C:[["scan()","method","scan()","Find I²C addresses"],["readfrom()","method","readfrom()","Read bytes"],["writeto()","method","writeto()","Write bytes"],["read_registers()","method","read_registers()","Read register bytes"],["write_register()","method","write_register()","Write register"]],
     I2CDevice:[["read()","method","read()","Read bytes"],["write()","method","write()","Write bytes"],["read_registers()","method","read_registers()","Read registers"],["write_register()","method","write_register()","Write register"]],
     UART:[["read()","method","read()","Read bytes"],["readline()","method","readline()","Read serial line"],["write()","method","write()","Write bytes"],["print()","method","print()","Write text"],["available()","method","available()","Buffered bytes"]],
@@ -1293,7 +1300,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.3.1",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.4.0",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1637,8 +1644,8 @@ while True:
     const head=`<div class="card-title-row"><span class="sensor-status-dot"></span><strong>${title}</strong><span class="instance-name">${name}</span>${iface?`<span class="interface-badge">${iface}</span>`:""}</div>`;
     if(sp.type==="led")return `<div class="demo-card hardware-card single-led-card" data-hw-key="${key}" data-hw-type="led"><div class="single-led-visual"><i data-role="single-led-glow"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="single-led-label">${sp.pin==null?"PIN NOT ASSIGNED":"OFF"}</span><div class="analog-bar"><i data-role="single-led-fill"></i></div><span class="sensor-secondary">${sp.pin==null?`Use ${escapeHtml(sp.token||"LED1")}(GPIO)`:`GPIO${sp.pin}`}</span></div></div>`;
     if(sp.type==="rgb")return `<div class="demo-card hardware-card rgb-card" data-hw-key="${key}" data-hw-type="rgb"><div class="rgb-shell"><div class="rgb-led" data-role="rgb-led"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rgb-label">R0 G0 B0</span><span class="sensor-secondary">${sp.r==null||sp.g==null||sp.b==null?`Assign 3 pins in ${escapeHtml(sp.token||"RGBLED1")}(R,G,B)`:`GPIO ${sp.r}/${sp.g}/${sp.b}`}</span></div></div>`;
-    if(sp.type==="tm1637")return `<div class="demo-card hardware-card tm1637-card" data-hw-key="${key}" data-hw-type="tm1637"><div class="tm-display" data-role="tm-display">${[0,1,2,3].map(i=>`<span class="tm-digit" data-role="tm-digit-${i}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i><i class="f"></i><i class="g"></i><i class="dp"></i></span>`).join("")}<b class="tm-colon" data-role="tm-colon">:</b></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="tm-label">---- · brightness ${sp.brightness}</span><span class="sensor-secondary">CLK ${sp.clk} · DIO ${sp.dio} · native ACK driver</span></div></div>`;
-    if(sp.type==="lcd1602")return `<div class="demo-card hardware-card lcd1602-card" data-hw-key="${key}" data-hw-type="lcd1602"><div class="lcd1602-screen" data-role="lcd-screen"><pre data-role="lcd-line-0">                </pre><pre data-role="lcd-line-1">                </pre></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="lcd-label">16×2 LCD · READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"")}</span></div></div>`;
+    if(sp.type==="tm1637")return `<div class="demo-card hardware-card tm1637-card" data-hw-key="${key}" data-hw-type="tm1637" data-tm-clk="${sp.clk}" data-tm-dio="${sp.dio}"><div class="tm-display" data-role="tm-display">${[0,1,2,3].map(i=>`<span class="tm-digit" data-role="tm-digit-${i}"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i><i class="f"></i><i class="g"></i><i class="dp"></i></span>`).join("")}<b class="tm-colon" data-role="tm-colon">:</b></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="tm-label">---- · brightness ${sp.brightness}</span><span class="sensor-secondary" data-role="tm-detail">CLK ${sp.clk} · DIO ${sp.dio} · native ACK driver</span></div></div>`;
+    if(sp.type==="lcd1602")return `<div class="demo-card hardware-card lcd1602-card" data-hw-key="${key}" data-hw-type="lcd1602" data-lcd-bus="${sp.bus}" data-lcd-address="${sp.address}" data-lcd-sda="${sp.sda}" data-lcd-scl="${sp.scl}"><div class="lcd1602-screen" data-role="lcd-screen"><pre data-role="lcd-line-0">                </pre><pre data-role="lcd-line-1">                </pre><i class="lcd-cursor" data-role="lcd-cursor"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="lcd-label">16×2 LCD · READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"")}</span></div></div>`;
     if(sp.type==="dht11")return `<div class="demo-card hardware-card dht-card" data-hw-key="${key}" data-hw-type="dht11"><div class="dht-visual"><div class="thermo"><i data-role="temp-fill"></i></div><div class="humidity-gauge"><i data-role="hum-fill"></i><b data-role="hum-mini">--%</b></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="dht-main">--.- °C · --.- %RH</span><span class="sensor-secondary" data-role="dht-detail">DATA GPIO${sp.pin}</span></div></div>`;
     if(sp.type==="ultrasonic")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="ultrasonic"><div class="ultra-visual"><div class="ultra-face"><i></i><i></i></div><div class="ultra-beam" data-role="ultra-beam"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="ultra-label">--.- cm</span><div class="ultra-range"><i data-role="ultra-fill"></i></div><span class="sensor-secondary">TRIG ${sp.trig} · ECHO ${sp.echo}</span></div></div>`;
     if(sp.type==="oled")return `<div class="demo-card hardware-card oled-card" data-hw-key="${key}" data-hw-type="oled"><canvas ${index===0?'id="oledCanvas" ':''}class="oled-canvas" width="128" height="64" aria-label="OLED 128 by 64 preview"></canvas><div class="demo-grow">${head}<span class="sensor-primary">Live OLED Preview</span><span class="sensor-secondary" data-role="oled-label">SDA ${sp.sda} · SCL ${sp.scl} · 0x${Number(sp.address).toString(16).toUpperCase()}</span></div></div>`;
@@ -2300,20 +2307,39 @@ while True:
     if(show)commitOledPreview();
   }
 
+  function displayCardsByPins(type,attrs){
+    const cards=[...document.querySelectorAll(`#sensorGrid .hardware-card[data-hw-type="${type}"]`)];
+    const exact=cards.filter(card=>Object.entries(attrs).every(([k,v])=>String(card.dataset[k]??"")===String(v)));
+    if(exact.length)return exact;
+    // If source parsing was delayed or a constructor used expressions, a single card is still unambiguous.
+    return cards.length===1?cards:[];
+  }
+  function normalizeSegmentArray(raw){
+    if(Array.isArray(raw))return raw.slice(0,4).map(v=>Number(v)||0);
+    if(raw&&typeof raw==="object"){
+      try{return Array.from(raw).slice(0,4).map(v=>Number(v)||0);}catch(_){}
+      const vals=Object.values(raw).slice(0,4);if(vals.length)return vals.map(v=>Number(v)||0);
+    }
+    return [0,0,0,0];
+  }
+
   function tmSegmentBits(card,index,bits){
     const digit=card?.querySelector(`[data-role="tm-digit-${index}"]`);if(!digit)return;const names=["a","b","c","d","e","f","g"];
     names.forEach((name,bit)=>{const el=digit.querySelector(`.${name}`);if(el)el.classList.toggle("on",!!(Number(bits)&(1<<bit)));});const dp=digit.querySelector(".dp");if(dp)dp.classList.toggle("on",!!(Number(bits)&0x80));
   }
   function paintTM1637(p={}){
-    const key=`${Number(p.clk??13)},${Number(p.dio??14)}`;sensorState.special=sensorState.special||{};sensorState.special.tm1637=sensorState.special.tm1637||{};sensorState.special.tm1637[key]={...sensorState.special.tm1637[key],...p};const state=sensorState.special.tm1637[key],seg=Array.isArray(state.segments)?state.segments.map(Number):[0,0,0,0];
-    for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&`${sp.clk},${sp.dio}`===key)){const card=findHardwareCard(sp);if(!card)continue;for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]');if(label){const shown=String(state.text??"").replace(/\s+$/g,"");const mode=state.simulated?"SIMULATION":(state.pending?"SYNCING":"KIT");label.textContent=`${shown?`“${shown}” · `:""}brightness ${Number(state.brightness??sp.brightness??7)} · ${mode}`;}card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
+    const clk=Number(p.clk??13),dio=Number(p.dio??14),key=`${clk},${dio}`;sensorState.special=sensorState.special||{};sensorState.special.tm1637=sensorState.special.tm1637||{};sensorState.special.tm1637[key]={...sensorState.special.tm1637[key],...p,clk,dio};const state=sensorState.special.tm1637[key],seg=normalizeSegmentArray(state.segments);while(seg.length<4)seg.push(0);
+    const cards=new Set();for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&Number(x.clk)===clk&&Number(x.dio)===dio)){const c=findHardwareCard(sp);if(c)cards.add(c);}for(const c of displayCardsByPins("tm1637",{tmClk:clk,tmDio:dio}))cards.add(c);
+    for(const card of cards){for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]'),detail=card.querySelector('[data-role="tm-detail"]');if(label){const shown=String(state.text??"").replace(/\s+$/g,"")||"----",mode=state.simulated?"SIMULATION":(state.pending?"SYNCING":"KIT"),effect=String(state.effect||"").toUpperCase();label.textContent=`${shown} · brightness ${Number(state.brightness??7)} · ${effect?effect+" · ":""}${mode}`;}if(detail)detail.textContent=`CLK ${clk} · DIO ${dio} · ${state.hardwareSynced?"physical synced":"native ACK driver"}`;card.dataset.effect=String(state.effect||"");card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
   }
   function lcdBlank(){return " ".repeat(16);}
   function paintLCD1602(p={}){
-    const bus=Number(p.bus??0)===1?1:0,address=Number(p.address??0x27),key=`${bus}:${address}`;sensorState.special=sensorState.special||{};sensorState.special.lcd1602=sensorState.special.lcd1602||{};const prev=sensorState.special.lcd1602[key]||{lines:[lcdBlank(),lcdBlank()],backlight:true,enabled:true};let lines=Array.isArray(prev.lines)?prev.lines.slice(0,2):[lcdBlank(),lcdBlank()];while(lines.length<2)lines.push(lcdBlank());const action=String(p.action||"").toLowerCase();
-    if(action==="clear")lines=[lcdBlank(),lcdBlank()];else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");}
-    const state={...prev,...p,bus,address,lines,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled};sensorState.special.lcd1602[key]=state;
-    for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const card=findHardwareCard(sp);if(!card)continue;for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);}const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":(state.pending?"SYNCING":"KIT");label.textContent=`16×2 LCD · ${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
+    const bus=Number(p.bus??0)===1?1:0,address=Number(p.address??0x27),key=`${bus}:${address}`;sensorState.special=sensorState.special||{};sensorState.special.lcd1602=sensorState.special.lcd1602||{};const prev=sensorState.special.lcd1602[key]||{lines:[lcdBlank(),lcdBlank()],backlight:true,enabled:true,cursor:false,blink:false};let lines=Array.isArray(prev.lines)?prev.lines.slice(0,2):[lcdBlank(),lcdBlank()];while(lines.length<2)lines.push(lcdBlank());const action=String(p.action||"").toLowerCase();
+    let cursorCol=Number(prev.cursorCol??0),cursorRow=Number(prev.cursorRow??0);
+    if(action==="clear"){lines=[lcdBlank(),lcdBlank()];cursorCol=0;cursorRow=0;}else if(action==="home"){cursorCol=0;cursorRow=0;}else if(action==="cursor"){cursorCol=Math.max(0,Math.min(15,Number(p.col)||0));cursorRow=Math.max(0,Math.min(1,Number(p.row)||0));}else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");cursorRow=row;cursorCol=Math.max(0,Math.min(15,col+Math.min(text.length,16-col)));}
+    const state={...prev,...p,bus,address,lines,cursorCol,cursorRow,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled,cursor:p.cursor===undefined?prev.cursor:!!p.cursor,blink:p.blink===undefined?prev.blink:!!p.blink};sensorState.special.lcd1602[key]=state;
+    const cards=new Set();for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const c=findHardwareCard(sp);if(c)cards.add(c);}for(const c of displayCardsByPins("lcd1602",{lcdBus:bus,lcdAddress:address}))cards.add(c);
+    for(const card of cards){for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);screen.classList.toggle("cursor-on",!!state.cursor);screen.classList.toggle("cursor-blink",!!state.cursor&&!!state.blink);}const cursorEl=card.querySelector('[data-role="lcd-cursor"]');if(cursorEl){cursorEl.style.transform=`translate(${Math.max(0,Math.min(15,Number(state.cursorCol)||0))*11.1}px,${Math.max(0,Math.min(1,Number(state.cursorRow)||0))*23.4}px)`;cursorEl.style.opacity=state.cursor&&state.enabled!==false?"1":"0";}card.dataset.effect=String(state.effect||"");const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":(state.pending?"SYNCING":"KIT"),effect=String(state.effect||"").toUpperCase();label.textContent=`16×2 LCD · ${effect?effect+" · ":""}${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
   }
 
   function applyDemo(p){
@@ -2454,7 +2480,7 @@ while True:
       try{
         while(kitClient?.connected){
           let next=null;
-          if(key.startsWith("tm:")){next=q.latest;q.latest=null;}
+          if(key.startsWith("tm:")){next=q.pending.shift()||q.latest||null;if(next===q.latest)q.latest=null;}
           else next=q.pending.shift()||null;
           if(!next)break;
           try{await sendDisplayHardwareOnce(next);}
@@ -2476,15 +2502,17 @@ while True:
   function queueDisplayHardware(p){
     const key=displayHardwareKey(p);if(!key)return;
     let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[]};displayHardwareQueues.set(key,q);}
-    if(p.command==="TM1637_SET")q.latest={...p};
-    else{
+    if(p.command==="TM1637_SET"){
+      if(p.ordered){q.pending.push({...p});if(q.pending.length>64)q.pending=q.pending.slice(-64);}else{q.pending=[];q.latest={...p};}
+    }else{
       const item={...p},action=String(item.action||"").toLowerCase();
       if(action==="clear")q.pending=[];
-      if(action==="write"){
-        const idx=q.pending.findIndex(x=>String(x.action||"").toLowerCase()==="write"&&Number(x.row||0)===Number(item.row||0)&&Number(x.col||0)===Number(item.col||0));
+      if(item.ordered)q.pending.push(item);
+      else if(action==="write"){
+        const idx=q.pending.findIndex(x=>!x.ordered&&String(x.action||"").toLowerCase()==="write"&&Number(x.row||0)===Number(item.row||0)&&Number(x.col||0)===Number(item.col||0));
         if(idx>=0)q.pending[idx]=item;else q.pending.push(item);
       }else q.pending.push(item);
-      if(q.pending.length>12)q.pending=q.pending.slice(-12);
+      if(q.pending.length>64)q.pending=q.pending.slice(-64);
     }
     if(kitClient?.connected)runDisplayHardwareQueue(key,q);
   }

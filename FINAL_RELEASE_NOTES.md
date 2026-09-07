@@ -1,33 +1,36 @@
-# ZEBJUS Python Lab v6.3.1 FINAL
+# ZEBJUS Python Lab v6.4.0 FINAL
 
-## Added
-- Native TM1637/HW-069 driver (`/api/tm1637`) with bidirectional DIO ACK handling.
-- `TM1637` Python class: number, text, raw segments, brightness, clear.
-- Animated four-digit browser card; works in offline simulation and mirrors physical kit when connected.
-- Native LCD1602 16x2 common PCF8574 I2C-backpack driver (`/api/lcd1602`).
-- `LCD1602` Python class: clear, home, cursor, write/print, line, center, backlight, display.
-- 16x2 LCD browser preview card.
-- Add Component / autocomplete / pin validator / interface conflict support for both displays.
-- LCD1602 shares the existing I2C bus when SDA/SCL match. Addresses such as 0x27 and 0x3F are supported.
-- Two new examples (40 total): TM1637 display and LCD1602 display.
-- Visible GitHub Actions workflow copy and root release-tool wrappers for easier macOS/GitHub upload.
+## Display preview / sync fixes
+- TM1637 **Kit Output / Sensors** card now matches commands by actual CLK/DIO pins, with a single-card fallback for expression-based constructors.
+- LCD1602 card now matches by I2C bus/address and mirrors both 16-character rows.
+- TM1637/LCD browser preview updates immediately; it does not wait for the ESP32 HTTP ACK.
+- Ordered display-effect frames preserve scroll/bounce/typewriter/blink animation order.
+- Normal rapid TM1637/LCD state changes still use low-latency coalescing to avoid Wi-Fi backlog.
+- Stale HTTP acknowledgements cannot roll the browser preview back to an older frame.
 
-## Fixed
-- Generic HardwareTransaction can hand a transaction-owned output pin back to input for protocols that require bidirectional ACK phases.
-- Old TM1637 `MODE input pin conflict: active output` path is therefore backward compatible.
-- Browser cache-busters updated to v6.3.1.
-- Arduino compile script and GitHub Actions now target firmware v2.3.
+## LCD1602 v2 effects
+- `center()`, `left()`, `right()` and `align()` can auto-scroll text longer than 16 characters.
+- Added `scroll()`, `marquee()`, `bounce()`, `typewriter()`, `blink_text()`, `progress()`, `spinner()`, `clear_line()` and `lines()`.
+- Added physical/browser cursor and cursor-blink control with `cursor()`.
+- Firmware direct `write` is constrained to the remaining visible columns of the selected row instead of continuing into hidden DDRAM.
+
+## TM1637 / HW-069 v2 effects
+- Added `decimal()`, `clock()`, `scroll()`, `marquee()`, `blink()`, `count()` and `pulse()`.
+- Expanded approximate seven-segment alphabet coverage.
+- Native bidirectional DIO ACK driver retained; old transaction-mode ACK conflict remains fixed.
+
+## Other output helpers
+- RGB: `fade()`, `pulse()`, `rainbow()`.
+- LED: `fade()`, `pulse()`.
+- PWM Servo: `sweep()`.
+- MotorDriver: `ramp()`.
+- Buzzer: `beep()`, `sweep()`.
+
+## Versions / tooling
+- Browser/UI: **v6.4.0**.
+- ESP32 firmware: **v2.4.0**.
+- Arduino sketch folder, root compile helper, GitHub Actions workflow and visible workflow copy all target v2.4.0.
+- `VERIFY_RELEASE.py` and `TEST_SENSOR_RUNTIME.py` cover the new display effects and long-text behavior.
 
 ## Retained
-All v6.2.2 real-sensor-sync, DHT11, ultrasonic, failsafe, Secure Mode, offline simulation, persistent live loop, I2C sharing and resource-manager fixes remain.
-
-
-## v6.3.1 Display synchronization / latency fix
-- Kit Output / Sensors TM1637/LCD preview updates immediately before network I/O.
-- TM1637 commands are latest-state coalesced to prevent HTTP backlog during fast counters.
-- LCD1602 commands are serialized with bounded/coalesced pending writes.
-- TM1637 Python packets include the human-readable displayed text for the UI label.
-- Stop drains in-flight display writes before end-run clear, preventing a stale frame race.
-- Firmware caches TM1637 data mode and brightness control state.
-- LCD1602 PCF8574 driver removes redundant expander writes per nibble.
-- Browser/firmware versions: 6.3.1 / 2.3.1.
+All v6.2.2/v6.3.1 real-sensor sync, DHT11, ultrasonic, failsafe, Secure Mode, offline simulation, reconnect, persistent live loop, I2C sharing and central resource-manager fixes remain.

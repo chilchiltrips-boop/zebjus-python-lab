@@ -1,7 +1,7 @@
 {
-  "release": "ZEBJUS Python Lab v6.3.1 TM1637 + LCD1602 Display Bridge FINAL",
-  "ui_version": "6.3.1",
-  "firmware": "2.3.1",
+  "release": "ZEBJUS Python Lab v6.4.0 Display FX + Robust Preview FINAL",
+  "ui_version": "6.4.0",
+  "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 40,
   "features": {
@@ -17,7 +17,15 @@
     "optional_per_kit_secure_mode": true,
     "trusted_lan_default": true,
     "visible_github_workflow_copy": true,
-    "root_tool_wrappers": true
+    "root_tool_wrappers": true,
+    "robust_tm1637_card_pin_binding": true,
+    "robust_lcd1602_card_bus_binding": true,
+    "ordered_display_effect_frames": true,
+    "lcd1602_long_text_auto_scroll": true,
+    "lcd1602_alignment_and_effects": true,
+    "lcd1602_cursor_blink": true,
+    "tm1637_scroll_count_decimal_effects": true,
+    "output_effect_helpers": true
   },
   "retained_safety_fixes": {
     "active_low_digital_failsafe": true,
@@ -37,6 +45,9 @@
     "sensor_and_display_runtime_stub_tests": "pass",
     "firmware_static_markers_and_bracket_balance": "pass",
     "tm1637_segment_command_test": "pass: 1234 -> 0x06,0x5B,0x4F,0x66",
-    "lcd1602_command_test": "pass: init + row0/row1 write command emission"
+    "lcd1602_command_test": "pass: init + row0/row1 write command emission",
+    "display_fx_runtime_tests": "pass: TM1637 ordered scroll/decimal + LCD long-text scroll/cursor",
+    "display_preview_binding_static_checks": "pass: pin/bus DOM identity fallback",
+    "firmware": "v2.4.0 cursor/display control + visible-row write boundary"
   }
 }

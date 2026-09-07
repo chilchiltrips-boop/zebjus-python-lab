@@ -288,10 +288,10 @@
       const data={action:String(action||"display"),clk,dio,brightness,segments:Array.from(segments||[]).slice(0,4).map(v=>Number(v)&255).join(",")};
       return this._request("/api/tm1637",{method:"POST",data,timeout:2200});
     }
-    async lcd1602({action="write",bus=0,sda=21,scl=22,address=0x27,backlight=true,text="",col=0,row=0,enabled=true}={}){
+    async lcd1602({action="write",bus=0,sda=21,scl=22,address=0x27,backlight=true,text="",col=0,row=0,enabled=true,cursor=false,blink=false}={}){
       bus=Number(bus)===1?1:0;sda=Number(sda);scl=Number(scl);address=Number(address);
       if(!SAFE_RGB_PINS.includes(sda)||!SAFE_RGB_PINS.includes(scl)||sda===scl)throw new Error("LCD1602 SDA/SCL must use different safe I2C GPIO pins.");
-      return this._request("/api/lcd1602",{method:"POST",data:{action:String(action||"write"),bus,sda,scl,address,backlight:backlight?1:0,text:String(text??""),col:Number(col)||0,row:Number(row)||0,enabled:enabled?1:0},timeout:2400});
+      return this._request("/api/lcd1602",{method:"POST",data:{action:String(action||"write"),bus,sda,scl,address,backlight:backlight?1:0,text:String(text??""),col:Number(col)||0,row:Number(row)||0,enabled:enabled?1:0,cursor:cursor?1:0,blink:blink?1:0},timeout:2400});
     }
 
     // Universal Hardware Bridge v2.1. These methods are interface-level, not sensor-specific.

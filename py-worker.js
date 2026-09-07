@@ -92,6 +92,7 @@ class RGBLED:
             self.pins=tuple(int(x) for x in args)
         else:
             raise ValueError("RGBLED expects RGBLED(1) or RGBLED(redPin, greenPin, bluePin)")
+        self._last=(0,0,0)
         if self.pins is not None:
             if len(set(self.pins))!=3: raise ValueError("RGB LED red, green and blue pins must be different")
             bad=[p for p in self.pins if p not in SUPPORTED_RGB_PINS]
@@ -100,7 +101,7 @@ class RGBLED:
         r,g,b=_clamp255(r),_clamp255(g),_clamp255(b)
         data={"id":self.id,"r":r,"g":g,"b":b,"commonAnode":self.common_anode}
         if self.pins is not None: data.update({"rPin":self.pins[0],"gPin":self.pins[1],"bPin":self.pins[2]})
-        _send("RGB_LED_SET",**data)
+        self._last=(r,g,b);_send("RGB_LED_SET",**data)
     def set(self,r=0,g=0,b=0): self.write(r,g,b)
     def color(self,name,brightness=255):
         key=str(name).strip().lower()
@@ -112,6 +113,22 @@ class RGBLED:
     def blue(self,value=255): self.write(0,0,value)
     def white(self,value=255): self.write(value,value,value)
     def off(self): self.write(0,0,0)
+    def fade(self,r=0,g=0,b=0,duration=.6,steps=24):
+        start=self._last;target=(_clamp255(r),_clamp255(g),_clamp255(b));steps=max(1,int(steps));delay=max(0.0,float(duration))/steps
+        for i in range(1,steps+1):self.write(*[round(start[j]+(target[j]-start[j])*i/steps) for j in range(3)]);time.sleep(delay)
+        return self
+    def pulse(self,color="blue",times=2,speed=.03,max_brightness=255):
+        key=str(color).lower();base=_RGB_COLORS.get(key,(0,0,255));levels=list(range(0,max(1,_clamp255(max_brightness))+1,16));levels+=list(reversed(levels[:-1]))
+        for _ in range(max(1,int(times))):
+            for lv in levels:self.write(*(round(c*lv/255) for c in base));time.sleep(max(.01,float(speed)))
+        return self
+    def rainbow(self,cycles=1,speed=.03,brightness=255):
+        import colorsys
+        level=_clamp255(brightness)
+        for _ in range(max(1,int(cycles))):
+            for deg in range(0,360,10):
+                r,g,b=colorsys.hsv_to_rgb(deg/360.0,1.0,1.0);self.write(round(r*level),round(g*level),round(b*level));time.sleep(max(.01,float(speed)))
+        return self
 
 # Backward-compatible LED API maps to the RGB LED.
 class LED:
@@ -121,6 +138,9 @@ class LED:
     def blink(self,count=3,interval=.5):
         for _ in range(int(count)):
             self.on();time.sleep(float(interval));self.off();time.sleep(float(interval))
+    def fade(self,start=0,end=255,duration=.6,steps=24):
+        start=_clamp255(start);end=_clamp255(end);self.rgb._last=(start,start,start);return self.rgb.fade(end,end,end,duration,steps)
+    def pulse(self,times=2,speed=.03): return self.rgb.pulse("white",times,speed,255)
 
 class _SingleLED:
     def __init__(self,pin,slot=1,active_high=True):
@@ -133,6 +153,13 @@ class _SingleLED:
     def blink(self,count=3,interval=.5):
         for _ in range(int(count)):
             self.on();time.sleep(float(interval));self.off();time.sleep(float(interval))
+    def fade(self,start=0,end=255,duration=.6,steps=24):
+        steps=max(1,int(steps));delay=max(0.0,float(duration))/steps
+        for i in range(steps+1):self.write(round(float(start)+(float(end)-float(start))*i/steps));time.sleep(delay)
+        return self
+    def pulse(self,times=2,speed=.03):
+        for _ in range(max(1,int(times))):self.fade(0,255,speed*16,16);self.fade(255,0,speed*16,16)
+        return self
 
 def _make_led_class(slot):
     class NumberedLED(_SingleLED):
@@ -288,20 +315,27 @@ class OLED:
 # ---------------- 4-DIGIT TM1637 + LCD1602 I2C ----------------
 _TM1637_CHARS={
     "0":0x3F,"1":0x06,"2":0x5B,"3":0x4F,"4":0x66,"5":0x6D,"6":0x7D,"7":0x07,"8":0x7F,"9":0x6F,
-    "A":0x77,"B":0x7C,"C":0x39,"D":0x5E,"E":0x79,"F":0x71,"H":0x76,"L":0x38,"P":0x73,"U":0x3E,
-    "-":0x40,"_":0x08," ":0x00
+    "A":0x77,"B":0x7C,"C":0x39,"D":0x5E,"E":0x79,"F":0x71,"G":0x3D,"H":0x76,"I":0x06,"J":0x1E,
+    "L":0x38,"N":0x54,"O":0x3F,"P":0x73,"R":0x50,"S":0x6D,"T":0x78,"U":0x3E,"Y":0x6E,"Z":0x5B,
+    "-":0x40,"_":0x08,"=":0x48,"?":0x53," ":0x00
 }
 
 class TM1637:
-    """HW-069 / TM1637 4-digit seven-segment display."""
+    """HW-069 / TM1637 4-digit seven-segment display with browser-synced effects."""
     __zebjus_ui__={"type":"tm1637"}
     def __init__(self,clk=13,dio=14,brightness=7):
         self.clk=int(clk);self.dio=int(dio);self._brightness=max(0,min(7,int(brightness)));self._segments=[0,0,0,0];self._display_text="    "
         if self.clk not in SUPPORTED_OUTPUT_PINS or self.dio not in SUPPORTED_OUTPUT_PINS or self.clk==self.dio: raise ValueError(f"TM1637 CLK/DIO must be different safe pins: {SUPPORTED_OUTPUT_PINS}")
         self._send("display")
-    def _send(self,action="display"):
-        _send("TM1637_SET",action=str(action),clk=self.clk,dio=self.dio,brightness=self._brightness,segments=list(self._segments),text=self._display_text)
+    def _send(self,action="display",ordered=False,effect=""):
+        _send("TM1637_SET",action=str(action),clk=self.clk,dio=self.dio,brightness=self._brightness,segments=list(self._segments),text=self._display_text,ordered=bool(ordered),effect=str(effect or ""))
         return self
+    def _encode(self,text,colon=False):
+        txt=str(text).upper()[:4].ljust(4);seg=[_TM1637_CHARS.get(ch,0x00) for ch in txt]
+        if colon: seg[1]|=0x80
+        return txt,seg
+    def _frame(self,text,colon=False,ordered=False,effect=""):
+        self._display_text,self._segments=self._encode(text,colon);return self._send("display",ordered,effect)
     def segments(self,values):
         vals=[int(x)&255 for x in list(values)]
         if len(vals)!=4: raise ValueError("TM1637 segments() needs exactly 4 bytes")
@@ -310,44 +344,135 @@ class TM1637:
         if level is None:return self._brightness
         self._brightness=max(0,min(7,int(level)));return self._send("brightness")
     def clear(self): self._segments=[0,0,0,0];self._display_text="    ";return self._send("clear")
-    def text(self,text,colon=False):
-        txt=str(text).upper()[:4].ljust(4);self._display_text=txt;self._segments=[_TM1637_CHARS.get(ch,0x00) for ch in txt]
-        if colon:self._segments[1]|=0x80
-        return self._send("display")
-    def number(self,value,leading_zero=False,colon=False):
+    def text(self,text,colon=False,ordered=False,effect=""): return self._frame(str(text),colon,ordered,effect)
+    def number(self,value,leading_zero=False,colon=False,ordered=False,effect=""):
         n=int(value);n=max(-999,min(9999,n))
-        if n<0: txt=("-"+str(abs(n))).rjust(4)
-        else: txt=(str(n).zfill(4) if leading_zero else str(n).rjust(4))
-        return self.text(txt,colon=colon)
-    def show(self,value,colon=False):
-        if isinstance(value,(int,float)) and float(value).is_integer():return self.number(int(value),colon=colon)
-        return self.text(value,colon=colon)
+        txt=("-"+str(abs(n))).rjust(4) if n<0 else (str(n).zfill(4) if leading_zero else str(n).rjust(4))
+        return self._frame(txt,colon,ordered,effect)
+    def decimal(self,value,decimals=1):
+        decimals=max(0,min(3,int(decimals)));scale=10**decimals;scaled=int(round(float(value)*scale));sign="-" if scaled<0 else "";digits=str(abs(scaled));raw=(sign+digits)[-4:].rjust(4);txt,seg=self._encode(raw,False)
+        if decimals>0:seg[max(0,3-decimals)]|=0x80
+        self._display_text=raw;self._segments=seg;return self._send("display")
+    def show(self,value,colon=False,ordered=False,effect=""):
+        if isinstance(value,(int,float)) and float(value).is_integer():return self.number(int(value),colon=colon,ordered=ordered,effect=effect)
+        return self.text(value,colon=colon,ordered=ordered,effect=effect)
+    def clock(self,hour,minute,colon=True):
+        h=max(0,min(99,int(hour)));m=max(0,min(99,int(minute)));return self._frame(f"{h:02d}{m:02d}",colon)
+    def scroll(self,text,speed=0.22,loops=1,gap=1,direction="left"):
+        txt=str(text).upper();speed=max(0.03,float(speed));loops=max(1,int(loops));gap=max(1,int(gap));track=txt+(" "*gap)
+        if len(track)<=4:return self._frame(track)
+        doubled=track+track;frames=[doubled[i:i+4] for i in range(len(track))]
+        if str(direction).lower()=="right":frames=list(reversed(frames))
+        for _ in range(loops):
+            for frame in frames:self._frame(frame,False,True,"scroll");time.sleep(speed)
+        return self
+    def marquee(self,text,speed=0.22,loops=1,gap=1): return self.scroll(text,speed,loops,gap,"left")
+    def blink(self,value,times=3,speed=0.25,colon=False):
+        times=max(1,int(times));speed=max(0.03,float(speed));saved=str(value)
+        for _ in range(times):self.show(saved,colon,True,"blink");time.sleep(speed);self._segments=[0,0,0,0];self._display_text="    ";self._send("display",True,"blink");time.sleep(speed)
+        return self.show(saved,colon)
+    def count(self,start,end,step=1,speed=0.08,leading_zero=False):
+        start=int(start);end=int(end);step=int(step) or 1
+        if (end-start)*step<0:step=-step
+        stop=end+(1 if step>0 else -1)
+        for value in range(start,stop,step):self.number(value,leading_zero,False,True,"count");time.sleep(max(0.01,float(speed)))
+        return self
+    def pulse(self,value,times=2,speed=0.08,min_brightness=1,max_brightness=7):
+        saved=self._brightness;self.show(value);lo=max(0,min(7,int(min_brightness)));hi=max(lo,min(7,int(max_brightness)));levels=list(range(lo,hi+1))+list(range(hi-1,lo-1,-1))
+        for _ in range(max(1,int(times))):
+            for level in levels:self._brightness=level;self._send("brightness",True,"pulse");time.sleep(max(0.02,float(speed)))
+        self._brightness=saved;return self._send("brightness")
 
 class LCD1602:
-    """16x2 HD44780 LCD with common PCF8574 I2C backpack (usually 0x27 or 0x3F)."""
+    """16x2 HD44780 LCD with PCF8574 I2C backpack and high-level text effects."""
     __zebjus_ui__={"type":"lcd1602"}
     def __init__(self,sda=None,scl=None,address=0x27,bus=0,backlight=True):
         self.bus=1 if int(bus)==1 else 0;known=_i2c_bus_claimed.get(self.bus,_i2c_bus_defaults[self.bus])
-        self.sda=int(known[0] if sda is None else sda);self.scl=int(known[1] if scl is None else scl);self.address=int(address);self._backlight=bool(backlight)
+        self.sda=int(known[0] if sda is None else sda);self.scl=int(known[1] if scl is None else scl);self.address=int(address);self._backlight=bool(backlight);self._display_enabled=True
         if self.sda not in SUPPORTED_OUTPUT_PINS or self.scl not in SUPPORTED_OUTPUT_PINS or self.sda==self.scl: raise ValueError("LCD1602 SDA/SCL must be different safe GPIO pins")
         if not 1<=self.address<=127: raise ValueError("LCD1602 I2C address must be 0x01..0x7F")
         claimed=_i2c_bus_claimed.get(self.bus)
         if claimed is not None and tuple(claimed)!=(self.sda,self.scl): raise ValueError(f"I2C bus {self.bus} already uses SDA{claimed[0]}/SCL{claimed[1]}; LCD1602 requested SDA{self.sda}/SCL{self.scl}")
         if self.bus not in _i2c_bus_claimed:_i2c_bus_claimed[self.bus]=(self.sda,self.scl)
         self._cmd("init")
-    def _cmd(self,action,**kwargs):
-        _send("LCD1602_SET",action=str(action),bus=self.bus,sda=self.sda,scl=self.scl,address=self.address,backlight=self._backlight,**kwargs);return self
+    def _cmd(self,action,ordered=False,effect="",**kwargs):
+        _send("LCD1602_SET",action=str(action),bus=self.bus,sda=self.sda,scl=self.scl,address=self.address,backlight=self._backlight,ordered=bool(ordered),effect=str(effect or ""),**kwargs);return self
+    @staticmethod
+    def _row(row): return max(0,min(1,int(row)))
+    @staticmethod
+    def _col(col): return max(0,min(15,int(col)))
     def clear(self): return self._cmd("clear")
+    def clear_line(self,row): return self.line(row,"")
     def home(self): return self._cmd("home")
-    def set_cursor(self,col=0,row=0): return self._cmd("cursor",col=max(0,min(15,int(col))),row=max(0,min(1,int(row))))
-    def write(self,text,col=0,row=0): return self._cmd("write",text=str(text)[:32],col=max(0,min(15,int(col))),row=max(0,min(1,int(row))))
+    def set_cursor(self,col=0,row=0): return self._cmd("cursor",col=self._col(col),row=self._row(row))
+    def write(self,text,col=0,row=0,ordered=False,effect=""):
+        return self._cmd("write",ordered=ordered,effect=effect,text=str(text)[:32],col=self._col(col),row=self._row(row))
     def print(self,text,col=0,row=0): return self.write(text,col,row)
-    def line(self,row,text):
-        row=max(0,min(1,int(row)));return self.write(str(text)[:16].ljust(16),0,row)
-    def center(self,row,text):
-        txt=str(text)[:16];return self.line(row,txt.center(16))
+    def line(self,row,text,ordered=False,effect=""):
+        return self.write(str(text)[:16].ljust(16),0,self._row(row),ordered,effect)
+    def align(self,row,text,align="left",overflow="scroll",speed=0.22,loops=1):
+        txt=str(text);mode=str(align).lower();overflow=str(overflow).lower();row=self._row(row)
+        if len(txt)>16 and overflow in ("scroll","marquee","auto"):return self.scroll(row,txt,speed=speed,loops=loops)
+        txt=txt[:16]
+        if mode in ("center","centre","middle"):txt=txt.center(16)
+        elif mode in ("right","end"):txt=txt.rjust(16)
+        else:txt=txt.ljust(16)
+        return self.line(row,txt)
+    def left(self,row,text,overflow="scroll",speed=0.22,loops=1): return self.align(row,text,"left",overflow,speed,loops)
+    def right(self,row,text,overflow="scroll",speed=0.22,loops=1): return self.align(row,text,"right",overflow,speed,loops)
+    def center(self,row,text,overflow="scroll",speed=0.22,loops=1): return self.align(row,text,"center",overflow,speed,loops)
+    def lines(self,line1="",line2="",align="left",overflow="clip"):
+        self.align(0,line1,align,overflow);self.align(1,line2,align,overflow);return self
+    def scroll(self,row,text,direction="left",speed=0.22,loops=1,gap=3):
+        row=self._row(row);txt=str(text);speed=max(0.03,float(speed));loops=max(1,int(loops));gap=max(1,int(gap))
+        if len(txt)<=16:return self.line(row,txt)
+        track=txt+(" "*gap);doubled=track+track;frames=[doubled[i:i+16] for i in range(len(track))]
+        if str(direction).lower()=="right":frames=list(reversed(frames))
+        for _ in range(loops):
+            for frame in frames:self.line(row,frame,True,"scroll");time.sleep(speed)
+        return self
+    def marquee(self,row,text,speed=0.22,loops=1,gap=3): return self.scroll(row,text,"left",speed,loops,gap)
+    def bounce(self,row,text,speed=0.18,loops=1):
+        row=self._row(row);txt=str(text);speed=max(0.03,float(speed));loops=max(1,int(loops))
+        if len(txt)<=16:
+            width=max(0,16-len(txt));positions=list(range(width+1))+list(range(max(0,width-1),0,-1))
+            frames=[(" "*i+txt).ljust(16)[:16] for i in positions]
+        else:
+            positions=list(range(0,len(txt)-15))+list(range(max(0,len(txt)-17),0,-1));frames=[txt[i:i+16].ljust(16) for i in positions]
+        for _ in range(loops):
+            for frame in frames:self.line(row,frame,True,"bounce");time.sleep(speed)
+        return self
+    def typewriter(self,row,text,speed=0.08,align="left"):
+        row=self._row(row);txt=str(text);self.clear_line(row)
+        for i in range(1,len(txt)+1):
+            part=txt[:i];frame=part[-16:]
+            if len(part)<=16:
+                if str(align).lower() in ("center","centre","middle"):frame=frame.center(16)
+                elif str(align).lower() in ("right","end"):frame=frame.rjust(16)
+                else:frame=frame.ljust(16)
+            self.line(row,frame,True,"typewriter");time.sleep(max(0.02,float(speed)))
+        return self
+    def blink_text(self,row,text,times=3,speed=0.25,align="left"):
+        row=self._row(row);times=max(1,int(times));speed=max(0.03,float(speed));txt=str(text)
+        frame=self._formatted_line(txt,align)
+        for _ in range(times):self.write(frame,0,row,True,"blink");time.sleep(speed);self.line(row,"",True,"blink");time.sleep(speed)
+        return self.align(row,txt,align,"clip")
+    @staticmethod
+    def _formatted_line(text,align="left"):
+        txt=str(text)[:16];mode=str(align).lower()
+        return txt.center(16) if mode in ("center","centre","middle") else (txt.rjust(16) if mode in ("right","end") else txt.ljust(16))
+    def progress(self,row,percent,label="",fill="#",empty="-"):
+        pct=max(0.0,min(100.0,float(percent)));label=str(label)[:5]
+        suffix=f"{int(round(pct)):3d}%";prefix=(label+" ") if label else "";width=max(1,16-len(prefix)-len(suffix));n=max(0,min(width,round(width*pct/100.0)));frame=(prefix+(str(fill)[:1]*n)+(str(empty)[:1]*(width-n))+suffix)[:16]
+        return self.line(row,frame,effect="progress")
+    def spinner(self,row=1,col=15,cycles=2,speed=0.12,frames="|/-\\"):
+        row=self._row(row);col=self._col(col);seq=str(frames) or "|/-\\"
+        for _ in range(max(1,int(cycles))):
+            for ch in seq:self.write(ch,col,row,True,"spinner");time.sleep(max(0.02,float(speed)))
+        return self
     def backlight(self,enabled=True): self._backlight=bool(enabled);return self._cmd("backlight")
-    def display(self,enabled=True): return self._cmd("display",enabled=bool(enabled))
+    def display(self,enabled=True): self._display_enabled=bool(enabled);return self._cmd("display",enabled=self._display_enabled)
+    def cursor(self,visible=True,blink=False): return self._cmd("cursor_mode",cursor=bool(visible),blink=bool(blink))
 
 class AnalogInput:
     def __init__(self,pin=34):
@@ -521,6 +646,11 @@ class PWMServo:
     def write_us(self,microseconds):
         period=1000000.0/self.frequency;us=max(0,float(microseconds));duty=round(self.pwm.max_duty*us/period);out=self.pwm.write(duty);angle=max(0.0,min(180.0,(us-self.min_us)*180.0/max(1,self.max_us-self.min_us)));_send("UI_SERVO_SET",id=self.pin,pin=self.pin,angle=angle);return out
     def detach(self): self.pwm.off();_send("UI_SERVO_SET",id=self.pin,pin=self.pin,angle=0,detached=True)
+    def sweep(self,start=0,end=180,step=3,delay=.025,cycles=1):
+        start=max(0,int(start));end=min(180,int(end));step=max(1,abs(int(step)));forward=list(range(start,end+1,step));back=list(range(end-step,start,-step))
+        for _ in range(max(1,int(cycles))):
+            for a in forward+back:self.write(a);time.sleep(max(.005,float(delay)))
+        return self
 
 class MotorDriver:
     __zebjus_ui__={"type":"motor"}
@@ -530,6 +660,10 @@ class MotorDriver:
     def backward(self,speed=100): speed=max(0,min(100,float(speed)));self.in1.off();self.in2.on();self.pwm.percent(speed);_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=-speed,mode="backward")
     def stop(self): self.pwm.off();self.in1.off();self.in2.off();_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=0,mode="stop")
     def brake(self): self.pwm.off();self.in1.on();self.in2.on();_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=0,mode="brake")
+    def ramp(self,target=100,duration=.6,steps=12,direction="forward"):
+        steps=max(1,int(steps));delay=max(0.0,float(duration))/steps;target=max(0,min(100,float(target)));fn=self.backward if str(direction).lower().startswith("back") else self.forward
+        for i in range(steps+1):fn(target*i/steps);time.sleep(delay)
+        return self
 
 class I2C:
     __zebjus_ui__={"type":"i2c"}
@@ -722,6 +856,11 @@ class Buzzer(PWM):
     def __init__(self,pin,frequency=1000): super().__init__(pin,frequency,8,0)
     def tone(self,frequency=1000,volume=50): self.frequency=max(20,int(frequency));duty=round(self.max_duty*max(0,min(100,float(volume)))/200.0);self.write(duty);_send("UI_BUZZER_SET",pin=self.pin,frequency=self.frequency,volume=max(0,min(100,float(volume))));return self.frequency
     def no_tone(self): self.off();_send("UI_BUZZER_SET",pin=self.pin,frequency=0,volume=0)
+    def beep(self,frequency=1000,duration=.15,volume=50): self.tone(frequency,volume);time.sleep(max(0.01,float(duration)));self.no_tone();return self
+    def sweep(self,start=300,end=2000,duration=.8,steps=24,volume=45):
+        steps=max(1,int(steps));delay=max(0.0,float(duration))/steps
+        for i in range(steps+1):self.tone(round(float(start)+(float(end)-float(start))*i/steps),volume);time.sleep(delay)
+        self.no_tone();return self
 
 class Joystick:
     __zebjus_ui__={"type":"joystick"}
