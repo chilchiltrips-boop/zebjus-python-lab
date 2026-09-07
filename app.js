@@ -1300,7 +1300,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.4.3",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.4.4",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -2027,18 +2027,24 @@ while True:
     kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;
     if(st)persistKitIdentity(st);
     if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
-    for(const [key,q] of displayHardwareQueues)if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);
+    for(const [key,q] of displayHardwareQueues){q.paused=false;if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);}
   }
 
   function markKitFailure(reason=""){
     kitFailureCount=Math.min(KIT_FAILURE_LIMIT,kitFailureCount+1);
     if(kitEverConnected&&kitFailureCount<KIT_FAILURE_LIMIT){
-      // v5.23 no-blink rule: 1–4 misses keep the visible state Connected.
+      // Stable-link hysteresis: 1–4 local HTTP misses keep the cached kit session alive.
+      // Do not switch Python to simulation, clear the cached IP, or blink the UI.
       return false;
+    }
+    if(kitFailureCount>=KIT_FAILURE_LIMIT){
+      sensorState.simulationMode=true;
+      for(const q of displayHardwareQueues.values())q.paused=true;
+      if(kitClient?.connected)kitClient.disconnect({forgetIdentity:false});
     }
     badge($("kitStatus"),"Kit disconnected");
     if(kitFailureCount===KIT_FAILURE_LIMIT&&reason&&!kitCommandErrorShown){
-      log("Kit connection lost after 5 consecutive checks. Program is kept running; ESP outputs fail safe after 10 s without heartbeat.");
+      log("Kit connection lost after 5 consecutive checks. Python continues in Simulation; background reconnect keeps the cached kit identity/IP and restores physical output automatically.");
       kitCommandErrorShown=true;
     }
     return true;
@@ -2475,20 +2481,34 @@ while True:
   }
 
   async function runDisplayHardwareQueue(key,q){
-    if(q.busy||!kitClient?.connected)return q.runner||null;q.busy=true;
+    if(q.busy||q.paused||!kitClient?.connected)return q.runner||null;q.busy=true;
     q.runner=(async()=>{
       try{
-        while(kitClient?.connected){
+        while(kitClient?.connected&&!q.paused){
           let next=null;
           if(key.startsWith("tm:")){next=q.pending.shift()||q.latest||null;if(next===q.latest)q.latest=null;}
           else next=q.pending.shift()||null;
           if(!next)break;
           try{await sendDisplayHardwareOnce(next);}
-          catch(e){if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);else scheduleSilentReconnect();break;}
+          catch(e){
+            if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);
+            else{
+              // Preserve the latest physical frame instead of dropping it on a transient LAN timeout.
+              q.paused=true;
+              if(key.startsWith("tm:")){if(next.ordered)q.pending.unshift(next);else if(!q.latest)q.latest=next;}
+              else{
+                const action=String(next.action||"").toLowerCase();
+                const newer=action==="write"&&q.pending.some(x=>!x.ordered&&String(x.action||"").toLowerCase()==="write"&&Number(x.row||0)===Number(next.row||0)&&Number(x.col||0)===Number(next.col||0));
+                if(!newer)q.pending.unshift(next);
+              }
+              scheduleSilentReconnect();
+            }
+            break;
+          }
         }
       }finally{
         q.busy=false;q.runner=null;
-        if((q.latest||q.pending.length)&&kitClient?.connected)setTimeout(()=>runDisplayHardwareQueue(key,q),0);
+        if(!q.paused&&(q.latest||q.pending.length)&&kitClient?.connected)setTimeout(()=>runDisplayHardwareQueue(key,q),0);
       }
     })();
     return q.runner;
@@ -2501,7 +2521,7 @@ while True:
 
   function queueDisplayHardware(p){
     const key=displayHardwareKey(p);if(!key)return;
-    let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[]};displayHardwareQueues.set(key,q);}
+    let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[],paused:false};displayHardwareQueues.set(key,q);}
     if(p.command==="TM1637_SET"){
       if(p.ordered){q.pending.push({...p});if(q.pending.length>64)q.pending=q.pending.slice(-64);}else{q.pending=[];q.latest={...p};}
     }else{
@@ -2514,7 +2534,7 @@ while True:
       }else q.pending.push(item);
       if(q.pending.length>64)q.pending=q.pending.slice(-64);
     }
-    if(kitClient?.connected)runDisplayHardwareQueue(key,q);
+    if(kitClient?.connected&&!q.paused)runDisplayHardwareQueue(key,q);
   }
 
   async function handleKit(p){

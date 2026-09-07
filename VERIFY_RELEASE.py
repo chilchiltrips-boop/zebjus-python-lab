@@ -25,9 +25,9 @@ for h in ROOT.glob('*.html'):
         if r and not (ROOT/r).exists(): raise SystemExit(f'Missing local ref in {h.name}: {r}')
 for h in ('index.html','settings.html','camera-bridge.html'):
     text=(ROOT/h).read_text(errors='ignore')
-    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1','?v=6.4.2'):
+    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1','?v=6.4.2','?v=6.4.3'):
         if stale in text: raise SystemExit(f'Stale cache-buster remains in {h}: {stale}')
-    if '?v=6.4.3' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
+    if '?v=6.4.4' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
 
 # Generated Pyodide Python blocks: validate raw source AND actual JS-decoded templates.
 s=(ROOT/'py-worker.js').read_text();blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
@@ -41,6 +41,10 @@ for i,b in enumerate(decoded,1):
     if b is not None: compile(b,f'<decoded-pyodide-block-{i}>', 'exec')
 
 app=(ROOT/'app.js').read_text();settings=(ROOT/'settings.js').read_text();client=(ROOT/'kit-client.js').read_text();styles=(ROOT/'styles.css').read_text()
+for marker in ('One local HTTP miss must not erase a healthy cached connection.','localAddressSpaceMode','this._lastGoodAt=Date.now()'):
+    if marker not in client: raise SystemExit('Missing stable-link client marker: '+marker)
+for marker in ('kitClient.disconnect({forgetIdentity:false})','q.paused=true','q.paused=false','Stable-link hysteresis'):
+    if marker not in app: raise SystemExit('Missing stable-link app marker: '+marker)
 start=app.find('const examples={');end=app.find('\n  };',start);example_block=app[start:end]
 examples=re.findall(r'\n\s*([A-Za-z0-9_]+):`([\s\S]*?)`(?:,|\s*$)',example_block)
 if len(examples)!=40: raise SystemExit(f'Expected 40 Python examples, found {len(examples)}')
@@ -93,6 +97,7 @@ for marker in ('cursor_mode','visible=(size_t)(16-col)','display-effects-v2'):
 
 subprocess.check_call([sys.executable,str(ROOT/'TEST_SENSOR_RUNTIME.py')])
 subprocess.check_call([sys.executable,str(ROOT/'TEST_RUNTIME_NAMESPACE.py')])
+subprocess.check_call([sys.executable,str(ROOT/'TEST_CONNECTION_STABILITY.py')])
 worker_text=(ROOT/'py-worker.js').read_text()
 if 'import sys, io, json' not in worker_text: raise SystemExit('Per-cycle io import hotfix missing')
 for marker in ('def _zebjus_new_student_namespace():','def _zebjus_ensure_terminal_streams():','_zebjus_student_globals, _zebjus_student_globals','runtimeReady=false','if(runtimeReady&&pyodide)return pyodide','catch(err){runtimeReady=false;readyPromise=null;throw err;}'):
@@ -101,5 +106,5 @@ if 'preparedRunSession=session;await pyodide.runPythonAsync' in worker_text:
     raise SystemExit('Run session is marked prepared before reset helper succeeds')
 if 'globals(), globals())' in worker_text: raise SystemExit('Student code still executes in runtime globals')
 bc=json.loads((ROOT/'BUILD_CHECK.json').read_text())
-assert bc['ui_version']=='6.4.3' and bc['firmware']=='2.4.0' and bc['examples_count']==40
-print(f'ZEBJUS v6.4.3 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')
+assert bc['ui_version']=='6.4.4' and bc['firmware']=='2.4.0' and bc['examples_count']==40
+print(f'ZEBJUS v6.4.4 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')

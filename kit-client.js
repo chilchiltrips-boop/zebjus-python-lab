@@ -50,16 +50,21 @@
     const q=formBody(data);return q?"?"+q:"";
   }
 
-  async function fetchLocal(url,options={},timeoutMs=2200){
+  let localAddressSpaceMode=null;
+  async function fetchLocal(url,options={},timeoutMs=2400){
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
     const base={cache:"no-store",...options,signal:ctrl.signal};
     try{
+      if(localAddressSpaceMode===true)return await fetch(url,{...base,targetAddressSpace:"local"});
+      if(localAddressSpaceMode===false)return await fetch(url,base);
       try{
-        return await fetch(url,{...base,targetAddressSpace:"local"});
+        const r=await fetch(url,{...base,targetAddressSpace:"local"});
+        localAddressSpaceMode=true;return r;
       }catch(first){
         if(first?.name==="AbortError")throw first;
-        return await fetch(url,base);
+        const r=await fetch(url,base);
+        localAddressSpaceMode=false;return r;
       }
     }finally{clearTimeout(timer);}
   }
@@ -95,7 +100,7 @@
     let lastErr=null;
     for(const base of [...new Set(bases)]){
       try{
-        const status=await requestBase(base,"/api/status",{timeout:1800});
+        const status=await requestBase(base,"/api/status",{timeout:2100});
         if(status.kit!=="ZEBJUS")throw new Error("This device is not a ZEBJUS kit.");
         const actualChip=String(status.chipId||"");
         const expectedChip=String(expectedChipId||"");
@@ -135,12 +140,13 @@
   class KitClient{
     constructor(){
       this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";this.token="";
-      this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
+      this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;this._lastGoodAt=0;
       this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";this._dhtCache=new Map();this._ultraCache=new Map();
     }
     get connected(){return !!this.base&&!!this.status;}
+    get lastGoodAgeMs(){return this._lastGoodAt?Math.max(0,Date.now()-this._lastGoodAt):Infinity;}
     _accept(status,base){
-      this.base=base;this.status=status;this.name=status?.name||this.name;this.ipHint=status?.ip||this.ipHint;this.chipId=String(status?.chipId||this.chipId||"");
+      this.base=base;this.status=status;this._lastGoodAt=Date.now();this.name=status?.name||this.name;this.ipHint=status?.ip||this.ipHint;this.chipId=String(status?.chipId||this.chipId||"");
       if(status?.rgb)this._lastRgb={rPin:status.rgb.rPin??25,gPin:status.rgb.gPin??26,bPin:status.rgb.bPin??27,commonAnode:!!status.rgb.commonAnode};
       return status;
     }
@@ -150,16 +156,16 @@
       return this._accept(r.status,r.base);
     }
     disconnect({forgetIdentity=false}={}){
-      this._commandEpoch++;this._commandChain=Promise.resolve();this.base="";this.status=null;
+      this._commandEpoch++;this._commandChain=Promise.resolve();this.base="";this.status=null;this._lastGoodAt=0;
       if(forgetIdentity){this.name="";this.ipHint="";this.chipId="";}
     }
     async refresh(){
       if(!this.base)throw new Error("Kit not connected.");
       try{
-        const st=await requestBase(this.base,"/api/status",{timeout:1400});
+        const st=await requestBase(this.base,"/api/status",{timeout:2100});
         if(this.chipId&&String(st?.chipId||"")!==String(this.chipId))throw new Error("Connected device identity changed.");
         rememberKit(st,this.base);return this._accept(st,this.base);
-      }catch(e){this.base="";this.status=null;throw e;}
+      }catch(e){e.transient=true;throw e;}
     }
     async reconnect(retries=4){
       if(this._reconnectPromise)return this._reconnectPromise;
@@ -185,18 +191,23 @@
     }
     async flushCommands(){try{return await this._commandChain;}catch(_){return null;}}
     async _request(path,opts={},retry=true){
-      if(!this.base)await this.reconnect(4);
-      try{return await requestBase(this.base,path,{...opts,token:this.token});}
+      if(!this.base)await this.reconnect(2);
+      const base=this.base;
+      try{const r=await requestBase(base,path,{...opts,token:this.token});this._lastGoodAt=Date.now();return r;}
       catch(e){
-        if(!retry||e?.status&&e.status<500)throw e;
-        this.base="";this.status=null;await this.reconnect(4);return requestBase(this.base,path,{...opts,token:this.token});
+        if(!retry||(e?.status&&e.status<500))throw e;
+        // One local HTTP miss must not erase a healthy cached connection.
+        // Retry the same cached IP/mDNS target once; app-level background reconnect handles DHCP/name recovery.
+        await new Promise(r=>setTimeout(r,80));
+        try{const r=await requestBase(base,path,{...opts,timeout:Math.max(Number(opts.timeout)||0,1800),token:this.token});this._lastGoodAt=Date.now();return r;}
+        catch(second){second.transient=true;throw second;}
       }
     }
     async beginRun(){
       await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();this._oledInitialized=false;this._dhtCache.clear();
       return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
     }
-    async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900,token:this.token});}
+    async pingRun(){if(!this.base)throw new Error("Kit not connected.");const r=await requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:1400,token:this.token});this._lastGoodAt=Date.now();return r;}
     async endRun(){
       if(!this.base)return {ok:true};
       this._commandEpoch++;this._commandChain=Promise.resolve();

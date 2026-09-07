@@ -1,4 +1,4 @@
-# TM1637 / HW-069 and LCD1602 I2C — v6.4.3
+# TM1637 / HW-069 and LCD1602 I2C — v6.4.4
 
 ## TM1637 / HW-069 4-digit display
 Recommended direct ESP32 wiring:
@@ -47,7 +47,7 @@ lcd.center(1, "Python Lab")
 ```
 
 ### Long text
-A 16×2 LCD can physically show only 16 characters per row at one time. In v6.4.3, long text passed to `center()`, `left()`, `right()` or `align()` can auto-scroll instead of being silently truncated.
+A 16×2 LCD can physically show only 16 characters per row at one time. In v6.4.4, long text passed to `center()`, `left()`, `right()` or `align()` can auto-scroll instead of being silently truncated.
 
 ```python
 lcd.center(1, "Python Lab BINU K JOSE", speed=0.18, loops=1)

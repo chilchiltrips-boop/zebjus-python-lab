@@ -1,5 +1,17 @@
-# ZEBJUS Python Lab v6.4.3 FINAL
+# ZEBJUS Python Lab v6.4.4 Stable Local Link FINAL
 
+
+## v6.4.4 Stable Local Link / No-Blink Connection Fix
+
+- Fixed false `KIT ↔ SIMULATION` switching when one local ESP32 HTTP request times out.
+- Cached IP, base URL, status and kit identity remain active through the first 1–4 consecutive local misses.
+- Hard offline/simulation transition occurs only on the 5th consecutive health/heartbeat failure.
+- Any successful heartbeat, status read or hardware command resets the failure counter immediately.
+- Local HTTP requests retry the same cached target once without clearing the connection; DHCP/mDNS recovery remains a single background reconnect process.
+- Display queues pause on a transient LAN failure and preserve the latest TM1637/LCD state instead of dropping it or replaying a large stale backlog.
+- Reconnect success unpauses the queues and mirrors the latest pending display state automatically.
+- Local Network Access fetch capability is detected once instead of potentially retrying every failed request twice.
+- ESP32 firmware remains v2.4.0; hardware commands already refresh the firmware 10-second run heartbeat.
 ## v6.4.3 Bootstrap Recovery Hotfix
 - Fixed LCD1602 `spinner()` generated-Python escaping for the backslash frame.
 - Pyodide templates are now tested after real JavaScript template-string decoding, not only as raw JS source.
