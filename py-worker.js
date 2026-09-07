@@ -1,17 +1,19 @@
 import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.mjs";
 
-let pyodide=null,readyPromise=null,opencvReady=false,importLoadCache=new Set();
+let pyodide=null,readyPromise=null,runtimeReady=false,opencvReady=false,importLoadCache=new Set();
 let activeLiveSession="",preparedRunSession="",livePrefixDone=false,livePrefixCode="",liveCycleCode="";
 
 async function initialize(){
-  if(pyodide)return pyodide;
+  if(runtimeReady&&pyodide)return pyodide;
   if(readyPromise)return readyPromise;
 
   readyPromise=(async()=>{
     const base="https://cdn.jsdelivr.net/pyodide/v314.0.6/full/";
-    pyodide=await loadPyodide({indexURL:base});
-    pyodide.setStdout({batched:text=>postMessage({type:"runtime-stdout",text})});
-    pyodide.setStderr({batched:text=>postMessage({type:"stderr",text})});
+    if(!pyodide){
+      pyodide=await loadPyodide({indexURL:base});
+      pyodide.setStdout({batched:text=>postMessage({type:"runtime-stdout",text})});
+      pyodide.setStderr({batched:text=>postMessage({type:"stderr",text})});
+    }
 
     await pyodide.runPythonAsync(`
 import sys,types,time,io,base64,js,math,json,traceback
@@ -491,8 +493,8 @@ class LCD1602:
         pct=max(0.0,min(100.0,float(percent)));label=str(label)[:5]
         suffix=f"{int(round(pct)):3d}%";prefix=(label+" ") if label else "";width=max(1,16-len(prefix)-len(suffix));n=max(0,min(width,round(width*pct/100.0)));frame=(prefix+(str(fill)[:1]*n)+(str(empty)[:1]*(width-n))+suffix)[:16]
         return self.line(row,frame,effect="progress")
-    def spinner(self,row=1,col=15,cycles=2,speed=0.12,frames="|/-\\"):
-        row=self._row(row);col=self._col(col);seq=str(frames) or "|/-\\"
+    def spinner(self,row=1,col=15,cycles=2,speed=0.12,frames="|/-\\\\"):
+        row=self._row(row);col=self._col(col);seq=str(frames) or "|/-\\\\"
         for _ in range(max(1,int(cycles))):
             for ch in seq:self.write(ch,col,row,True,"spinner");time.sleep(max(0.02,float(speed)))
         return self
@@ -1114,11 +1116,14 @@ zc.__all__=["Camera","load_image","show","draw_rgb_led","draw_potentiometer","dr
 sys.modules["zebjus_cv"]=zc
     `);
 
+    runtimeReady=true;
     postMessage({type:"ready"});
     return pyodide;
   })();
 
-  return readyPromise;
+  try{return await readyPromise;}
+  catch(err){runtimeReady=false;readyPromise=null;throw err;}
+  finally{if(runtimeReady)readyPromise=null;}
 }
 
 async function syncUploadedFiles(files){
@@ -1353,7 +1358,7 @@ self.onmessage=async e=>{
   try{
     await initialize();
     const session=String(m.liveSessionId||"default");
-    if(preparedRunSession!==session){preparedRunSession=session;await pyodide.runPythonAsync(`_zebjus_reset_student_namespace();_i2c_bus_claimed={};_gps_state={}`);}
+    if(preparedRunSession!==session){await pyodide.runPythonAsync(`_zebjus_reset_student_namespace();_i2c_bus_claimed={};_gps_state={}`);preparedRunSession=session;}
     const execCode=await prepareRun(m);
     const liveParts=buildPersistentLiveParts(execCode);
     let result={ok:true};

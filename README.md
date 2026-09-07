@@ -1,12 +1,21 @@
-# ZEBJUS Python Lab v6.4.2 — Display FX + Robust Hardware Preview
+# ZEBJUS Python Lab v6.4.3 — Display FX + Robust Hardware Preview
 
-## v6.4.2 Protected runtime namespace
+## v6.4.3 Bootstrap Recovery Hotfix
+- Fixed LCD1602 `spinner()` generated-Python escaping for the backslash frame.
+- Pyodide templates are now tested after real JavaScript template-string decoding, not only as raw JS source.
+- Python runtime is marked ready only after the complete bootstrap succeeds.
+- A failed bootstrap clears the pending-ready state so Run/Reset cannot fall through to missing `_zebjus_reset_student_namespace`.
+- A run session is marked prepared only after student-namespace reset succeeds.
+- ESP32 firmware remains v2.4.0; this is a browser/Pyodide runtime hotfix.
+
+
+## v6.4.3 Protected runtime namespace
 Student code runs in its own persistent globals dictionary. This protects Python Lab internals from accidental variable-name collisions while preserving LIVE MODE state. Runtime stdin/stdout/stderr are reinstalled before every cycle. ESP32 firmware remains v2.4.0.
 
-## v6.4.2 runtime hotfix
+## v6.4.3 runtime hotfix
 `py-worker.js` now self-imports `sys`, `io`, and `json` on every execution refresh. This prevents `io.StringIO` NameError even if student code or a previous live cycle changes global names. Firmware remains v2.4.0.
 
-## v6.4.2 display/output update
+## v6.4.3 display/output update
 
 - TM1637 **Kit Output / Sensors** preview now binds by actual CLK/DIO pins, fixing cases where the physical HW-069 worked but the browser card stayed at `----`.
 - LCD1602 preview now binds by I2C bus/address and mirrors rows, backlight, display state, cursor/blink and active effect.

@@ -1,11 +1,13 @@
 from pathlib import Path
-import re, sys, types, math
+import re, sys, types, math, subprocess, json
 ROOT=Path(__file__).resolve().parent
 s=(ROOT/'py-worker.js').read_text()
-blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
-assert blocks, 'Pyodide init block missing'
+# Decode JavaScript template-literal escapes before compiling generated Python.
+node_script='const fs=require("fs");\nconst s=fs.readFileSync(process.argv[1],"utf8");\nconst re=/runPythonAsync\\(`([\\s\\S]*?)`\\)/g;\nlet m,out=[];\nwhile((m=re.exec(s))){\n  const raw=m[1];\n  if(raw.includes("${")){out.push(null);continue;}\n  out.push(Function("return `"+raw.replace(/`/g,"\\\\`")+"`;")());\n}\nprocess.stdout.write(JSON.stringify(out));'
+blocks=json.loads(subprocess.check_output(['node','-e',node_script,str(ROOT/'py-worker.js')],text=True))
+assert blocks and blocks[0], 'Pyodide init block missing'
 for i,b in enumerate(blocks,1):
-    if '${' not in b: compile(b,f'<pyodide-block-{i}>','exec')
+    if b is not None: compile(b,f'<decoded-pyodide-block-{i}>', 'exec')
 
 messages=[]
 class Obj:
@@ -78,7 +80,7 @@ try:
     dec=[x for x in payloads if x.get('command')=='TM1637_SET'][-1]
     assert dec.get('segments',[0,0,0,0])[2]&0x80, dec
 
-    messages.clear();lcd=g['LCD1602'](21,22,0x27,0);lcd.center(1,'Python Lab BINU K JOSE',speed=.03,loops=1);lcd.cursor(True,True)
+    messages.clear();lcd=g['LCD1602'](21,22,0x27,0);lcd.center(1,'Python Lab BINU K JOSE',speed=.03,loops=1);lcd.spinner(cycles=1,speed=.02);lcd.cursor(True,True)
     payloads=[m.get('payload',{}) for m in messages if isinstance(m,dict) and m.get('type')=='kit-command']
     scroll=[x for x in payloads if x.get('command')=='LCD1602_SET' and x.get('effect')=='scroll']
     assert len(scroll)>5 and all(x.get('ordered') is True for x in scroll), scroll[:3]

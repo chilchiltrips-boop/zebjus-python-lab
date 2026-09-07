@@ -1,16 +1,25 @@
-# ZEBJUS Python Lab v6.4.2 FINAL
+# ZEBJUS Python Lab v6.4.3 FINAL
 
-## v6.4.2 Protected Runtime
+## v6.4.3 Bootstrap Recovery Hotfix
+- Fixed LCD1602 `spinner()` generated-Python escaping for the backslash frame.
+- Pyodide templates are now tested after real JavaScript template-string decoding, not only as raw JS source.
+- Python runtime is marked ready only after the complete bootstrap succeeds.
+- A failed bootstrap clears the pending-ready state so Run/Reset cannot fall through to missing `_zebjus_reset_student_namespace`.
+- A run session is marked prepared only after student-namespace reset succeeds.
+- ESP32 firmware remains v2.4.0; this is a browser/Pyodide runtime hotfix.
+
+
+## v6.4.3 Protected Runtime
 - Student `main.py` now executes in a separate persistent namespace instead of the Pyodide runtime global namespace.
 - Fixes `_zebjus_stdout is not defined` and prevents user variables such as `io`, `time`, `json`, `math`, or private-looking names from corrupting runtime helpers.
 - LIVE MODE variables still persist across cycles; a new Run session gets a clean student namespace.
 - stdin/stdout/stderr bootstrap is revalidated every cycle.
 - ESP32 firmware remains v2.4.0; this update is browser/runtime-only.
 
-## v6.4.2 Runtime IO hotfix
+## v6.4.3 Runtime IO hotfix
 - Fixes `NameError: name 'io' is not defined` in Run/LIVE MODE.
 - The per-cycle stdin/runtime refresh now imports `sys`, `io`, and `json` locally before use.
-- Browser cache-busters are v6.4.2. ESP32 firmware remains v2.4.0; no reflashing is required for this hotfix.
+- Browser cache-busters are v6.4.3. ESP32 firmware remains v2.4.0; no reflashing is required for this hotfix.
 
 ## Display preview / sync fixes
 - TM1637 **Kit Output / Sensors** card now matches commands by actual CLK/DIO pins, with a single-card fallback for expression-based constructors.
@@ -39,7 +48,7 @@
 - Buzzer: `beep()`, `sweep()`.
 
 ## Versions / tooling
-- Browser/UI: **v6.4.2**.
+- Browser/UI: **v6.4.3**.
 - ESP32 firmware: **v2.4.0**.
 - Arduino sketch folder, root compile helper, GitHub Actions workflow and visible workflow copy all target v2.4.0.
 - `VERIFY_RELEASE.py` and `TEST_SENSOR_RUNTIME.py` cover the new display effects and long-text behavior.

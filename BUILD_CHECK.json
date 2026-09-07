@@ -1,6 +1,6 @@
 {
-  "release": "ZEBJUS Python Lab v6.4.2 Protected Runtime FINAL",
-  "ui_version": "6.4.2",
+  "release": "ZEBJUS Python Lab v6.4.3 Bootstrap Recovery FINAL",
+  "ui_version": "6.4.3",
   "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 40,
@@ -27,7 +27,10 @@
     "tm1637_scroll_count_decimal_effects": true,
     "output_effect_helpers": true,
     "protected_student_runtime_namespace": true,
-    "per_cycle_terminal_stream_self_heal": true
+    "per_cycle_terminal_stream_self_heal": true,
+    "js_decoded_pyodide_template_validation": true,
+    "retry_safe_python_bootstrap": true,
+    "reset_after_init_failure_guard": true
   },
   "retained_safety_fixes": {
     "active_low_digital_failsafe": true,
@@ -40,7 +43,7 @@
   },
   "validation": {
     "javascript_syntax": "7/7 pass",
-    "pyodide_initialization_python": "generated Pyodide Python blocks compile",
+    "pyodide_initialization_python": "raw + JavaScript-decoded generated Pyodide Python blocks compile",
     "examples": "40/40 Python examples compile",
     "arduino_cli_compile": "not executed in packaging runtime because arduino-cli is not installed; local helper and GitHub Actions real compile workflow included",
     "html_duplicate_ids_and_assets": "pass",
@@ -51,7 +54,8 @@
     "display_fx_runtime_tests": "pass: TM1637 ordered scroll/decimal + LCD long-text scroll/cursor",
     "display_preview_binding_static_checks": "pass: pin/bus DOM identity fallback",
     "firmware": "v2.4.0 cursor/display control + visible-row write boundary",
-    "protected_runtime_namespace_test": "pass: user io/time/json/math/private helper names cannot overwrite runtime globals; LIVE state persists and resets per session"
+    "protected_runtime_namespace_test": "pass: user io/time/json/math/private helper names cannot overwrite runtime globals; LIVE state persists and resets per session",
+    "bootstrap_failure_recovery": "pass: runtimeReady set only after bootstrap success; failed init clears readyPromise; session prepared flag set after reset succeeds"
   },
-  "runtime_io_hotfix": "v6.4.2: main.py executes in an isolated persistent namespace; runtime streams are self-healed each cycle."
+  "runtime_io_hotfix": "v6.4.3: protected student namespace + self-healing streams + JS-decoded template validation + retry-safe bootstrap."
 }
