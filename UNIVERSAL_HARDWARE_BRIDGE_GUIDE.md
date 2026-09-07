@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.1 — Universal Hardware Bridge Guide
+# ZEBJUS Python Lab v6.2 — Universal Hardware Bridge Guide
 
 The ESP32 firmware is now interface-aware instead of sensor-aware. Most future modules can be added with a Python driver without adding a new firmware route for every sensor.
 

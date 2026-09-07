@@ -1,64 +1,40 @@
-# ZEBJUS Python Lab v6.1 — Safety + Runtime Bridge FIXED
+# ZEBJUS Python Lab v6.2 — Offline Simulation + Sensor Studio + Secure Mode
 
-v6.1 keeps the v6 Universal Hardware Bridge architecture and fixes the safety, live-runtime and resource-allocation issues found during the full v6.0 review.
+## New in v6.2
 
-## Critical fixes
+- Programs that use kit hardware no longer fail just because the kit is offline. Valid Python runs in **Offline Simulation** and keeps the browser visual output active.
+- When a live program starts offline and the saved kit later reconnects, the ESP32 run session and heartbeat start automatically; subsequent commands are mirrored physically without restarting the Python program.
+- `PWMServo` now drives a dedicated servo-angle visualization while still using physical bridge PWM.
+- `MotorDriver` now drives direction/speed visualization while still using physical GPIO + PWM.
+- GPS gets a dedicated fix/satellite/coordinate visual card.
+- MPU6050 gets a dedicated live orientation/tilt visual card.
+- Added visual families for LDR, soil moisture, gas, voltage, sound, rain, water level, thermistor, PIR, reed, touch, flame, flow, RPM/counter/pulse, buzzer and joystick.
+- Generic I²C/UART/SPI modules keep activity cards; future custom modules can publish arbitrary live cards through `dashboard(...)`.
+- Kit Output / Sensors is generated from source instances/imports and live command metadata rather than requiring a fixed page layout.
 
-- Active-low `DigitalOutput` / relay failsafe now stores the correct physical safe state. A heartbeat timeout will not force every digital output LOW.
-- `HardwareTransaction` `WRITE` and `PULSEOUT` operations register outputs in the firmware safe-output registry.
-- GPIO and PWM bridge APIs now fail cleanly when safe-output/PWM slots are exhausted.
-- `DigitalOutput.toggle()` now toggles the logical state correctly for both active-high and active-low devices.
-- Persistent `while True` runtime: code before the top-level live loop initializes once per Run session; loop variables, filters, counters and objects persist between browser cycles.
-- Exact source line layout is retained by the live-loop transformer so runtime errors continue to point to the student's original line.
+## Python/runtime bug fixes
 
-## I²C / bus fixes
+- Fixed the Pyodide startup `SyntaxError: unterminated string literal` caused by generated GPS parser escaping.
+- Fixed the live-mode `_close_cv_windows is not defined` path by defining the cleanup helper within worker initialization before cleanup use.
+- Persistent top-level `while True` behavior from v6.1 is retained.
+- I²C same-bus/same-pins sharing and inherited bus pins are retained.
 
-- OLED, `I2C`, `I2CDevice` and `MPU6050` can share I²C bus 0 when SDA/SCL are the same.
-- If an I²C object omits SDA/SCL after the bus has already been configured, it inherits that bus's existing SDA/SCL pair.
-- `InterfaceConflictError` is produced only when the same hardware bus number is explicitly requested with a different pin pair.
-- Firmware independently enforces the same rule, so browser validation cannot be bypassed by dynamic Python code.
-- SPI buses can share SCK/MISO/MOSI across devices with separate CS pins.
-- UART ports reject accidental reconfiguration to different RX/TX or baud settings during the same run.
+## Firmware / security
 
-## GPIO / resource fixes
+- Firmware version is **2.2** and mDNS/status metadata are aligned to 2.2.
+- Arduino sketch forward declarations for `CounterSlot`, `RotarySlot` and bridge structs are retained to avoid Arduino auto-prototype type-order errors.
+- Added optional per-kit **Secure Mode** using `X-Zebjus-Token`.
+- Trusted LAN remains the default, preserving the existing same-Wi-Fi setup flow.
+- Setup AP/recovery remains available even when Secure Mode is enabled.
+- Existing 1-second heartbeat, 10-second failsafe, active-low safe state, transaction output registry and central resource manager remain enabled.
 
-- Firmware now has a central resource manager covering outputs, OLED/I²C, generic I²C, UART, SPI, rotary encoders and interrupt counters.
-- `CounterInput` editor/runtime pins now match firmware. GPIO36/39 and GPIO12 are not offered as counter pins.
-- GPIO12 remains available only for selected explicit input/pulse uses and is moved out of normal auto-suggestion priority because it is a classic ESP32 boot-strapping pin.
-- Legacy `Motor()` and `Servo()` are labelled as simulator/legacy APIs; physical projects should use `MotorDriver(...)` and `PWMServo(pin)`.
+## Validation performed for this package
 
-## Connection / browser behavior retained
+- JavaScript syntax: pass for all 7 JavaScript files.
+- Pyodide initialization Python source: pass (796 lines compiled by Python parser).
+- HTML duplicate IDs: pass.
+- Local HTML asset references: pass.
+- v2.2 firmware forward declarations/security/version markers: pass.
+- ZIP integrity is checked after packaging.
 
-- Cached IP primary + Kit-ID verification
-- mDNS fallback
-- 5 consecutive failures before the UI changes to disconnected
-- silent background reconnect and no connection-state blinking
-- 1-second active-run heartbeat
-- 10-second ESP32 failsafe
-- Wix/embedded-browser Local Network Access failure now gives a clear new-tab fallback message
-
-## Firmware
-
-Use:
-
-`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_1.ino`
-
-Firmware/status/mDNS metadata are aligned at **2.1**.
-
-OLED support requires Adafruit SSD1306, Adafruit GFX and Adafruit BusIO.
-
-## Validation
-
-- JavaScript syntax: passed
-- 38/38 embedded Python examples: passed Python syntax compilation
-- Pyodide worker embedded Python blocks: passed Python syntax compilation
-- I²C sharing/conflict regression tests: passed
-- Persistent live-loop state regression test: passed
-- HTML duplicate ID and local-reference checks: passed
-- Firmware delimiter/static route/safety checks: passed
-
-See `BUILD_CHECK.json` for the packaged check result and `V6_1_SAFETY_RUNTIME_FIXES.md` for focused regression cases.
-
-### Hardware compile note
-
-The packaging runtime did not contain Arduino CLI, and its network/DNS sandbox prevented downloading the toolchain. Firmware syntax/delimiter/static route checks were run, and the Arduino-ESP32 API calls used by this sketch were cross-checked against current official API documentation. A final Arduino IDE/CLI compile on the target ESP32 environment is still required before flashing production kits.
+A real Arduino-ESP32 compile was not executable in the packaging sandbox because Arduino CLI/core were unavailable. `tools/compile_esp32_firmware.sh` and `.github/workflows/esp32-firmware-compile.yml` are included so the sketch can be compiled with the real ESP32 toolchain locally or automatically in GitHub Actions.

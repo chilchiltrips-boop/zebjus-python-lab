@@ -3,7 +3,7 @@
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,liveSessionId=0,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
-  let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,kitReconnectBusy=false,kitHeartbeatPingBusy=false,activePotPin=34;
+  let kitCommandErrorShown=false,kitHeartbeatTimer=null,kitHealthTimer=null,currentRunUsesKit=false,currentRunNeedsKit=false,kitReconnectBusy=false,kitHeartbeatPingBusy=false,activePotPin=34;
   const KIT_FAILURE_LIMIT=5;
   let kitFailureCount=0,kitEverConnected=false,lastHardwareWarning="",lastHardwareWarningAt=0;
   let aiState={detected:false,fingers:0,side:"",faces:[],landmarks:[]};
@@ -15,19 +15,19 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}}};
+  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}},special:{}};
   const customDashboardCards=new Map();
   const plotter={series:new Map(),maxPoints:180,seq:0};
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",wsUrl:"",
+    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",
     demoUltrasonic:45,demoPot:128,demoDhtTemp:28,demoDhtHumidity:65
   };
   function getSettings(){let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(e){}return {...defaults,...s};}
   let prefs=getSettings();
   if(!prefs.kitName&&prefs.kitId&&!/^ZB-/i.test(prefs.kitId))prefs.kitName=prefs.kitId;
-  if(kitClient){kitClient.name=prefs.kitName||"";kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=String(prefs.kitChipId||"");}
+  if(kitClient){kitClient.name=prefs.kitName||"";kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=String(prefs.kitChipId||"");kitClient.token=String(prefs.kitToken||"");}
   sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
   sensorState.dhtTemperature=Number(prefs.demoDhtTemp)||28; sensorState.dhtHumidity=Number(prefs.demoDhtHumidity)||65;
   sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
@@ -604,7 +604,7 @@ while True:
       ["AnalogInput","class","AnalogInput","Generic analog input"],["Potentiometer","class","Potentiometer","Potentiometer / analog knob"],["DigitalInput","class","DigitalInput","Generic digital input"],["Switch","class","Switch","Digital switch input"],["RotaryEncoder","class","RotaryEncoder","Rotary encoder input"],
       ["DigitalOutput","class","DigitalOutput","Universal digital output"],["Relay","class","Relay","Relay / digital output"],["GPIOInput","class","GPIOInput","Universal GPIO input"],["ADC","class","ADC","Raw ADC1 interface"],["PWM","class","PWM","Generic LEDC PWM output"],["PWMServo","class","PWMServo","Physical servo using generic PWM"],["MotorDriver","class","MotorDriver","2 direction pins + PWM"],
       ["I2C","class","I2C","Generic I²C bus; custom sensor drivers"],["I2CDevice","class","I2CDevice","Generic addressed I²C device"],["UART","class","UART","Generic UART for GPS/RFID/serial modules"],["SPI","class","SPI","Generic SPI bus"],["PulseInput","class","PulseInput","Pulse width / frequency sensor"],["PulseOutput","class","PulseOutput","Precise pulse output"],["CounterInput","class","CounterInput","Interrupt-backed pulse counter / flow / RPM"],["HardwareTransaction","class","HardwareTransaction","Local GPIO/pulse transaction VM"],
-      ["GPS","class","GPS","NMEA GPS over UART"],["MPU6050","class","MPU6050","I²C IMU driver"],["LDR","class","LDR","ADC light sensor alias"],["SoilMoisture","class","SoilMoisture","ADC soil sensor alias"],["GasSensor","class","GasSensor","ADC gas sensor alias"],["VoltageSensor","class","VoltageSensor","ADC voltage sensor alias"],["dashboard","function","dashboard","Show custom live sensor card"],
+      ["GPS","class","GPS","NMEA GPS over UART"],["MPU6050","class","MPU6050","I²C IMU driver"],["LDR","class","LDR","ADC light sensor"],["SoilMoisture","class","SoilMoisture","ADC soil sensor"],["GasSensor","class","GasSensor","ADC gas sensor"],["VoltageSensor","class","VoltageSensor","ADC voltage sensor"],["SoundSensor","class","SoundSensor","ADC sound level sensor"],["RainSensor","class","RainSensor","ADC rain sensor"],["WaterLevelSensor","class","WaterLevelSensor","ADC water level sensor"],["Thermistor","class","Thermistor","ADC thermistor input"],["PIRSensor","class","PIRSensor","Digital motion sensor"],["ReedSwitch","class","ReedSwitch","Magnetic reed switch"],["TouchSensor","class","TouchSensor","Digital touch module"],["FlameSensor","class","FlameSensor","Digital flame module"],["FlowSensor","class","FlowSensor","Pulse flow sensor"],["RPMSensor","class","RPMSensor","Pulse RPM sensor"],["Buzzer","class","Buzzer","PWM buzzer output"],["Joystick","class","Joystick","Dual ADC joystick + switch"],["dashboard","function","dashboard","Show custom live sensor card"],
       ["Motor","class","Motor","Legacy bridge API"],["Servo","class","Servo","Legacy bridge API"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
@@ -687,7 +687,7 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*LED\\d+\\s*\\(").test(code))return "SingleLED";
@@ -703,7 +703,7 @@ while True:
   function filterItems(items,prefix){const p=String(prefix||"").toLowerCase();return items.filter(x=>x[0].replace(/\(\)$/,"").toLowerCase().startsWith(p)).map(hintItem);}
 
   // ---------- GPIO pin assistance / validation ----------
-  // v6.1 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
+  // v6.2 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
   // Classic ESP32 DevKit: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
@@ -746,7 +746,19 @@ while True:
     {className:"LDR",label:"LDR / Light Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"ldr",status:"ready",pinCost:{adc:1}},
     {className:"SoilMoisture",label:"Soil Moisture",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"soil",status:"ready",pinCost:{adc:1}},
     {className:"GasSensor",label:"Analog Gas Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"gas",status:"ready",pinCost:{adc:1}},
-    {className:"VoltageSensor",label:"Voltage Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"voltage",status:"ready",pinCost:{adc:1}}
+    {className:"VoltageSensor",label:"Voltage Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"voltage",status:"ready",pinCost:{adc:1}},
+    {className:"SoundSensor",label:"Sound Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"sound",status:"ready",pinCost:{adc:1}},
+    {className:"RainSensor",label:"Rain Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"rain",status:"ready",pinCost:{adc:1}},
+    {className:"WaterLevelSensor",label:"Water Level Sensor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"water",status:"ready",pinCost:{adc:1}},
+    {className:"Thermistor",label:"Thermistor",group:"Ready Drivers",interface:"ADC1 IN",max:6,prefix:"thermistor",status:"ready",pinCost:{adc:1}},
+    {className:"PIRSensor",label:"PIR Motion Sensor",group:"Ready Drivers",interface:"Digital IN",max:10,prefix:"pir",status:"ready",pinCost:{input:1}},
+    {className:"ReedSwitch",label:"Reed Switch",group:"Ready Drivers",interface:"Digital IN",max:10,prefix:"reed",status:"ready",pinCost:{input:1}},
+    {className:"TouchSensor",label:"Touch Sensor Module",group:"Ready Drivers",interface:"Digital IN",max:10,prefix:"touch",status:"ready",pinCost:{input:1}},
+    {className:"FlameSensor",label:"Flame Sensor Module",group:"Ready Drivers",interface:"Digital IN",max:10,prefix:"flame",status:"ready",pinCost:{input:1}},
+    {className:"FlowSensor",label:"Flow Sensor",group:"Ready Drivers",interface:"Counter / pulse IN",max:8,prefix:"flow",status:"ready",pinCost:{input:1}},
+    {className:"RPMSensor",label:"RPM / Tachometer Sensor",group:"Ready Drivers",interface:"Counter / pulse IN",max:8,prefix:"rpm",status:"ready",pinCost:{input:1}},
+    {className:"Buzzer",label:"Buzzer",group:"Outputs",interface:"PWM OUT",max:15,prefix:"buzzer",status:"ready",pinCost:{out:1}},
+    {className:"Joystick",label:"2-Axis Joystick",group:"Inputs",interface:"2 × ADC1 + optional switch",max:3,prefix:"joystick",status:"ready",pinCost:{adc:2,input:1}}
   ];
   const PIN_HINT_ORDER={
     SingleLED:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
@@ -759,8 +771,8 @@ while True:
     DHT11:[13,4,14,16,17,18,19,23,25,26,27,32,33,21,22],
     OLED:[21,22,18,19,16,17,23,25,26,27,32,33,4,13,14],
     DigitalOutput:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],Relay:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],PWM:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],PWMServo:[18,19,16,17,25,26,27,32,33,4,13,14,21,22,23],PulseOutput:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33],
-    ADC:[34,35,36,39,32,33],LDR:[34,35,36,39,32,33],SoilMoisture:[34,35,36,39,32,33],GasSensor:[34,35,36,39,32,33],VoltageSensor:[34,35,36,39,32,33],
-    GPIOInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],PulseInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],CounterInput:[34,35,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23]
+    ADC:[34,35,36,39,32,33],LDR:[34,35,36,39,32,33],SoilMoisture:[34,35,36,39,32,33],GasSensor:[34,35,36,39,32,33],VoltageSensor:[34,35,36,39,32,33],SoundSensor:[34,35,36,39,32,33],RainSensor:[34,35,36,39,32,33],WaterLevelSensor:[34,35,36,39,32,33],Thermistor:[34,35,36,39,32,33],Joystick:[34,35,36,39,32,33],
+    GPIOInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],PIRSensor:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],ReedSwitch:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],TouchSensor:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],FlameSensor:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],PulseInput:[34,35,36,39,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],CounterInput:[34,35,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],FlowSensor:[34,35,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],RPMSensor:[34,35,32,33,14,27,26,25,4,13,16,17,18,19,21,22,23],Buzzer:[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33]
   };
 
   function numberedTokenInfo(token){
@@ -769,7 +781,7 @@ while True:
   }
   function canonicalHardwareClass(token){
     const n=numberedTokenInfo(token);if(n)return n.base==="LED"?"SingleLED":"RGBLED";
-    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo"].includes(token)?token:null;
+    return ["RGBLED","LED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"].includes(token)?token:null;
   }
   function sequenceNumbers(src,base){
     const nums=new Set();const re=new RegExp("\\b"+base+"(\\d+)\\b","g");let m;
@@ -840,9 +852,10 @@ while True:
       // OLED owns/shares hardware I2C bus 0. A later generic I2C object with omitted pins inherits this pair.
       const oled=/\bOLED\s*\(([^)]*)\)/g;while((m=oled.exec(clean))){const a=m[1],sda=parseNumberArg(a,"sda",0,21),scl=parseNumberArg(a,"scl",1,22),key=`i2c:0:${sda}:${scl}`;for(const e of out.filter(x=>x.kind==="OLED"&&x.line===line)){e.shareKey=key;e.shareChannel=/SDA/.test(e.role)?"sda":"scl";}if(!i2cConfigured.has(0))i2cConfigured.set(0,{sda,scl,line});}
 
-      const dout=/\b(DigitalOutput|Relay|PWM|PWMServo|PulseOutput)\s*\(([^)]*)\)/g;while((m=dout.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" output",m[1],RGB_OUTPUT_PINS,m.index+1);}
-      const adc=/\b(ADC|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(([^)]*)\)/g;while((m=adc.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" ADC",m[1],ANALOG_INPUT_PINS,m.index+1);}
-      const gin=/\b(GPIOInput|PulseInput|CounterInput)\s*\(([^)]*)\)/g;while((m=gin.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null),valid=m[1]==="CounterInput"?COUNTER_INPUT_PINS:ULTRASONIC_ECHO_PINS;if(pin!==null)add(pin,line,m[1]+" input",m[1],valid,m.index+1);}
+      const dout=/\b(DigitalOutput|Relay|PWM|PWMServo|PulseOutput|Buzzer)\s*\(([^)]*)\)/g;while((m=dout.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" output",m[1],RGB_OUTPUT_PINS,m.index+1);}
+      const adc=/\b(ADC|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor)\s*\(([^)]*)\)/g;while((m=adc.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null);if(pin!==null)add(pin,line,m[1]+" ADC",m[1],ANALOG_INPUT_PINS,m.index+1);}
+      const gin=/\b(GPIOInput|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|PulseInput|CounterInput|FlowSensor|RPMSensor)\s*\(([^)]*)\)/g;while((m=gin.exec(clean))){const pin=parseNumberArg(m[2],"pin",0,null),valid=["CounterInput","FlowSensor","RPMSensor"].includes(m[1])?COUNTER_INPUT_PINS:ULTRASONIC_ECHO_PINS;if(pin!==null)add(pin,line,m[1]+" input",m[1],valid,m.index+1);}
+      const joystick=/\bJoystick\s*\(([^)]*)\)/g;while((m=joystick.exec(clean))){const a=m[1],xp=parseNumberArg(a,"x_pin",0,34),yp=parseNumberArg(a,"y_pin",1,35),sw=parseNumberArg(a,"switch_pin",2,-1);add(xp,line,"Joystick X","Joystick",ANALOG_INPUT_PINS,m.index+1);add(yp,line,"Joystick Y","Joystick",ANALOG_INPUT_PINS,m.index+1);if(sw>=0)add(sw,line,"Joystick switch","Joystick",DIGITAL_INPUT_PINS,m.index+1);}
       const motor=/\bMotorDriver\s*\(([^)]*)\)/g;while((m=motor.exec(clean))){const a=m[1],p1=parseNumberArg(a,"in1",0,null),p2=parseNumberArg(a,"in2",1,null),pwm=parseNumberArg(a,"pwm_pin",2,null);if(p1!==null)add(p1,line,"Motor IN1","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(p2!==null)add(p2,line,"Motor IN2","MotorDriver",RGB_OUTPUT_PINS,m.index+1);if(pwm!==null)add(pwm,line,"Motor PWM","MotorDriver",RGB_OUTPUT_PINS,m.index+1);}
 
       const i2c=/\b(I2C|MPU6050)\s*\(([^)]*)\)/g;while((m=i2c.exec(clean))){const a=m[2],bus=parseNumberArg(a,"bus",3,0)===1?1:0,pins=i2cPins(a,bus,0,1),key=`i2c:${bus}:${pins.sda}:${pins.scl}`;add(pins.sda,line,m[1]+" SDA",m[1],RGB_OUTPUT_PINS,m.index+1,key,"sda");add(pins.scl,line,m[1]+" SCL",m[1],RGB_OUTPUT_PINS,m.index+1,key,"scl");if(!i2cConfigured.has(bus))i2cConfigured.set(bus,{...pins,line});}
@@ -1085,7 +1098,7 @@ while True:
     m=line.match(/^\s*(?:import|from)\s+([A-Za-z_]\w*)?$/);
     if(m){prefix=m[1]||"";return{list:filterItems(libraries,prefix),from:CodeMirror.Pos(cur.line,cur.ch-prefix.length),to:cur};}
 
-    // v6.1: import-member completion also works after commas and with partial names.
+    // v6.2: import-member completion also works after commas and with partial names.
     m=line.match(/^\s*from\s+(zebjus|zebjus_ai|zebjus_cv|cv2|cvzone|mediapipe|SerialModule|HandTrackingModule|zebjus_wifi)\s+import\s*(.*)$/);
     if(m){
       const moduleName=m[1],tail=m[2]||"",segment=(tail.split(",").pop()||"").replace(/^\s*\(?\s*/,"");
@@ -1242,7 +1255,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.1",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.2",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1427,9 +1440,10 @@ while True:
     if(item.className==="AnalogInput"||item.className==="Potentiometer"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="Switch"||item.className==="DigitalInput"){const p=firstFree(PIN_HINT_ORDER[item.className],used);return p==null?null:String(p);}
     if(item.className==="RotaryEncoder"){const free=PIN_HINT_ORDER.RotaryEncoder.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
-    if(["DigitalOutput","Relay","PWM","PWMServo","PulseOutput"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||RGB_OUTPUT_PINS,used);return p==null?null:String(p);}
-    if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||ANALOG_INPUT_PINS,used);return p==null?null:String(p);}
-    if(["GPIOInput","PulseInput","CounterInput"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||DIGITAL_INPUT_PINS,used);return p==null?null:String(p);}
+    if(["DigitalOutput","Relay","PWM","PWMServo","PulseOutput","Buzzer"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||RGB_OUTPUT_PINS,used);return p==null?null:String(p);}
+    if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||ANALOG_INPUT_PINS,used);return p==null?null:String(p);}
+    if(["GPIOInput","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","PulseInput","CounterInput","FlowSensor","RPMSensor"].includes(item.className)){const p=firstFree(PIN_HINT_ORDER[item.className]||DIGITAL_INPUT_PINS,used);return p==null?null:String(p);}
+    if(item.className==="Joystick"){const free=ANALOG_INPUT_PINS.filter(p=>!used.has(p));if(free.length<2)return null;const u2=new Set(used);u2.add(free[0]);u2.add(free[1]);const sw=firstFree(DIGITAL_INPUT_PINS,u2);return `${free[0]}, ${free[1]}${sw==null?"":`, ${sw}`}`;}
     if(item.className==="MotorDriver"){const free=RGB_OUTPUT_PINS.filter(p=>!used.has(p));return free.length>=3?`${free[0]}, ${free[1]}, ${free[2]}`:null;}
     if(item.className==="I2C"||item.className==="MPU6050"){const existing=allPinEntries(src).find(e=>e.shareKey&&String(e.shareKey).startsWith("i2c:0:"));if(item.className==="MPU6050"&&existing){const parts=existing.shareKey.split(":");return `${parts[2]}, ${parts[3]}, 0x68, 0`;}if(item.className==="I2C"&&constructorCount(src,"I2C")===0&&existing){const parts=existing.shareKey.split(":");return `${parts[2]}, ${parts[3]}, 400000, 0`;}const free=PIN_HINT_ORDER.OLED.filter(p=>!used.has(p));if(free.length<2)return null;const bus=item.className==="I2C"&&constructorCount(src,"I2C")>0?1:0;return item.className==="MPU6050"?`${free[0]}, ${free[1]}, 0x68, ${bus}`:`${free[0]}, ${free[1]}, 400000, ${bus}`; }
     if(item.className==="UART"||item.className==="GPS"){const rx=firstFree([34,35,36,39,32,33,19,18,16,17,14,13,4,21,22,23,25,26,27],used);if(rx==null)return null;const u2=new Set(used);u2.add(rx);const tx=firstFree(RGB_OUTPUT_PINS,u2);if(tx==null)return null;const port=Math.min(2,constructorCount(src,"UART")+constructorCount(src,"GPS")+1);return `${rx}, ${tx}, 9600, ${port}`;}
@@ -1448,7 +1462,7 @@ while True:
   }
   function insertHardwareConstructor(src,line){
     const lines=String(src||"").split("\n");let lastImport=-1;for(let i=0;i<lines.length;i++)if(/^\s*(?:from\s+\S+\s+import\b|import\s+\S+)/.test(lines[i]))lastImport=i;let at=lastImport+1;while(at<lines.length&&lines[at].trim()==="")at++;
-    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|Motor|Servo)\s*\(/.test(lines[at]))at++;
+    while(at<lines.length&&/^\s*[A-Za-z_]\w*\s*=\s*(?:zebjus\.)?(?:RGBLED(?:\d+)?|LED\d+|LED|DHT11|Ultrasonic|OLED|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick|Motor|Servo)\s*\(/.test(lines[at]))at++;
     lines.splice(at,0,line);if(at+1<lines.length&&lines[at+1].trim()!=="")lines.splice(at+1,0,"");return lines.join("\n");
   }
   function allocatorSummary(src){const st=gpioResourceState(src);return `GPIO free · OUT ${st.freeOut.length}/${RGB_OUTPUT_PINS.length} · Digital ${st.freeDigital.length}/${DIGITAL_INPUT_PINS.length} · ADC1 ${st.freeAdc.length}/${ANALOG_INPUT_PINS.length}`;}
@@ -1463,11 +1477,11 @@ while True:
   }
 
 
-  // v6.1: Build the Kit Output / Sensors dashboard
+  // v6.2: Build the Kit Output / Sensors dashboard
 
-  // v6.1: Build the Kit Output / Sensors dashboard from the student's source code.
+  // v6.2: Build the Kit Output / Sensors dashboard from the student's source code.
   // Import order controls card order. Multiple constructor instances become separate cards.
-  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","Motor","Servo"]);
+  const HARDWARE_CLASSES=new Set(["RGBLED","LED","SingleLED","DHT11","Ultrasonic","OLED","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo"]);
   const DEFAULT_HARDWARE_CLASSES=["RGBLED","DHT11","Ultrasonic","OLED","AnalogInput","Switch","RotaryEncoder"];
 
   function parseCtorNumber(args,name,index,defaultValue=null){
@@ -1509,14 +1523,19 @@ while True:
       spec.type="motor";spec.title="Motor";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
     }else if(c==="Servo"){
       spec.type="servo";spec.title="Servo";spec.id=parseCtorNumber(args,"id",0,1);spec.identity=String(spec.id);
-    }else if(c==="DigitalOutput"||c==="Relay"||c==="PWM"||c==="PulseOutput"){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
-    }else if(c==="GPIOInput"||c==="PulseInput"||c==="CounterInput"){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
-    }else if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor"].includes(c)){spec.type="bridge";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`ADC GPIO${spec.pin}`;
+    }else if(c==="DigitalOutput"||c==="Relay"){spec.type=c==="Relay"?"relay":"digital_output";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(c==="PWM"||c==="PulseOutput"||c==="Buzzer"){spec.type=c==="Buzzer"?"buzzer":"pwm_output";spec.title=c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(c==="GPIOInput"||c==="PIRSensor"||c==="ReedSwitch"||c==="TouchSensor"||c==="FlameSensor"){spec.type={PIRSensor:"motion",ReedSwitch:"reed",TouchSensor:"touch",FlameSensor:"flame"}[c]||"bridge_input";spec.title={PIRSensor:"PIR Motion",ReedSwitch:"Reed Switch",TouchSensor:"Touch Sensor",FlameSensor:"Flame Sensor"}[c]||c;spec.pin=parseCtorNumber(args,"pin",0,c==="PIRSensor"?27:32);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(c==="PulseInput"||c==="CounterInput"||c==="FlowSensor"||c==="RPMSensor"){spec.type=c==="FlowSensor"?"flow":(c==="RPMSensor"?"rpm":(c==="CounterInput"?"counter":"pulse"));spec.title={FlowSensor:"Flow Sensor",RPMSensor:"RPM Sensor"}[c]||c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`GPIO${spec.pin}`;
+    }else if(["ADC","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor"].includes(c)){const types={LDR:"light",SoilMoisture:"soil",GasSensor:"gas",VoltageSensor:"voltage",SoundSensor:"sound",RainSensor:"rain",WaterLevelSensor:"water",Thermistor:"temperature"};spec.type=types[c]||"bridge_analog";spec.title={LDR:"Light Sensor",SoilMoisture:"Soil Moisture",GasSensor:"Gas Sensor",VoltageSensor:"Voltage Sensor",SoundSensor:"Sound Sensor",RainSensor:"Rain Sensor",WaterLevelSensor:"Water Level",Thermistor:"Thermistor"}[c]||c;spec.pin=parseCtorNumber(args,"pin",0,null);spec.identity=String(spec.pin);spec.detail=`ADC GPIO${spec.pin}`;
+    }else if(c==="Joystick"){spec.type="joystick";spec.title="2-Axis Joystick";spec.xPin=parseCtorNumber(args,"x_pin",0,34);spec.yPin=parseCtorNumber(args,"y_pin",1,35);spec.sw=parseCtorNumber(args,"switch_pin",2,-1);spec.identity=`${spec.xPin},${spec.yPin},${spec.sw}`;
     }else if(c==="PWMServo"){spec.type="servo";spec.title="PWM Servo";spec.pin=parseCtorNumber(args,"pin",0,null);spec.id=spec.pin;spec.identity=String(spec.pin);
     }else if(c==="MotorDriver"){spec.type="motor";spec.title="Motor Driver";spec.in1=parseCtorNumber(args,"in1",0,null);spec.in2=parseCtorNumber(args,"in2",1,null);spec.pwm=parseCtorNumber(args,"pwm_pin",2,null);spec.id=spec.pwm;spec.identity=`${spec.in1},${spec.in2},${spec.pwm}`;
-    }else if(c==="I2C"||c==="I2CDevice"||c==="MPU6050"){spec.type="bridge";spec.title=c==="MPU6050"?"MPU6050 IMU":c;const off=c==="I2CDevice"?1:0;spec.sda=parseCtorNumber(args,"sda",off,21);spec.scl=parseCtorNumber(args,"scl",off+1,22);spec.bus=parseCtorNumber(args,"bus",c==="MPU6050"?3:(c==="I2CDevice"?4:3),0);spec.identity=`${spec.bus}:${spec.sda},${spec.scl}`;spec.detail=`I²C bus ${spec.bus} · SDA ${spec.sda} · SCL ${spec.scl}`;
-    }else if(c==="UART"||c==="GPS"){spec.type="bridge";spec.title=c==="GPS"?"GPS / GNSS":"UART";spec.rx=parseCtorNumber(args,"rx",0,16);spec.tx=parseCtorNumber(args,"tx",1,17);spec.port=parseCtorNumber(args,"port",3,1);spec.identity=`${spec.port}:${spec.rx},${spec.tx}`;spec.detail=`UART${spec.port} · RX ${spec.rx} · TX ${spec.tx}`;
-    }else if(c==="SPI"){spec.type="bridge";spec.title="SPI";spec.sck=parseCtorNumber(args,"sck",0,18);spec.miso=parseCtorNumber(args,"miso",1,19);spec.mosi=parseCtorNumber(args,"mosi",2,23);spec.cs=parseCtorNumber(args,"cs",3,4);spec.bus=parseCtorNumber(args,"bus",6,1);spec.identity=`${spec.bus}:${spec.sck},${spec.miso},${spec.mosi},${spec.cs}`;spec.detail=`SPI${spec.bus} · SCK ${spec.sck} · MISO ${spec.miso} · MOSI ${spec.mosi} · CS ${spec.cs}`;
+    }else if(c==="MPU6050"){spec.type="imu";spec.title="MPU6050 IMU";spec.sda=parseCtorNumber(args,"sda",0,21);spec.scl=parseCtorNumber(args,"scl",1,22);spec.bus=parseCtorNumber(args,"bus",3,0);spec.identity=`${spec.bus}:${spec.sda},${spec.scl}`;spec.detail=`I²C bus ${spec.bus} · SDA ${spec.sda} · SCL ${spec.scl}`;
+    }else if(c==="I2C"||c==="I2CDevice"){spec.type="i2c";spec.title=c;const off=c==="I2CDevice"?1:0;spec.sda=parseCtorNumber(args,"sda",off,21);spec.scl=parseCtorNumber(args,"scl",off+1,22);spec.bus=parseCtorNumber(args,"bus",c==="I2CDevice"?4:3,0);spec.identity=`${spec.bus}:${spec.sda},${spec.scl}`;spec.detail=`I²C bus ${spec.bus} · SDA ${spec.sda} · SCL ${spec.scl}`;
+    }else if(c==="GPS"){spec.type="gps";spec.title="GPS / GNSS";spec.rx=parseCtorNumber(args,"rx",0,16);spec.tx=parseCtorNumber(args,"tx",1,17);spec.port=parseCtorNumber(args,"port",3,1);spec.identity=`${spec.port}:${spec.rx},${spec.tx}`;spec.detail=`UART${spec.port} · RX ${spec.rx} · TX ${spec.tx}`;
+    }else if(c==="UART"){spec.type="uart";spec.title="UART";spec.rx=parseCtorNumber(args,"rx",0,16);spec.tx=parseCtorNumber(args,"tx",1,17);spec.port=parseCtorNumber(args,"port",3,1);spec.identity=`${spec.port}:${spec.rx},${spec.tx}`;spec.detail=`UART${spec.port} · RX ${spec.rx} · TX ${spec.tx}`;
+    }else if(c==="SPI"){spec.type="spi";spec.title="SPI";spec.sck=parseCtorNumber(args,"sck",0,18);spec.miso=parseCtorNumber(args,"miso",1,19);spec.mosi=parseCtorNumber(args,"mosi",2,23);spec.cs=parseCtorNumber(args,"cs",3,4);spec.bus=parseCtorNumber(args,"bus",6,1);spec.identity=`${spec.bus}:${spec.sck},${spec.miso},${spec.mosi},${spec.cs}`;spec.detail=`SPI${spec.bus} · SCK ${spec.sck} · MISO ${spec.miso} · MOSI ${spec.mosi} · CS ${spec.cs}`;
     }else if(c==="HardwareTransaction"){spec.type="bridge";spec.title="Custom Hardware Transaction";spec.identity=variable||"custom";spec.detail="Local GPIO / pulse timing VM";
     }else return null;
     return spec;
@@ -1581,6 +1600,15 @@ while True:
     if(sp.type==="rotary")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="rotary"><div class="rotary-visual"><div class="rotary-dial" data-role="rotary-dial"></div><div class="rotary-press" data-role="rotary-press"></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="rotary-label">Position 0</span><span class="sensor-secondary" data-role="rotary-detail">CLK ${sp.clk} · DT ${sp.dt}${sp.sw>=0?` · SW ${sp.sw}`:""}</span></div></div>`;
     if(sp.type==="motor")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="motor"><div class="motor-visual" data-role="motor-visual">M</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="motor-label">Stopped</span><div class="analog-bar"><i data-role="motor-fill"></i></div><span class="sensor-secondary">Motor ID ${sp.id}</span></div></div>`;
     if(sp.type==="servo")return `<div class="demo-card hardware-card" data-hw-key="${key}" data-hw-type="servo"><div class="servo-visual"><i data-role="servo-needle"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="servo-label">90°</span><span class="sensor-secondary">${sp.pin!=null?`GPIO${sp.pin}`:`Servo ID ${sp.id}`}</span></div></div>`;
+    if(sp.type==="gps")return `<div class="demo-card hardware-card sensor-studio-card gps-card" data-hw-key="${key}" data-hw-type="gps"><div class="studio-icon gps-icon">⌖<i></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="gps-fix">NO FIX · 0 SAT</span><span class="sensor-secondary" data-role="gps-coords">Latitude — · Longitude —</span><div class="studio-meter"><i data-role="gps-meter"></i></div></div></div>`;
+    if(sp.type==="imu")return `<div class="demo-card hardware-card sensor-studio-card imu-card" data-hw-key="${key}" data-hw-type="imu"><div class="imu-scene"><div class="imu-cube" data-role="imu-cube"><i></i><b></b></div></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="imu-main">LEVEL · waiting</span><span class="sensor-secondary" data-role="imu-detail">Acc — · Gyro —</span></div></div>`;
+    if(["light","soil","gas","voltage","sound","rain","water","temperature","bridge_analog"].includes(sp.type))return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="${sp.type}"><div class="studio-icon ${sp.type}-icon">${({light:"☀",soil:"♒",gas:"◌",voltage:"⚡",sound:"♪",rain:"☂",water:"≈",temperature:"℃",bridge_analog:"A"})[sp.type]}</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="studio-value">WAITING</span><div class="studio-meter"><i data-role="studio-fill"></i></div><span class="sensor-secondary" data-role="studio-detail">${escapeHtml(sp.detail||"")}</span></div></div>`;
+    if(["motion","reed","touch","flame","bridge_input"].includes(sp.type))return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="${sp.type}"><div class="studio-icon digital-studio-icon" data-role="digital-studio-icon">${({motion:"◉",reed:"⊣",touch:"☝",flame:"♨",bridge_input:"I"})[sp.type]}</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="digital-studio-value">WAITING</span><span class="sensor-secondary">${escapeHtml(sp.detail||"")}</span></div></div>`;
+    if(["flow","rpm","counter","pulse"].includes(sp.type))return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="${sp.type}"><div class="studio-icon pulse-icon" data-role="pulse-icon">↻</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="pulse-value">WAITING</span><span class="sensor-secondary" data-role="pulse-detail">${escapeHtml(sp.detail||"")}</span></div></div>`;
+    if(sp.type==="buzzer")return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="buzzer"><div class="studio-icon buzzer-icon" data-role="buzzer-icon">◖))</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="buzzer-value">OFF</span><div class="studio-meter"><i data-role="buzzer-fill"></i></div><span class="sensor-secondary">GPIO${sp.pin}</span></div></div>`;
+    if(sp.type==="digital_output"||sp.type==="relay"||sp.type==="pwm_output")return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="${sp.type}"><div class="studio-icon output-icon" data-role="output-icon">${sp.type==="relay"?"⏻":"⇥"}</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="output-value">OFF</span><div class="studio-meter"><i data-role="output-fill"></i></div><span class="sensor-secondary">${escapeHtml(sp.detail||"")}</span></div></div>`;
+    if(sp.type==="joystick")return `<div class="demo-card hardware-card sensor-studio-card" data-hw-key="${key}" data-hw-type="joystick"><div class="joystick-pad"><i data-role="joystick-stick"></i></div><div class="demo-grow">${head}<span class="sensor-primary" data-role="joystick-value">X — · Y —</span><span class="sensor-secondary" data-role="joystick-detail">ADC ${sp.xPin}/${sp.yPin}${sp.sw>=0?` · SW ${sp.sw}`:""}</span></div></div>`;
+    if(["i2c","uart","spi"].includes(sp.type))return `<div class="demo-card hardware-card bridge-card bus-card" data-hw-key="${key}" data-hw-type="${sp.type}"><div class="bridge-icon">${sp.type==="i2c"?"I²C":sp.type==="uart"?"TX":"SPI"}</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="bus-label">READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"Universal hardware interface")}</span></div></div>`;
     if(sp.type==="bridge")return `<div class="demo-card hardware-card bridge-card" data-hw-key="${key}" data-hw-type="bridge"><div class="bridge-icon">↔</div><div class="demo-grow">${head}<span class="sensor-primary" data-role="bridge-label">READY</span><span class="sensor-secondary">${escapeHtml(sp.detail||"Universal hardware interface")}</span></div></div>`;
     return "";
   }
@@ -1607,6 +1635,7 @@ while True:
   }
   async function refreshInputsFromKit(src,showError=false){
     if(prefs.demoMode)return true;
+    if(!kitClient?.connected)return false;
     const specs=requestedInputs(src);
     try{
       for(const a of specs.analog){
@@ -1765,9 +1794,9 @@ while True:
       sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
       updateSensorGraphics();
     }
-    if(!prefs.demoMode&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(liveCode)){
+    if(!prefs.demoMode&&kitClient?.connected&&/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(liveCode)){
       const ok=await refreshInputsFromKit(liveCode,false);if(!ok)scheduleSilentReconnect();
-    }
+    }else if(!prefs.demoMode&&!kitClient?.connected){scheduleSilentReconnect();}
     const frame=await refreshLiveAI();
     if(!liveMode||!running)return;
     postProgramToWorker(liveCode,frame);
@@ -1795,16 +1824,18 @@ while True:
       badge($("pythonStatus"),"Fix code error","warn");
       return;
     }
-    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src);
+    const needsPhysicalKit=/\b(?:RGBLED(?:\d+)?|LED(?:\d+)?|Motor|Servo|OLED|DHT11|Ultrasonic|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|DigitalOutput|Relay|GPIOInput|ADC|PWM|PWMServo|MotorDriver|I2C|I2CDevice|UART|SPI|PulseInput|PulseOutput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src);
+    currentRunNeedsKit=needsPhysicalKit;
     const inputSpecs=requestedInputs(src),rgbPins=requestedRgbPins(src);
     const inputPins=[...inputSpecs.analog.map(x=>x.pin),...inputSpecs.digital.map(x=>x.pin),...inputSpecs.rotary.flatMap(x=>[x.clk,x.dt,...(x.sw>=0?[x.sw]:[])]),...inputSpecs.ultrasonic.flatMap(x=>[x.trig,x.echo]),...inputSpecs.dht11.map(x=>x.pin)];
     const conflict=inputPins.find(pin=>rgbPins.includes(pin));
     if(conflict!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${conflict} is selected for both an input and RGB output.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
     const seenPins=new Set(),duplicateInput=inputPins.find(pin=>seenPins.has(pin)?true:(seenPins.add(pin),false));
     if(duplicateInput!==undefined){terminal.textContent="";log(`Pin conflict: GPIO${duplicateInput} is assigned to more than one input device.`);badge($("pythonStatus"),"Pin conflict","warn");return;}
-    if(needsPhysicalKit&&!prefs.demoMode){
-      const connected=await ensureKitConnected(true);
-      if(!connected){badge($("pythonStatus"),"Kit not connected","warn");return;}
+    let physicalKitAvailable=!!kitClient?.connected;
+    if(needsPhysicalKit&&!prefs.demoMode&&!physicalKitAvailable){
+      physicalKitAvailable=await ensureKitConnected(false,{silent:true});
+      if(!physicalKitAvailable){log("Kit not connected — Offline Simulation is active. Python and Kit Output / Sensors will run; physical hardware will resume after reconnect.");badge($("kitStatus"),"Simulation · kit offline","warn");}
     }
     const needsHand=/\bzebjus_ai\b|\bHandDetector\b|\bHandTrackingModule\b|\bhandDetector\s*\(/.test(src);
     const needsFace=/\bFaceDetector\b|\bFaceDetectionModule\b|\bface_detection\b|\bmp\.solutions\.face_detection\b/.test(src);
@@ -1814,7 +1845,7 @@ while True:
 
     terminal.textContent="";clearPlotter();
     running=true;liveSessionId++;updateRunControls();
-    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src));
+    liveMode=/\bwhile\s+True\s*:/.test(src)&&(needsCamera||/\bSerialObject\b|\bWifiBridge\b|\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src));
     liveCode=src;liveNeedsHand=needsHand;liveNeedsFace=needsFace;liveNeedsCamera=needsCamera;
     if(liveTimer){clearTimeout(liveTimer);liveTimer=null;}
     if(liveMode)log("LIVE MODE started — press Stop to end.");
@@ -1897,12 +1928,12 @@ while True:
       updateSensorGraphics();
     }
 
-    if(needsPhysicalKit&&!prefs.demoMode){
+    if(needsPhysicalKit&&!prefs.demoMode&&kitClient?.connected){
       try{
         await beginHardwareRun();
-        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor)\s*\(/.test(src))await refreshInputsFromKit(src,true);
+        if(/\b(?:DHT11|AnalogInput|Potentiometer|DigitalInput|Switch|RotaryEncoder|Ultrasonic|GPIOInput|ADC|I2C|I2CDevice|UART|SPI|PulseInput|CounterInput|HardwareTransaction|GPS|MPU6050|LDR|SoilMoisture|GasSensor|VoltageSensor|SoundSensor|RainSensor|WaterLevelSensor|Thermistor|PIRSensor|ReedSwitch|TouchSensor|FlameSensor|FlowSensor|RPMSensor|Buzzer|Joystick)\s*\(/.test(src))await refreshInputsFromKit(src,false);
       }
-      catch(e){running=false;updateRunControls();log("Could not start kit run session: "+(e?.message||e));badge($("pythonStatus"),"Kit not ready","warn");return;}
+      catch(e){currentRunUsesKit=false;log("Physical kit session unavailable — continuing in Offline Simulation: "+(e?.message||e));scheduleSilentReconnect();}
     }else{currentRunUsesKit=false;}
 
     badge($("pythonStatus"),liveMode?"Live running…":"Running…","warn");
@@ -1916,7 +1947,7 @@ while True:
     prefs.kitChipId=String(st.chipId||prefs.kitChipId||"");
     if(st.ip)prefs.kitIp=st.ip; // DHCP/new-IP cache update
     localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));
-    if(kitClient){kitClient.name=prefs.kitName;kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=prefs.kitChipId||"";}
+    if(kitClient){kitClient.name=prefs.kitName;kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=prefs.kitChipId||"";kitClient.token=String(prefs.kitToken||"");}
     if($("kitNameText"))$("kitNameText").textContent=prefs.kitName||"No kit selected";
   }
 
@@ -1959,7 +1990,7 @@ while True:
         kitClient.chipId=String(prefs.kitChipId||kitClient.chipId||"");
         const st=await kitClient.reconnect(2);
         markKitSuccess(st);
-        if(running&&currentRunUsesKit)await resumeRunSessionAfterReconnect();
+        if(running&&currentRunNeedsKit){await beginHardwareRun();}
       }catch(_){/* failure counter is driven by health/heartbeat cycles, not every fallback address */}
       finally{kitReconnectBusy=false;}
     });
@@ -1990,7 +2021,7 @@ while True:
 
   async function endHardwareRun(){
     stopKitHeartbeat();
-    const used=currentRunUsesKit;currentRunUsesKit=false;
+    const used=currentRunUsesKit;currentRunUsesKit=false;currentRunNeedsKit=false;
     const stopRgb={command:"RGB_LED_SET",id:1,r:0,g:0,b:0};
     if(used&&!prefs.demoMode&&kitClient?.connected){
       try{await kitClient.flushCommands();await kitClient.endRun();kitCommandErrorShown=false;}
@@ -2062,6 +2093,31 @@ while True:
         if(role("hum-fill"))role("hum-fill").style.height=h+"%";
         if(role("hum-mini"))role("hum-mini").textContent=Math.round(h)+"%";
         card.classList.toggle("live",hasData||prefs.demoMode);
+      }else if(["light","soil","gas","voltage","sound","rain","water","temperature","bridge_analog"].includes(sp.type)){
+        const d=sensorState.bridge?.adc?.[`adc:${sp.pin}`]||{},raw=Math.max(0,Math.min(4095,Number(d.raw??0)||0)),pct=Math.max(0,Math.min(100,raw*100/4095)),mv=Math.max(0,Number(d.millivolts??0)||0),has=Object.keys(d).length>0;
+        const labelMap={light:`${Math.round(pct)}% light`,soil:`${Math.round(pct)}% moisture`,gas:`${Math.round(pct)}% level`,voltage:mv?`${(mv/1000).toFixed(2)} V`:`${Math.round(pct)}%`,sound:`${Math.round(pct)}% sound`,rain:`${Math.round(pct)}% wet`,water:`${Math.round(pct)}% level`,temperature:`${Math.round(pct)}% raw`,bridge_analog:`${raw} raw`};
+        if(role("studio-value"))role("studio-value").textContent=has?labelMap[sp.type]:"WAITING";if(role("studio-fill"))role("studio-fill").style.width=pct+"%";if(role("studio-detail"))role("studio-detail").textContent=`ADC GPIO${sp.pin}${has?` · ${raw} · ${mv} mV`:""}`;card.classList.toggle("live",has);
+      }else if(["motion","reed","touch","flame","bridge_input"].includes(sp.type)){
+        const d=sensorState.bridge?.gpio?.[`gpio:${sp.pin}`]||{},has=Object.keys(d).length>0,state=!!Number(d.value??0),labels={motion:state?"MOTION":"CLEAR",reed:state?"OPEN / HIGH":"CLOSED / LOW",touch:state?"TOUCHED":"IDLE",flame:state?"DETECTED":"CLEAR",bridge_input:state?"HIGH":"LOW"};
+        if(role("digital-studio-value"))role("digital-studio-value").textContent=has?labels[sp.type]:"WAITING";if(role("digital-studio-icon"))role("digital-studio-icon").classList.toggle("active",has&&state);card.classList.toggle("live",has&&state);
+      }else if(["flow","rpm","counter","pulse"].includes(sp.type)){
+        const all=sp.type==="pulse"?(sensorState.bridge?.pulse||{}):(sensorState.bridge?.counter||{});const d=Object.entries(all).find(([k])=>k.includes(`:${sp.pin}:`)||k===`counter:${sp.pin}`)?.[1]||{},hz=Number(d.hz??0)||0,count=Number(d.count??0)||0,has=Object.keys(d).length>0;
+        const special=sensorState.special?.[sp.type==="flow"?"flow sensor":sp.type==="rpm"?"rpm sensor":""]||{};let main=sp.type==="flow"&&special.Flow_L_min!==undefined?`${Number(special.Flow_L_min).toFixed(2)} L/min`:sp.type==="rpm"&&special.RPM!==undefined?`${Number(special.RPM).toFixed(0)} RPM`:has?`${hz.toFixed(2)} Hz`:"WAITING";
+        if(role("pulse-value"))role("pulse-value").textContent=main;if(role("pulse-detail"))role("pulse-detail").textContent=`GPIO${sp.pin}${has?` · count ${count}`:""}`;if(role("pulse-icon"))role("pulse-icon").style.transform=`rotate(${(Date.now()/18)*(hz?1:0)}deg)`;card.classList.toggle("live",has||!!Object.keys(special).length);
+      }else if(sp.type==="digital_output"||sp.type==="relay"){
+        const d=sensorState.bridge?.gpio?.[`gpio:${sp.pin}`]||{},has=Object.keys(d).length>0,on=!!Number(d.value??0);if(role("output-value"))role("output-value").textContent=has?(on?"ON / HIGH":"OFF / LOW"):"OFF";if(role("output-fill"))role("output-fill").style.width=on?"100%":"0%";if(role("output-icon"))role("output-icon").classList.toggle("active",on);card.classList.toggle("live",on);
+      }else if(sp.type==="pwm_output"){
+        const d=sensorState.bridge?.pwm?.[`pwm:${sp.pin}`]||{},duty=Math.max(0,Number(d.duty??0)||0),bits=Math.max(1,Number(d.resolution??8)||8),pct=Math.min(100,duty/((1<<Math.min(bits,16))-1)*100),has=Object.keys(d).length>0;if(role("output-value"))role("output-value").textContent=has?`${Math.round(pct)}% PWM`:"OFF";if(role("output-fill"))role("output-fill").style.width=pct+"%";card.classList.toggle("live",pct>0);
+      }else if(sp.type==="buzzer"){
+        const u=sensorState.special?.[`buzzer:${sp.pin}`]||{},d=sensorState.bridge?.pwm?.[`pwm:${sp.pin}`]||{},active=(Number(u.frequency)||Number(d.duty)||0)>0,f=Number(u.frequency||d.frequency||0),vol=Number(u.volume??0);if(role("buzzer-value"))role("buzzer-value").textContent=active?`${Math.round(f)} Hz${vol?` · ${Math.round(vol)}%`:""}`:"OFF";if(role("buzzer-fill"))role("buzzer-fill").style.width=(active?Math.max(10,Math.min(100,vol||50)):0)+"%";if(role("buzzer-icon"))role("buzzer-icon").classList.toggle("active",active);card.classList.toggle("live",active);
+      }else if(sp.type==="joystick"){
+        const dx=sensorState.bridge?.adc?.[`adc:${sp.xPin}`]||{},dy=sensorState.bridge?.adc?.[`adc:${sp.yPin}`]||{},x=Number(dx.raw??2048),y=Number(dy.raw??2048),has=Object.keys(dx).length>0||Object.keys(dy).length>0,nx=Math.max(-1,Math.min(1,(x-2048)/2048)),ny=Math.max(-1,Math.min(1,(y-2048)/2048));if(role("joystick-stick"))role("joystick-stick").style.transform=`translate(${nx*22}px,${ny*22}px)`;if(role("joystick-value"))role("joystick-value").textContent=has?`X ${Math.round(x)} · Y ${Math.round(y)}`:"WAITING";card.classList.toggle("live",has);
+      }else if(sp.type==="gps"){
+        const d=sensorState.special?.gps||{},fix=d.Fix===true||String(d.Fix).toLowerCase()==="true",sat=Number(d.Satellites??0)||0,lat=d.Latitude,lon=d.Longitude,has=Object.keys(d).length>0;if(role("gps-fix"))role("gps-fix").textContent=has?`${fix?"FIX":"NO FIX"} · ${sat} SAT`:"WAITING FOR GPS";if(role("gps-coords"))role("gps-coords").textContent=(lat!=null&&lon!=null)?`${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}${d.Speed_kmh!==undefined?` · ${Number(d.Speed_kmh).toFixed(1)} km/h`:""}`:"Latitude — · Longitude —";if(role("gps-meter"))role("gps-meter").style.width=Math.min(100,sat/12*100)+"%";card.classList.toggle("live",has&&fix);
+      }else if(sp.type==="imu"){
+        const d=sensorState.special?.mpu6050||{},ax=Number(d.AccX??0),ay=Number(d.AccY??0),az=Number(d.AccZ??1),gx=Number(d.GyroX??0),gy=Number(d.GyroY??0),gz=Number(d.GyroZ??0),has=Object.keys(d).length>0,roll=Math.atan2(ay,az)*180/Math.PI,pitch=Math.atan2(-ax,Math.sqrt(ay*ay+az*az))*180/Math.PI;if(role("imu-cube"))role("imu-cube").style.transform=`rotateX(${pitch.toFixed(1)}deg) rotateZ(${-roll.toFixed(1)}deg)`;if(role("imu-main"))role("imu-main").textContent=has?`Roll ${roll.toFixed(1)}° · Pitch ${pitch.toFixed(1)}°`:"LEVEL · waiting";if(role("imu-detail"))role("imu-detail").textContent=has?`Acc ${ax.toFixed(2)},${ay.toFixed(2)},${az.toFixed(2)} · Gyro ${gx.toFixed(1)},${gy.toFixed(1)},${gz.toFixed(1)}`:"Acc — · Gyro —";card.classList.toggle("live",has);
+      }else if(["i2c","uart","spi"].includes(sp.type)){
+        const group=sp.type,all=sensorState.bridge?.[group]||{},has=Object.keys(all).length>0;if(role("bus-label"))role("bus-label").textContent=has?"ACTIVE":"READY";card.classList.toggle("live",has);
       }
     }
   }
@@ -2172,27 +2228,28 @@ while True:
   }
 
   function applyDemo(p){
-    if(String(p.command||"").startsWith("BRIDGE_")){const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"};const group=map[p.command]||"gpio",key=String(p.key||p.command);let d={ok:true};if(p.command==="BRIDGE_GPIO_READ")d.value=0;if(p.command==="BRIDGE_ADC_READ")d={...d,raw:2048,millivolts:1650};if(p.command==="BRIDGE_I2C"&&p.op==="scan")d.addresses=[60,104];if(p.command==="BRIDGE_UART")d={...d,text:"",data:[],available:0};if(p.command==="BRIDGE_SPI")d.data=Array.isArray(p.data)?p.data:[];if(p.command==="BRIDGE_PULSE")d={...d,microseconds:1000,hz:50};if(p.command==="BRIDGE_COUNTER")d={...d,count:120,delta:3,hz:12.0};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;}
+    if(String(p.command||"").startsWith("BRIDGE_")){const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"};const group=map[p.command]||"gpio",key=String(p.key||p.command),prev=sensorState.bridge?.[group]?.[key]||{};let d={ok:true};if(p.command==="BRIDGE_GPIO_READ")d={...d,value:Number(prev.value??0),pin:Number(p.pin)};if(p.command==="BRIDGE_GPIO_WRITE")d={...d,value:Number(p.value?1:0),safeValue:Number(p.safeValue?1:0),pin:Number(p.pin)};if(p.command==="BRIDGE_ADC_READ"){const raw=Number(prev.raw??2048);d={...d,raw,millivolts:Number(prev.millivolts??Math.round(raw*3300/4095)),pin:Number(p.pin)}}if(p.command==="BRIDGE_PWM_SET")d={...d,pin:Number(p.pin),duty:Number(p.duty)||0,frequency:Number(p.frequency)||1000,resolution:Number(p.resolution)||8,safeDuty:Number(p.safeDuty)||0};if(p.command==="BRIDGE_I2C"&&p.op==="scan")d.addresses=[60,104];if(p.command==="BRIDGE_UART")d={...d,text:"",data:[],available:0};if(p.command==="BRIDGE_SPI")d.data=Array.isArray(p.data)?p.data:[];if(p.command==="BRIDGE_PULSE")d={...d,microseconds:1000,hz:50,pin:Number(p.pin)};if(p.command==="BRIDGE_COUNTER")d={...d,count:Number(prev.count??0)+3,delta:3,hz:12.0,pin:Number(p.pin)};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;}
     if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
     if(p.command==="RGB_LED_SET")updateRgbCommand(p);
     if(p.command==="LED_SET"){
       const pin=Number(p.pin),value=Math.max(0,Math.min(255,Number(p.value??0)));
       for(const sp of activeHardwareCards.filter(x=>x.type==="led"&&(x.pin==null||Number(x.pin)===pin))){const card=findHardwareCard(sp);if(!card)continue;const glow=card.querySelector('[data-role="single-led-glow"]'),label=card.querySelector('[data-role="single-led-label"]'),fill=card.querySelector('[data-role="single-led-fill"]');if(glow){glow.style.opacity=String(.18+.82*value/255);glow.style.filter=`drop-shadow(0 0 ${Math.round(4+14*value/255)}px rgba(80,220,255,.95))`;}if(label)label.textContent=value===0?"OFF":`Brightness ${value}`;if(fill)fill.style.width=(value/255*100)+"%";card.classList.toggle("live",value>0);}
     }
-    if(p.command==="MOTOR_SET"){
+    if(p.command==="MOTOR_SET"||p.command==="UI_MOTOR_SET"){
       const speed=Math.max(-100,Math.min(100,+p.speed||0));
       for(const sp of activeHardwareCards.filter(x=>x.type==="motor"&&Number(x.id)===Number(p.id||1))){
         const card=findHardwareCard(sp);if(!card)continue;const fill=card.querySelector('[data-role="motor-fill"]'),label=card.querySelector('[data-role="motor-label"]'),visual=card.querySelector('[data-role="motor-visual"]');
         if(fill)fill.style.width=Math.abs(speed)+"%";if(label)label.textContent=speed===0?"Stopped":`${speed>0?"Forward":"Backward"} ${Math.abs(speed)}%`;if(visual)visual.style.transform=`rotate(${speed*1.8}deg)`;card.classList.toggle("live",speed!==0);
       }
     }
-    if(p.command==="SERVO_SET"){
+    if(p.command==="SERVO_SET"||p.command==="UI_SERVO_SET"){
       const angle=Math.max(0,Math.min(180,+p.angle||0));
       for(const sp of activeHardwareCards.filter(x=>x.type==="servo"&&Number(x.id)===Number(p.id||1))){
         const card=findHardwareCard(sp);if(!card)continue;const needle=card.querySelector('[data-role="servo-needle"]'),label=card.querySelector('[data-role="servo-label"]');
-        if(needle)needle.style.transform=`rotate(${angle-90}deg)`;if(label)label.textContent=angle+"°";card.classList.add("live");
+        if(needle)needle.style.transform=`rotate(${angle-90}deg)`;if(label)label.textContent=p.detached?"Detached":angle+"°";card.classList.toggle("live",!p.detached);
       }
     }
+    if(p.command==="UI_BUZZER_SET"){sensorState.special=sensorState.special||{};sensorState.special[`buzzer:${Number(p.pin)}`]={frequency:Number(p.frequency)||0,volume:Number(p.volume)||0};updateSensorGraphics();}
   }
 
   function renderCustomDashboardCards(){
@@ -2200,7 +2257,7 @@ while True:
     grid.querySelectorAll(".custom-dashboard-card").forEach(x=>x.remove());
     for(const [name,values] of customDashboardCards){const card=document.createElement("div");card.className="demo-card hardware-card bridge-card custom-dashboard-card live";const rows=Object.entries(values||{}).slice(0,8).map(([k,v])=>`<span class="custom-sensor-row"><b>${escapeHtml(k)}</b><em>${escapeHtml(v===null||v===undefined?"—":v)}</em></span>`).join("");card.innerHTML=`<div class="bridge-icon">◆</div><div class="demo-grow"><div class="card-title-row"><span class="sensor-status-dot"></span><strong>${escapeHtml(name)}</strong><span class="interface-badge">Python driver</span></div><div class="custom-sensor-values">${rows||'<span class="sensor-secondary">Waiting for values…</span>'}</div></div>`;grid.appendChild(card);}
   }
-  function updateCustomSensorCard(name,jsonText){let values={};try{values=JSON.parse(String(jsonText||"{}"));}catch(_){values={value:String(jsonText||"")};}customDashboardCards.set(String(name||"Sensor"),values);renderCustomDashboardCards();}
+  function updateCustomSensorCard(name,jsonText){let values={};try{values=JSON.parse(String(jsonText||"{}"));}catch(_){values={value:String(jsonText||"")};}const n=String(name||"Sensor"),key=n.trim().toLowerCase();sensorState.special=sensorState.special||{};sensorState.special[key]=values;if(key==="gps"||key==="mpu6050"||key==="flow sensor"||key==="rpm sensor"||key==="joystick"){updateSensorGraphics();return;}customDashboardCards.set(n,values);renderCustomDashboardCards();}
   function ensureBridgeState(){sensorState.bridge=sensorState.bridge||{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}};for(const k of ["gpio","adc","pwm","i2c","uart","spi","pulse","counter","transaction"])sensorState.bridge[k]=sensorState.bridge[k]||{};return sensorState.bridge;}
   function updateBridgeState(group,key,data){const b=ensureBridgeState();b[group][String(key||group)]={...(data||{})};updateSensorGraphics();}
 
@@ -2255,10 +2312,13 @@ while True:
 
   async function handleKit(p){
     if(!p)return;
+    const uiOnly=String(p.command||"").startsWith("UI_");
+    if(uiOnly){applyDemo(p);return;}
     if(prefs.demoMode){applyDemo(p);return;}
 
     if(kitClient?.connected){
       try{
+        if(running&&currentRunNeedsKit&&!currentRunUsesKit)await beginHardwareRun();
         if(String(p.command||"").startsWith("BRIDGE_")){await handleUniversalBridge(p);}
         else if(p.command==="LED_SET"){
           let result;try{result=await kitClient.led(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.led(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
@@ -2293,10 +2353,11 @@ while True:
       return;
     }
 
-    if(ws?.readyState===WebSocket.OPEN){
-      ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
-      applyDemo(p);
-    }else scheduleSilentReconnect();
+    // Offline Simulation: valid Python keeps running and every output is mirrored in Kit Output / Sensors.
+    // Physical transmission resumes automatically after the saved kit reconnects.
+    applyDemo(p);
+    if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
+    else scheduleSilentReconnect();
   }
 
   async function ensureKitConnected(showError=true,{silent=false}={}){

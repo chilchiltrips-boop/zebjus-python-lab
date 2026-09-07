@@ -64,8 +64,9 @@
     }finally{clearTimeout(timer);}
   }
 
-  async function requestBase(base,path,{method="GET",data=null,timeout=2200}={}){
+  async function requestBase(base,path,{method="GET",data=null,timeout=2200,token=""}={}){
     const headers={"Accept":"application/json"};
+    if(token)headers["X-Zebjus-Token"]=String(token);
     const opts={method,headers};
     if(data!==null){
       headers["Content-Type"]="application/x-www-form-urlencoded;charset=UTF-8";
@@ -133,7 +134,7 @@
 
   class KitClient{
     constructor(){
-      this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";
+      this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";this.token="";
       this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
       this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";this._dhtCache=new Map();
     }
@@ -185,17 +186,17 @@
     async flushCommands(){try{return await this._commandChain;}catch(_){return null;}}
     async _request(path,opts={},retry=true){
       if(!this.base)await this.reconnect(4);
-      try{return await requestBase(this.base,path,opts);}
+      try{return await requestBase(this.base,path,{...opts,token:this.token});}
       catch(e){
         if(!retry||e?.status&&e.status<500)throw e;
-        this.base="";this.status=null;await this.reconnect(4);return requestBase(this.base,path,opts);
+        this.base="";this.status=null;await this.reconnect(4);return requestBase(this.base,path,{...opts,token:this.token});
       }
     }
     async beginRun(){
       await this.ensureLive();this._commandEpoch++;this._commandChain=Promise.resolve();this._oledInitialized=false;this._dhtCache.clear();
       return this._request("/api/run/start",{method:"POST",data:{start:1},timeout:1800});
     }
-    async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900});}
+    async pingRun(){if(!this.base)throw new Error("Kit not connected.");return requestBase(this.base,"/api/run/ping",{method:"POST",data:{ping:1},timeout:900,token:this.token});}
     async endRun(){
       if(!this.base)return {ok:true};
       this._commandEpoch++;this._commandChain=Promise.resolve();
@@ -312,6 +313,11 @@
       const payload={op,pin,edge:String(edge||"rising"),pullup:pullup?1:0};const read=String(op).toLowerCase()!=="reset";return read?this._request("/api/bridge/counter"+queryString(payload),{timeout:1600}):this._request("/api/bridge/counter",{method:"POST",data:payload,timeout:1600});
     }
     async transaction(ops){return this._request("/api/bridge/transaction",{method:"POST",data:{ops:String(ops||"")},timeout:3500});}
+
+    async securityStatus(){if(!this.base)await this.reconnect(4);return requestBase(this.base,"/api/security",{timeout:1800});}
+    async enableSecurity(token){token=String(token||"").trim();if(token.length<16)throw new Error("Secure Mode token must be at least 16 characters.");return this._request("/api/security",{method:"POST",data:{action:"enable",token},timeout:2200},false);}
+    async rotateSecurity(token){token=String(token||"").trim();if(token.length<16)throw new Error("Secure Mode token must be at least 16 characters.");return this._request("/api/security",{method:"POST",data:{action:"rotate",token},timeout:2200},false);}
+    async disableSecurity(){return this._request("/api/security",{method:"POST",data:{action:"disable"},timeout:2200},false);}
 
     async rename(name){
       if(!this.base)await this.reconnect(4);const clean=normalizeKitName(name);if(clean.length<3)throw new Error("Kit name must be 3–32 characters.");

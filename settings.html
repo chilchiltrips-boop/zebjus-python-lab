@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <title>ZEBJUS Python Lab Settings v6.1</title>
+  <title>ZEBJUS Python Lab Settings v6.2</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="settings-page">
@@ -122,6 +122,21 @@
             </div>
           </div>
           <span id="wifiMessage" class="muted"></span>
+        </div>
+
+        <div class="kit-subsection">
+          <strong>Optional Per-Kit Secure Mode</strong>
+          <p class="muted settings-note">Default is Trusted LAN, so the existing same-Wi-Fi workflow stays unchanged. Enable Secure Mode when you want this kit to require a private browser token for control, sensor, name and Wi-Fi APIs. Setup AP recovery always remains available.</p>
+          <label>
+            <span>Kit security token</span>
+            <input id="kitToken" type="password" placeholder="32-character token" autocomplete="off">
+          </label>
+          <div class="settings-inline">
+            <button id="generateTokenBtn" class="btn">Generate Token</button>
+            <button id="enableSecurityBtn" class="btn primary">Enable / Save Secure Mode</button>
+            <button id="disableSecurityBtn" class="btn">Disable Secure Mode</button>
+          </div>
+          <span id="securityMessage" class="muted">Trusted LAN mode is the default.</span>
         </div>
 
         <div class="kit-subsection">

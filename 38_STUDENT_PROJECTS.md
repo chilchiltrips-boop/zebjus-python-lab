@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.1 — 38 Current Examples
+# ZEBJUS Python Lab v6.2 — 38 Current Examples
 
 1. **LED Basic Colors** — `ledBasic`
 2. **LED Blink** — `ledBlink`

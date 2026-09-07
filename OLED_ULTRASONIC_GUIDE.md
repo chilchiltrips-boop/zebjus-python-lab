@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.1 — OLED + Ultrasonic Guide
+# ZEBJUS Python Lab v6.2 — OLED + Ultrasonic Guide
 
 ## Default wiring
 
@@ -98,7 +98,7 @@ This is an OLED radar animation. A future physical scanning radar can reuse the 
 
 ## Pin Assist
 
-v6.1 validates and suggests pins for:
+v6.2 validates and suggests pins for:
 
 - `RGBLED(...)`
 - `AnalogInput(...)`

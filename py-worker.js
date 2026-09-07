@@ -394,20 +394,20 @@ class PWMServo:
     def __init__(self,pin,min_us=500,max_us=2500,frequency=50):
         self.pin=int(pin);self.min_us=int(min_us);self.max_us=int(max_us);self.frequency=int(frequency);self.pwm=PWM(pin,frequency,14,0)
     def write(self,angle=90):
-        angle=max(0.0,min(180.0,float(angle)));us=self.min_us+(self.max_us-self.min_us)*(angle/180.0);period=1000000.0/self.frequency;duty=round(self.pwm.max_duty*us/period);self.pwm.write(duty);return angle
+        angle=max(0.0,min(180.0,float(angle)));us=self.min_us+(self.max_us-self.min_us)*(angle/180.0);period=1000000.0/self.frequency;duty=round(self.pwm.max_duty*us/period);self.pwm.write(duty);_send("UI_SERVO_SET",id=self.pin,pin=self.pin,angle=angle);return angle
     def angle(self,value): return self.write(value)
     def write_us(self,microseconds):
-        period=1000000.0/self.frequency;duty=round(self.pwm.max_duty*max(0,float(microseconds))/period);return self.pwm.write(duty)
-    def detach(self): self.pwm.off()
+        period=1000000.0/self.frequency;us=max(0,float(microseconds));duty=round(self.pwm.max_duty*us/period);out=self.pwm.write(duty);angle=max(0.0,min(180.0,(us-self.min_us)*180.0/max(1,self.max_us-self.min_us)));_send("UI_SERVO_SET",id=self.pin,pin=self.pin,angle=angle);return out
+    def detach(self): self.pwm.off();_send("UI_SERVO_SET",id=self.pin,pin=self.pin,angle=0,detached=True)
 
 class MotorDriver:
     __zebjus_ui__={"type":"motor"}
     def __init__(self,in1,in2,pwm_pin,frequency=18000):
         self.in1=DigitalOutput(in1);self.in2=DigitalOutput(in2);self.pwm=PWM(pwm_pin,frequency,8,0)
-    def forward(self,speed=100): self.in1.on();self.in2.off();self.pwm.percent(speed)
-    def backward(self,speed=100): self.in1.off();self.in2.on();self.pwm.percent(speed)
-    def stop(self): self.pwm.off();self.in1.off();self.in2.off()
-    def brake(self): self.pwm.off();self.in1.on();self.in2.on()
+    def forward(self,speed=100): speed=max(0,min(100,float(speed)));self.in1.on();self.in2.off();self.pwm.percent(speed);_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=speed,mode="forward")
+    def backward(self,speed=100): speed=max(0,min(100,float(speed)));self.in1.off();self.in2.on();self.pwm.percent(speed);_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=-speed,mode="backward")
+    def stop(self): self.pwm.off();self.in1.off();self.in2.off();_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=0,mode="stop")
+    def brake(self): self.pwm.off();self.in1.on();self.in2.on();_send("UI_MOTOR_SET",id=self.pwm.pin,pwmPin=self.pwm.pin,in1=self.in1.pin,in2=self.in2.pin,speed=0,mode="brake")
 
 class I2C:
     __zebjus_ui__={"type":"i2c"}
@@ -514,7 +514,7 @@ class GPS:
         except Exception:return None
     def read(self):
         text=self.uart.readline(220);st=_gps_state.setdefault(self.key,{"latitude":None,"longitude":None,"altitude":None,"speed":0.0,"course":0.0,"satellites":0,"hdop":None,"fix":False,"utc":""})
-        for line in str(text).replace("\\r","\r").replace("\\n","\n").splitlines():
+        for line in str(text).splitlines():
             parts=line.strip().split(",");
             if not parts: continue
             typ=parts[0][-3:]
@@ -542,11 +542,53 @@ class MPU6050:
         d=self.dev.read_registers(0x3B,14);d=(d+[0]*14)[:14];ax=self._s16(d[0],d[1])/16384.0;ay=self._s16(d[2],d[3])/16384.0;az=self._s16(d[4],d[5])/16384.0;temp=self._s16(d[6],d[7])/340.0+36.53;gx=self._s16(d[8],d[9])/131.0;gy=self._s16(d[10],d[11])/131.0;gz=self._s16(d[12],d[13])/131.0
         out={"accel_x":ax,"accel_y":ay,"accel_z":az,"gyro_x":gx,"gyro_y":gy,"gyro_z":gz,"temperature":temp};dashboard("MPU6050",AccX=round(ax,3),AccY=round(ay,3),AccZ=round(az,3),GyroX=round(gx,2),GyroY=round(gy,2),GyroZ=round(gz,2));return out
 
-# Common analog modules can share one generic ADC driver without firmware changes.
-class LDR(ADC): pass
-class SoilMoisture(ADC): pass
-class GasSensor(ADC): pass
-class VoltageSensor(ADC): pass
+# Common modules share the universal bridge; sensor-specific UI is handled in the browser.
+class LDR(ADC): __zebjus_ui__={"type":"light"}
+class SoilMoisture(ADC): __zebjus_ui__={"type":"soil"}
+class GasSensor(ADC): __zebjus_ui__={"type":"gas"}
+class VoltageSensor(ADC): __zebjus_ui__={"type":"voltage"}
+class SoundSensor(ADC): __zebjus_ui__={"type":"sound"}
+class RainSensor(ADC): __zebjus_ui__={"type":"rain"}
+class WaterLevelSensor(ADC): __zebjus_ui__={"type":"water"}
+class Thermistor(ADC): __zebjus_ui__={"type":"temperature"}
+
+class PIRSensor(GPIOInput):
+    __zebjus_ui__={"type":"motion"}
+    def __init__(self,pin=27,active_low=False): super().__init__(pin,"input",active_low)
+class ReedSwitch(GPIOInput):
+    __zebjus_ui__={"type":"reed"}
+    def __init__(self,pin=32,active_low=True): super().__init__(pin,"pullup",active_low)
+class TouchSensor(GPIOInput):
+    __zebjus_ui__={"type":"touch"}
+    def __init__(self,pin=32,active_low=False): super().__init__(pin,"input",active_low)
+class FlameSensor(GPIOInput):
+    __zebjus_ui__={"type":"flame"}
+    def __init__(self,pin=32,active_low=False): super().__init__(pin,"input",active_low)
+
+class FlowSensor(CounterInput):
+    __zebjus_ui__={"type":"flow"}
+    def __init__(self,pin,pulses_per_liter=450.0,edge="rising",pullup=False): super().__init__(pin,edge,pullup);self.pulses_per_liter=max(0.001,float(pulses_per_liter))
+    def liters(self): return self.count()/self.pulses_per_liter
+    def flow_lpm(self):
+        hz=self.frequency();v=hz*60.0/self.pulses_per_liter;dashboard("Flow Sensor",Flow_L_min=round(v,3),Frequency_Hz=round(hz,2),Pulses=self.count());return v
+
+class RPMSensor(CounterInput):
+    __zebjus_ui__={"type":"rpm"}
+    def __init__(self,pin,pulses_per_revolution=1.0,edge="rising",pullup=False): super().__init__(pin,edge,pullup);self.ppr=max(0.001,float(pulses_per_revolution))
+    def rpm(self):
+        hz=self.frequency();v=hz*60.0/self.ppr;dashboard("RPM Sensor",RPM=round(v,1),Frequency_Hz=round(hz,2));return v
+
+class Buzzer(PWM):
+    __zebjus_ui__={"type":"buzzer"}
+    def __init__(self,pin,frequency=1000): super().__init__(pin,frequency,8,0)
+    def tone(self,frequency=1000,volume=50): self.frequency=max(20,int(frequency));duty=round(self.max_duty*max(0,min(100,float(volume)))/200.0);self.write(duty);_send("UI_BUZZER_SET",pin=self.pin,frequency=self.frequency,volume=max(0,min(100,float(volume))));return self.frequency
+    def no_tone(self): self.off();_send("UI_BUZZER_SET",pin=self.pin,frequency=0,volume=0)
+
+class Joystick:
+    __zebjus_ui__={"type":"joystick"}
+    def __init__(self,x_pin=34,y_pin=35,switch_pin=None,active_low=True): self.x=ADC(x_pin);self.y=ADC(y_pin);self.switch=None if switch_pin is None else GPIOInput(switch_pin,"pullup" if active_low else "input",active_low);self.x_pin=int(x_pin);self.y_pin=int(y_pin);self.switch_pin=None if switch_pin is None else int(switch_pin)
+    def read(self):
+        out={"x":self.x.raw(),"y":self.y.raw(),"pressed":False if self.switch is None else self.switch.read()};dashboard("Joystick",X=out["x"],Y=out["y"],Pressed=out["pressed"]);return out
 
 def sleep(seconds): time.sleep(float(seconds))
 
@@ -746,11 +788,11 @@ z=types.ModuleType("zebjus")
 for k,v in {
     "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
     "plot":plot,"clear_plot":clear_plot,"dashboard":dashboard,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,
-    "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"sleep":sleep
+    "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"SoundSensor":SoundSensor,"RainSensor":RainSensor,"WaterLevelSensor":WaterLevelSensor,"Thermistor":Thermistor,"PIRSensor":PIRSensor,"ReedSwitch":ReedSwitch,"TouchSensor":TouchSensor,"FlameSensor":FlameSensor,"FlowSensor":FlowSensor,"RPMSensor":RPMSensor,"Buzzer":Buzzer,"Joystick":Joystick,"sleep":sleep
 }.items(): setattr(z,k,v)
 for i,c in LED_CLASSES.items(): setattr(z,f"LED{i}",c)
 for i,c in RGBLED_CLASSES.items(): setattr(z,f"RGBLED{i}",c)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
@@ -827,6 +869,8 @@ class _BrowserVideoCapture:
     def release(self): self.opened=False
 
 def _browser_imshow(title,img): show(img,str(title))
+def _browser_close_windows():
+    postMessage(to_js({"type":"close-images"},dict_converter=js.Object.fromEntries))
 def _browser_waitKey(delay=1):
     # Browser/Pyodide compatibility: OpenCV waitKey uses milliseconds.
     # The Python runtime lives in a Web Worker, so this delay does not freeze the page UI.
@@ -837,7 +881,7 @@ def _browser_waitKey(delay=1):
 cv2.VideoCapture=_BrowserVideoCapture
 cv2.imshow=_browser_imshow
 cv2.waitKey=_browser_waitKey
-cv2.destroyAllWindows=_close_cv_windows
+cv2.destroyAllWindows=_browser_close_windows
     `);
     opencvReady=true;
   }

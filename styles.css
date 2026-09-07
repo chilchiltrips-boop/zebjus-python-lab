@@ -713,7 +713,7 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
 /* v5.27 single LED live card */
 .single-led-card{min-width:220px}.single-led-visual{width:70px;height:70px;border-radius:20px;display:grid;place-items:center;background:radial-gradient(circle at 45% 35%,rgba(46,70,90,.85),rgba(8,14,24,.95));border:1px solid rgba(112,210,255,.18)}.single-led-visual i{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f8ffff,#6ce7ff 30%,#0d6d91 72%,#052836);opacity:.18;transition:opacity .14s ease,filter .14s ease}.single-led-card.live .single-led-visual{box-shadow:0 0 22px rgba(65,211,255,.12)}
 
-/* v6.1 Universal Hardware Bridge cards */
+/* v6.2 Universal Hardware Bridge / Sensor Studio cards */
 .bridge-card{position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(11,25,43,.96),rgba(10,18,32,.98))!important}
 .bridge-card::after{content:"";position:absolute;inset:auto -24px -28px auto;width:72px;height:72px;border-radius:50%;background:radial-gradient(circle,rgba(55,196,255,.12),transparent 68%);pointer-events:none}
 .bridge-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;font:800 17px ui-monospace,SFMono-Regular,Menlo,monospace;color:#8ce5ff;background:linear-gradient(145deg,#10243b,#0a1728);border:1px solid #264b69;box-shadow:inset 0 0 14px rgba(64,190,255,.08),0 6px 14px rgba(0,0,0,.22)}
@@ -722,3 +722,17 @@ input:focus,select:focus,textarea:focus{border-color:#7183ff;box-shadow:0 0 0 2p
 .custom-sensor-row b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.custom-sensor-row em{font-style:normal;color:#d8f3ff;white-space:nowrap}
 .custom-dashboard-card{min-height:72px!important}.custom-dashboard-card .bridge-icon{color:#a9ffca;border-color:#2c6b53;background:linear-gradient(145deg,#0f2c25,#0a1b18)}
 @media(max-width:680px){.custom-sensor-values{grid-template-columns:1fr}}
+
+/* v6.2 Sensor Studio — import/instance-aware live hardware visualizations */
+.sensor-studio-card{min-height:82px;position:relative;overflow:hidden}.sensor-studio-card.live{box-shadow:inset 0 0 0 1px rgba(101,211,255,.18),0 6px 20px rgba(0,0,0,.16)}
+.studio-icon{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;flex:0 0 auto;font-size:24px;font-weight:850;background:linear-gradient(145deg,#132942,#0b1829);border:1px solid #2d4d70;color:#9ddfff;transition:transform .18s ease,filter .18s ease,box-shadow .18s ease}
+.sensor-studio-card.live .studio-icon{transform:scale(1.04);filter:brightness(1.15);box-shadow:0 0 18px rgba(75,198,255,.12)}
+.studio-meter{height:6px;border-radius:999px;background:#0b1422;border:1px solid #233b58;overflow:hidden;margin:5px 0}.studio-meter>i{display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,#3d8bd9,#6ad8ff);transition:width .2s ease}
+.sensor-primary{display:block;font:800 11px ui-monospace,SFMono-Regular,Menlo,monospace;color:#e7f4ff;margin-top:3px}.sensor-secondary{display:block;font:9px ui-monospace,SFMono-Regular,Menlo,monospace;color:#88a3c6;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gps-icon{position:relative;font-size:31px}.gps-icon i{position:absolute;width:7px;height:7px;border-radius:50%;background:#78dfff;opacity:.25}.gps-card.live .gps-icon i{animation:zebjusGpsPulse 1s infinite}@keyframes zebjusGpsPulse{0%{box-shadow:0 0 0 0 rgba(111,223,255,.45);opacity:1}100%{box-shadow:0 0 0 15px rgba(111,223,255,0);opacity:.25}}
+.imu-scene{width:58px;height:58px;display:grid;place-items:center;perspective:160px;flex:0 0 auto}.imu-cube{width:35px;height:27px;position:relative;transform-style:preserve-3d;background:linear-gradient(145deg,#1c4d72,#102c49);border:1px solid #5ea7d2;border-radius:4px;transition:transform .16s linear;box-shadow:0 8px 18px rgba(0,0,0,.24)}.imu-cube::before,.imu-cube::after{content:"";position:absolute;inset:4px;border:1px solid rgba(181,233,255,.35);border-radius:3px}.imu-cube i{position:absolute;left:50%;top:-10px;width:2px;height:18px;background:#ffce69;transform:translateX(-50%)}.imu-cube b{position:absolute;left:50%;top:50%;width:7px;height:7px;border-radius:50%;background:#d9f6ff;transform:translate(-50%,-50%)}
+.digital-studio-icon.active,.buzzer-icon.active{animation:zebjusSensorActive .7s ease-in-out infinite alternate}@keyframes zebjusSensorActive{from{transform:scale(.96)}to{transform:scale(1.08)}}
+.pulse-icon{transition:transform .18s linear}.sensor-studio-card.live .pulse-icon{animation:zebjusSpin 1.3s linear infinite}@keyframes zebjusSpin{to{transform:rotate(360deg)}}
+.joystick-pad{width:58px;height:58px;border-radius:50%;position:relative;flex:0 0 auto;background:radial-gradient(circle,#152a43 0 28%,#0b1626 30% 58%,#263d58 60% 63%,#09111e 65%);border:1px solid #2c4968}.joystick-pad i{position:absolute;left:50%;top:50%;width:17px;height:17px;border-radius:50%;background:#90dfff;border:2px solid #d7f7ff;box-shadow:0 4px 10px #0007;transform:translate(0,0);margin:-10px 0 0 -10px;transition:transform .12s linear}
+.bus-card .bridge-icon{font-size:11px;letter-spacing:-.4px}.bus-card.live .bridge-icon{box-shadow:0 0 18px rgba(90,220,255,.18)}
+@media(max-width:520px){.studio-icon,.imu-scene,.joystick-pad{width:44px;height:44px}.imu-cube{width:30px;height:23px}}

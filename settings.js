@@ -5,7 +5,7 @@
   const client=Kit?new Kit.KitClient():null;
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",wsUrl:"",
+    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",demoUltrasonic:45,demoPot:128
   };
 
@@ -34,6 +34,7 @@
     $("demoMode").checked=!!current.demoMode;
     $("kitName").value=current.kitName||"";
     $("kitIp").value=current.kitIp||"";
+    $("kitToken").value=current.kitToken||"";
     $("wsUrl").value=current.wsUrl||"";
     $("fontSize").value=String(current.fontSize||14);
     $("autoSave").checked=current.autoSave!==false;
@@ -66,7 +67,7 @@
     current={
       ...current,
       autoCamera:$("autoCamera").checked,demoMode:$("demoMode").checked,
-      kitName:entered,kitId:entered,kitChipId:current.kitChipId||"",kitIp:$("kitIp").value.trim(),wsUrl:$("wsUrl").value.trim(),
+      kitName:entered,kitId:entered,kitChipId:current.kitChipId||"",kitIp:$("kitIp").value.trim(),kitToken:$("kitToken").value.trim(),wsUrl:$("wsUrl").value.trim(),
       cameraIndex:Number($("cameraSelect").value)||0,fontSize:Number($("fontSize").value)||14,
       autoSave:$("autoSave").checked,stdin:$("stdinBox").value||"",
       demoUltrasonic:Number($("demoUltrasonic").value)||45,demoPot:Number($("demoPot").value)||0
@@ -80,7 +81,8 @@
     const rows=[
       ["Name",status.name||"—"],["IP",status.ip||"—"],["Wi-Fi",status.ssid||"—"],
       ["Signal",status.rssi!==undefined?status.rssi+" dBm":"—"],["Kit ID",status.chipId||status.id||"—"],
-      ["RGB",status.rgb?`R${status.rgb.rPin} G${status.rgb.gPin} B${status.rgb.bPin}`:"R25 G26 B27"]
+      ["RGB",status.rgb?`R${status.rgb.rPin} G${status.rgb.gPin} B${status.rgb.bPin}`:"R25 G26 B27"],
+      ["Secure Mode",status.secureMode?"Enabled 🔒":"Trusted LAN"]
     ];
     rows.forEach(([k,v])=>{const row=document.createElement("div");const a=document.createElement("span"),b=document.createElement("strong");a.textContent=k;b.textContent=v;row.append(a,b);box.appendChild(row);});
   }
@@ -91,15 +93,56 @@
     if(name.length<3)throw new Error("Enter the kit name, for example zebjus_kit_1.");
     setConnBadge("Connecting…");setMessage("kitNameMessage","");
     const sameSavedKit=Kit.normalizeKitName(current.kitName||"")===name;
-    client.name=name;client.ipHint=$("kitIp").value.trim();client.chipId=sameSavedKit?String(current.kitChipId||""):"";
+    client.name=name;client.ipHint=$("kitIp").value.trim();client.chipId=sameSavedKit?String(current.kitChipId||""):"";client.token=sameSavedKit?String(current.kitToken||$("kitToken").value.trim()||""):String($("kitToken").value.trim()||"");
     let status;
     try{status=await client.connect(name,client.ipHint);}
     catch(_){status=await client.reconnect(4);}
     $("kitName").value=status.name||name;$("kitIp").value=status.ip||"";$("newKitName").value=status.name||name;
-    current.kitName=status.name||name;current.kitId=current.kitName;current.kitChipId=String(status.chipId||"");current.kitIp=status.ip||"";current.demoMode=false;$("demoMode").checked=false;persist();
+    current.kitName=status.name||name;current.kitId=current.kitName;current.kitChipId=String(status.chipId||"");current.kitIp=status.ip||"";current.kitToken=String($("kitToken").value.trim()||current.kitToken||"");client.token=current.kitToken;current.demoMode=false;$("demoMode").checked=false;persist();
     setConnBadge("Connected",true);renderKitInfo(status);
-    refreshSavedWifi().catch(()=>{});
+    refreshSavedWifi().catch(()=>{});refreshSecurity().catch(()=>{});
     return status;
+  }
+
+  function makeSecureToken(){
+    const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);return Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+  }
+
+  async function refreshSecurity(){
+    if(!client?.connected){setMessage("securityMessage","Connect the kit first.");return null;}
+    const r=await client.securityStatus();
+    setMessage("securityMessage",r.enabled?"Secure Mode is enabled on this kit.":"Trusted LAN mode is active. Secure Mode is optional.",r.enabled?"ok-text":"");
+    return r;
+  }
+
+  async function enableSecurity(){
+    if(!client?.connected){setMessage("securityMessage","Connect the kit first.","error-text");return;}
+    let entered=$("kitToken").value.trim();const st=await client.securityStatus();
+    if(st.enabled){
+      if(current.kitToken){
+        client.token=current.kitToken;
+        if(!entered)entered=current.kitToken;
+        if(entered!==current.kitToken)await client.rotateSecurity(entered);
+        else await client.bridgeInfo();
+      }else{
+        if(!entered){setMessage("securityMessage","This kit is secured. Enter its existing token first.","error-text");return;}
+        client.token=entered;await client.bridgeInfo();
+      }
+    }else{
+      if(!entered){entered=makeSecureToken();$("kitToken").value=entered;}
+      client.token="";await client.enableSecurity(entered);
+    }
+    current.kitToken=entered;client.token=entered;persist();
+    setMessage("securityMessage","Secure Mode enabled. Token saved in this browser for this kit.","ok-text");
+    const status=await client.refresh();renderKitInfo(status);
+  }
+
+  async function disableSecurity(){
+    if(!client?.connected){setMessage("securityMessage","Connect the kit first.","error-text");return;}
+    client.token=String(current.kitToken||$("kitToken").value.trim()||"");
+    await client.disableSecurity();current.kitToken="";client.token="";$("kitToken").value="";persist();
+    setMessage("securityMessage","Secure Mode disabled. Trusted LAN behavior restored.","ok-text");
+    const status=await client.refresh();renderKitInfo(status);
   }
 
   async function scanKits(){
@@ -199,6 +242,9 @@
   $("disconnectKitBtn").onclick=()=>{client?.disconnect();setConnBadge("Not connected");renderKitInfo(null);};
   $("kitSelect").onchange=e=>{const op=e.target.selectedOptions[0];if(!op?.value)return;$("kitName").value=op.value;$("kitIp").value=op.dataset.ip||"";current.kitName=op.value;current.kitChipId=op.dataset.chip||"";connectKit(op.value).catch(err=>setMessage("kitNameMessage","Connection failed: "+err.message,"error-text"));};
   $("renameKitBtn").onclick=renameKit;$("resetKitNameBtn").onclick=resetKitName;$("scanWifiBtn").onclick=scanWifi;$("saveWifiBtn").onclick=saveWifi;$("resetWifiBtn").onclick=resetWifi;
+  $("generateTokenBtn").onclick=()=>{$("kitToken").value=makeSecureToken();setMessage("securityMessage","New token generated. Click Enable / Save Secure Mode to apply it.");};
+  $("enableSecurityBtn").onclick=()=>enableSecurity().catch(e=>setMessage("securityMessage","Secure Mode update failed: "+e.message,"error-text"));
+  $("disableSecurityBtn").onclick=()=>disableSecurity().catch(e=>setMessage("securityMessage","Could not disable Secure Mode: "+e.message,"error-text"));
   $("refreshSavedWifiBtn").onclick=()=>refreshSavedWifi().catch(e=>setMessage("wifiMessage","Saved Wi-Fi read failed: "+e.message,"error-text"));
   $("useSavedWifiBtn").onclick=useSavedWifi;$("forgetSavedWifiBtn").onclick=forgetSavedWifi;
 

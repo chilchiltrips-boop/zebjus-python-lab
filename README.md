@@ -1,107 +1,124 @@
-# ZEBJUS Python Lab v6.1 — Universal Hardware Bridge
+# ZEBJUS Python Lab v6.2 — Offline Simulation + Sensor Studio + Optional Secure Mode
 
-v6.1 is the **Safety + Runtime** update to the Universal Hardware Bridge introduced in v6.0. It keeps the universal hardware-interface platform and fixes live-loop state, failsafe and bus/resource conflicts. Existing RGB, LED, OLED, DHT11, Ultrasonic, AnalogInput, Switch, RotaryEncoder, Camera/MediaPipe, OpenCV, Serial Plotter, reconnect/heartbeat and dynamic sensor dashboard features are retained.
+v6.2 keeps the Universal Hardware Bridge architecture and adds three major upgrades: **offline hardware simulation**, **automatic sensor/module visual cards**, and **optional per-kit Secure Mode**. The v6.1 safety/runtime fixes remain in place, including active-low failsafe handling, persistent top-level `while True` state, shared I²C buses, central pin/resource ownership, 5-failure reconnect logic and the 10-second ESP32 output failsafe.
 
-## Main architecture
+## Run with or without a physical kit
 
-The ESP32 firmware v2.1 exposes reusable low-level interfaces instead of requiring a new firmware route for every sensor:
+A valid Python program can run even when the ESP32 kit is disconnected.
 
-- Digital GPIO input/output
-- ADC1 analog input
-- Generic LEDC PWM output
-- 2 × I²C buses
-- 2 × UART hardware ports
-- 2 × SPI buses
-- Pulse width input/output and frequency measurement
-- Local microsecond GPIO/pulse transaction VM
-- Existing OLED / DHT11 / Ultrasonic / Rotary / RGB / LED compatibility APIs
+- **Kit connected:** commands animate in **Kit Output / Sensors** and are also sent to the physical kit.
+- **Kit disconnected:** the same code continues in **Offline Simulation**; visual outputs still animate and sensor cards use simulated/cached values.
+- **Kit reconnects during a live run:** the browser automatically starts/resumes the ESP32 run session, the heartbeat restarts, and later hardware commands are mirrored physically without restarting the Python program.
 
-This means future modules can normally be added with a Python driver only.
+This is especially useful for RGB effects, LEDs, servos, motors and classroom projects where students may write/test code before connecting hardware.
+
+## Kit Output / Sensors — automatic cards
+
+Cards are auto-arranged from `main.py` imports/instances and live commands. Supported visual families include:
+
+- RGB LED / single LED
+- OLED preview
+- Servo (`PWMServo`) with angle animation
+- Motor driver (`MotorDriver`) with direction/speed animation
+- Ultrasonic distance
+- DHT11 temperature + humidity
+- Potentiometer / ADC
+- Rotary encoder / switch / digital input
+- GPS/GNSS with fix state, satellite count and coordinates
+- MPU6050 IMU with live orientation/tilt visualization
+- LDR / light
+- Soil moisture
+- Gas / air-quality analog modules
+- Voltage sensor
+- Sound sensor
+- Rain sensor
+- Water-level sensor
+- Thermistor
+- PIR motion
+- Reed switch
+- Touch sensor
+- Flame sensor
+- Flow sensor
+- RPM / frequency / counter / pulse input
+- Buzzer
+- Joystick
+- Generic I²C / UART / SPI activity cards
+- Any future/custom Python driver using `dashboard(...)`
+
+The generic bridge remains the foundation, so future modules usually need a Python driver and dashboard metadata rather than new firmware endpoints.
 
 ## Python universal APIs
 
 ```python
 from zebjus import (
-    DigitalOutput, GPIOInput, ADC, PWM,
+    RGBLED, LED, OLED, DHT11, Ultrasonic,
+    AnalogInput, Potentiometer, DigitalInput, Switch, RotaryEncoder,
+    DigitalOutput, Relay, GPIOInput, ADC, PWM,
+    PWMServo, MotorDriver,
     I2C, I2CDevice, UART, SPI,
-    PulseInput, PulseOutput, HardwareTransaction,
-    PWMServo, MotorDriver, GPS, MPU6050,
+    PulseInput, PulseOutput, CounterInput, HardwareTransaction,
+    GPS, MPU6050,
+    LDR, SoilMoisture, GasSensor, VoltageSensor, SoundSensor,
+    RainSensor, WaterLevelSensor, Thermistor,
+    PIRSensor, ReedSwitch, TouchSensor, FlameSensor,
+    FlowSensor, RPMSensor, Buzzer, Joystick,
     dashboard, plot, sleep
 )
 ```
 
-### I²C custom sensor
+### Servo
 
 ```python
-from zebjus import I2CDevice, dashboard, sleep
+from zebjus import PWMServo, sleep
 
-sensor = I2CDevice(0x76, 21, 22)
-
+servo = PWMServo(18)
 while True:
-    data = sensor.read_registers(0xD0, 1)
-    chip_id = data[0] if data else 0
-    dashboard("My I2C Sensor", Chip_ID=hex(chip_id))
+    servo.write(30)
+    sleep(0.5)
+    servo.write(150)
     sleep(0.5)
 ```
 
-### UART / GPS
+The servo moves physically when the kit is connected and the dashboard servo animates in both connected and offline modes.
+
+### Motor driver
+
+```python
+from zebjus import MotorDriver, sleep
+
+motor = MotorDriver(16, 17, 18)
+while True:
+    motor.forward(60)
+    sleep(1)
+    motor.backward(40)
+    sleep(1)
+    motor.stop()
+    sleep(0.5)
+```
+
+### GPS / GNSS
 
 ```python
 from zebjus import GPS, sleep
 
 gps = GPS(rx=34, tx=16, baud=9600, port=1)
-
 while True:
-    d = gps.read()
-    print(d)
+    print(gps.read())
     sleep(0.2)
 ```
 
-### SPI
+### MPU6050
 
 ```python
-from zebjus import SPI
+from zebjus import MPU6050, sleep
 
-spi = SPI(sck=18, miso=19, mosi=23, cs=4, frequency=1000000, mode=0, bus=1)
-rx = spi.transfer([0x00, 0x00])
+imu = MPU6050(21, 22, 0x68, 0)
+while True:
+    print(imu.read())
+    sleep(0.1)
 ```
 
-### PWM servo
-
-```python
-from zebjus import PWMServo
-
-servo = PWMServo(18)
-servo.write(90)
-```
-
-### Motor driver
-
-```python
-from zebjus import MotorDriver
-
-motor = MotorDriver(16, 17, 18)
-motor.forward(60)
-```
-
-## Live resource allocator
-
-The editor tracks both pins and hardware buses.
-
-Safe classic ESP32 DevKit pool used by this project:
-
-- Output / PWM: GPIO 4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33
-- Digital input: the above plus GPIO 34, 35, 36, 39; GPIO12 is permitted for selected input/pulse uses
-- Wi-Fi-safe ADC1: GPIO 32, 33, 34, 35, 36, 39
-- I²C controllers: 2
-- UART hardware ports exposed: 1 and 2
-- SPI buses exposed: 1 and 2
-
-I²C and SPI shared bus lines are counted once. Example: OLED and MPU6050 can both use SDA21/SCL22 on I²C bus 0 without consuming four pins. If `I2C()`, `I2CDevice()` or `MPU6050()` omits SDA/SCL after bus 0 was already claimed by the OLED, it inherits the existing bus pins. Assigning an explicitly different SDA/SCL pair to the same I²C bus number produces an editor `InterfaceConflictError`.
-
-## Custom sensor dashboard
-
-Any Python driver can publish values to **Kit Output / Sensors** without adding browser code:
+### Custom sensor dashboard
 
 ```python
 from zebjus import dashboard
@@ -109,64 +126,68 @@ from zebjus import dashboard
 dashboard("Air Quality", CO2=612, Temperature=28.4, Status="OK")
 ```
 
-The card is generated dynamically. The same values can also be graphed with `plot(...)`.
+## I²C sharing and conflict rules
 
-## Timing-sensitive custom modules
+OLED, `I2C`, `I2CDevice` and `MPU6050` can share the same I²C controller when they use the same SDA/SCL pair. Example: OLED + MPU6050 can share bus 0 on SDA21/SCL22.
 
-`HardwareTransaction` runs GPIO and pulse operations locally on the ESP32, so microsecond delays are not executed over Wi-Fi:
+If a later I²C object omits SDA/SCL, it inherits the already-claimed pins for that bus. `InterfaceConflictError` is raised only when the same bus number is explicitly requested with a different SDA/SCL pair.
 
-```python
-from zebjus import HardwareTransaction
+## Runtime fixes retained
 
-txn = HardwareTransaction("sensor")
-result = txn.run([
-    ("MODE", 34, "IN"),
-    ("PULSEIN", 34, 1, 100000),
-])
-```
+- Pyodide initialization template is syntax-checked; the GPS parser no longer generates a broken string literal.
+- `_close_cv_windows` is defined inside the worker initialization before cleanup is used, preventing the previous live-mode `NameError`.
+- A top-level `while True:` is transformed into one-time initialization plus repeated live cycles; variables and object state persist.
+- Error line positions remain aligned with the student's original source.
+- Generic bridge reads use the existing non-blocking cached-response model so Wi-Fi latency does not freeze the editor.
 
-Supported transaction operations in firmware v2.1: `MODE`, `WRITE`, `READ`, `ADC`, `DELAYUS`, `DELAYMS`, `PULSEIN`, `PULSEOUT`.
+## Connection and hardware safety
 
-## Important runtime model
-
-Browser Python is isolated in a Pyodide worker. A top-level `while True:` is split into **one-time initialization + repeated live-loop cycles**. Code before the loop now runs once per Run session, so counters, filters, objects and other Python state persist instead of being recreated every cycle. Source line positions are preserved for accurate error markers.
-
-Generic low-level read calls still use the intentional non-blocking cached-response model: a call requests the next ESP32 read and returns the most recent response, which is refreshed on the following live cycle. This avoids freezing the editor/UI on Wi-Fi latency. Dedicated DHT11/Ultrasonic/Analog/Digital APIs continue using their optimized polling path.
-
-## Connection safety retained
-
-- Cached IP primary
-- Physical Kit ID verification
+- Cached IP primary + physical Kit-ID verification
 - mDNS fallback
-- 5 consecutive failures before UI becomes disconnected
-- Silent background reconnect
-- No Connecting ↔ Connected blink during temporary misses
-- 1-second browser heartbeat while a hardware run is active
+- 5 consecutive failures before visible disconnect
+- silent background reconnect / no Connected↔Connecting blink
+- 1-second active-run heartbeat
 - 10-second ESP32 failsafe
-- Registered PWM/digital/RGB/transaction outputs move to their registered safe state on heartbeat timeout, including active-low relays
-- Bridge UART/SPI/I²C run resources released as applicable
-- OLED cleared on heartbeat timeout
-- Firmware central resource manager rejects cross-interface GPIO conflicts
-- Embedded/Wix Local Network Access failures include a direct-page/new-tab fallback hint
+- active-low relay safe state is preserved
+- transaction `WRITE` / `PULSEOUT` outputs are registered for failsafe
+- central resource manager covers outputs, I²C, UART, SPI, rotary and counter resources
+- GPIO12 is kept out of normal auto-priority because it is a classic ESP32 strapping pin
+- counter pins are aligned between editor/runtime/firmware
+
+## Optional per-kit Secure Mode
+
+The default remains **Trusted LAN** so the normal same-Wi-Fi classroom workflow does not change.
+
+Secure Mode can be enabled from **Settings**. The browser generates/stores a per-kit token and sends it as `X-Zebjus-Token`. When Secure Mode is enabled, control, bridge, Wi-Fi and naming APIs require the token. Setup AP/recovery remains accessible so a kit cannot be locked out of Wi-Fi provisioning.
+
+Secure Mode can also be disabled again from Settings using the saved token.
 
 ## Firmware
 
 Use:
 
-`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_1.ino`
+`esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_2.ino`
 
-Required Arduino libraries for the retained OLED API:
+Target: classic ESP32 / ESP32-WROOM-32 style DevKit with Arduino-ESP32 3.x.
+
+OLED support requires:
 
 - Adafruit SSD1306
 - Adafruit GFX Library
 - Adafruit BusIO
 
-Target: classic ESP32 / ESP32-WROOM-32 style DevKit with Arduino-ESP32 3.x.
+The sketch includes explicit forward declarations for `CounterSlot`, `RotarySlot` and other bridge structs so Arduino's automatic prototype generator does not reproduce the earlier `does not name a type` compile error.
+
+## Firmware compile verification helpers
+
+This package includes:
+
+- `tools/compile_esp32_firmware.sh` — one-command Arduino CLI compile helper
+- `.github/workflows/esp32-firmware-compile.yml` — GitHub Actions compile check for the ESP32 firmware
+- `tools/verify_release.py` — package/static regression verifier
+
+The packaging environment used to build this ZIP did not contain Arduino CLI, so a real ESP32 toolchain compile could not be executed locally here. The included GitHub workflow/local script performs the real compile in an environment where Arduino CLI and the ESP32 core can be installed.
 
 ## Examples
 
-v6.1 contains 38 selectable examples, including legacy projects plus Universal Digital Output, ADC plotting, PWM Servo, Motor Driver, I²C scanner, custom I²C register device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and custom timing transaction projects.
-
-## Trusted-LAN note
-
-The current kit keeps the simple classroom workflow: browser and ESP32 communicate directly on the same trusted Wi-Fi without a separate pairing password. For a public/commercial deployment on untrusted LANs, add a per-kit pairing/session credential before exposing configuration or output APIs beyond the trusted local network. This is intentionally not enabled in v6.1 so existing kit provisioning and browser connection behavior remain compatible.
+The package retains the 38 selectable examples from v6.1, including RGB, camera/AI, OLED, DHT11, ultrasonic, analog/digital inputs, PWM Servo, Motor Driver, I²C scanner/device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and hardware transaction projects.
