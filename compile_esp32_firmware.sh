@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SKETCH="$ROOT/esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_2.ino"
+SKETCH="$ROOT/esp32_firmware/ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_3_1"
 FQBN="${FQBN:-esp32:esp32:esp32}"
 if ! command -v arduino-cli >/dev/null 2>&1; then
   echo "arduino-cli is not installed. Install it from https://arduino.github.io/arduino-cli/" >&2

@@ -1,6 +1,6 @@
 from pathlib import Path
 import re, sys, types, math
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parent
 s=(ROOT/'py-worker.js').read_text()
 blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
 assert blocks, 'Pyodide init block missing'
@@ -51,4 +51,20 @@ assert g['RotaryEncoder'](32,33,14).position()==7
 messages.clear();g['RGBLED'](25,26,27).color('red');g['PWMServo'](4).write(90);g['MotorDriver'](13,14,16).forward(40)
 cmds=[m.get('payload',{}).get('command') for m in messages if isinstance(m,dict) and m.get('type')=='kit-command']
 for expected in ('RGB_LED_SET','UI_SERVO_SET','UI_MOTOR_SET'): assert expected in cmds, (expected,cmds)
+
+# Native display modules must emit deterministic commands for offline animation + physical mirroring.
+messages.clear()
+tm=g['TM1637'](13,14,6); tm.number(1234)
+lcd=g['LCD1602'](21,22,0x27,0); lcd.line(0,'ZEBJUS'); lcd.line(1,'Python Lab')
+display_payloads=[m.get('payload',{}) for m in messages if isinstance(m,dict) and m.get('type')=='kit-command']
+tm_msgs=[x for x in display_payloads if x.get('command')=='TM1637_SET']
+lcd_msgs=[x for x in display_payloads if x.get('command')=='LCD1602_SET']
+assert tm_msgs, 'TM1637 emitted no browser/hardware command'
+assert tm_msgs[-1].get('clk')==13 and tm_msgs[-1].get('dio')==14 and tm_msgs[-1].get('brightness')==6
+assert tm_msgs[-1].get('segments')==[0x06,0x5B,0x4F,0x66], tm_msgs[-1]
+assert tm_msgs[-1].get('text')=='1234', tm_msgs[-1]
+assert any(x.get('action')=='init' and x.get('address')==0x27 for x in lcd_msgs), lcd_msgs
+assert any(x.get('action')=='write' and x.get('row')==0 and str(x.get('text','')).startswith('ZEBJUS') for x in lcd_msgs), lcd_msgs
+assert any(x.get('action')=='write' and x.get('row')==1 and str(x.get('text','')).startswith('Python Lab') for x in lcd_msgs), lcd_msgs
+
 print('Sensor runtime regression PASS')

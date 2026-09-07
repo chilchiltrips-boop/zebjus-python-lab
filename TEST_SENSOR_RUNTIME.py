@@ -62,6 +62,7 @@ lcd_msgs=[x for x in display_payloads if x.get('command')=='LCD1602_SET']
 assert tm_msgs, 'TM1637 emitted no browser/hardware command'
 assert tm_msgs[-1].get('clk')==13 and tm_msgs[-1].get('dio')==14 and tm_msgs[-1].get('brightness')==6
 assert tm_msgs[-1].get('segments')==[0x06,0x5B,0x4F,0x66], tm_msgs[-1]
+assert tm_msgs[-1].get('text')=='1234', tm_msgs[-1]
 assert any(x.get('action')=='init' and x.get('address')==0x27 for x in lcd_msgs), lcd_msgs
 assert any(x.get('action')=='write' and x.get('row')==0 and str(x.get('text','')).startswith('ZEBJUS') for x in lcd_msgs), lcd_msgs
 assert any(x.get('action')=='write' and x.get('row')==1 and str(x.get('text','')).startswith('Python Lab') for x in lcd_msgs), lcd_msgs

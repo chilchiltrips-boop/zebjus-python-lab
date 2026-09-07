@@ -11,6 +11,7 @@
   let imageFrame=null,uploadedImages=[],activeUploadPath="";
   let oledBuffer=null,oledBufferCtx=null,oledInverted=false;
   let activeHardwareCards=[],hardwareLayoutSignature="",hardwareLayoutTimer=null;
+  const displayHardwareQueues=new Map();let displayCommandSeq=0;
 
   const isEmbedded=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
@@ -578,12 +579,13 @@ while True:
 from zebjus import TM1637, sleep
 
 display = TM1637(clk=13, dio=14, brightness=6)
+n = 0
 
 while True:
-    for n in range(10000):
-        display.number(n)
-        print("Display:", n)
-        sleep(0.1)`,
+    display.number(n)
+    print("Display:", n)
+    n = (n + 1) % 10000
+    sleep(0.1)`,
 
     lcd1602Display:`# LCD1602 16x2 with I2C backpack
 from zebjus import LCD1602, sleep
@@ -1291,7 +1293,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.3.0",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.3.1",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -2018,6 +2020,7 @@ while True:
     kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;
     if(st)persistKitIdentity(st);
     if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
+    for(const [key,q] of displayHardwareQueues)if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);
   }
 
   function markKitFailure(reason=""){
@@ -2084,6 +2087,8 @@ while True:
 
   async function endHardwareRun(){
     stopKitHeartbeat();
+    for(const q of displayHardwareQueues.values()){q.latest=null;if(q.pending)q.pending.length=0;}
+    await flushDisplayHardwareQueues();
     const used=currentRunUsesKit;currentRunUsesKit=false;currentRunNeedsKit=false;
     const stopRgb={command:"RGB_LED_SET",id:1,r:0,g:0,b:0};
     if(used&&!prefs.demoMode&&kitClient?.connected){
@@ -2301,14 +2306,14 @@ while True:
   }
   function paintTM1637(p={}){
     const key=`${Number(p.clk??13)},${Number(p.dio??14)}`;sensorState.special=sensorState.special||{};sensorState.special.tm1637=sensorState.special.tm1637||{};sensorState.special.tm1637[key]={...sensorState.special.tm1637[key],...p};const state=sensorState.special.tm1637[key],seg=Array.isArray(state.segments)?state.segments.map(Number):[0,0,0,0];
-    for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&`${sp.clk},${sp.dio}`===key)){const card=findHardwareCard(sp);if(!card)continue;for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]');if(label)label.textContent=`4 digits · brightness ${Number(state.brightness??sp.brightness??7)}${state.simulated?" · SIMULATION":""}`;card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
+    for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&`${sp.clk},${sp.dio}`===key)){const card=findHardwareCard(sp);if(!card)continue;for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]');if(label){const shown=String(state.text??"").replace(/\s+$/g,"");const mode=state.simulated?"SIMULATION":(state.pending?"SYNCING":"KIT");label.textContent=`${shown?`“${shown}” · `:""}brightness ${Number(state.brightness??sp.brightness??7)} · ${mode}`;}card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
   }
   function lcdBlank(){return " ".repeat(16);}
   function paintLCD1602(p={}){
     const bus=Number(p.bus??0)===1?1:0,address=Number(p.address??0x27),key=`${bus}:${address}`;sensorState.special=sensorState.special||{};sensorState.special.lcd1602=sensorState.special.lcd1602||{};const prev=sensorState.special.lcd1602[key]||{lines:[lcdBlank(),lcdBlank()],backlight:true,enabled:true};let lines=Array.isArray(prev.lines)?prev.lines.slice(0,2):[lcdBlank(),lcdBlank()];while(lines.length<2)lines.push(lcdBlank());const action=String(p.action||"").toLowerCase();
     if(action==="clear")lines=[lcdBlank(),lcdBlank()];else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");}
     const state={...prev,...p,bus,address,lines,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled};sensorState.special.lcd1602[key]=state;
-    for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const card=findHardwareCard(sp);if(!card)continue;for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);}const label=card.querySelector('[data-role="lcd-label"]');if(label)label.textContent=`16×2 LCD · ${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"}${state.simulated?" · SIM":""}`;card.classList.add("live");}
+    for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const card=findHardwareCard(sp);if(!card)continue;for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);}const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":(state.pending?"SYNCING":"KIT");label.textContent=`16×2 LCD · ${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
   }
 
   function applyDemo(p){
@@ -2408,6 +2413,82 @@ while True:
     updateBridgeState(group,key,r||{});markKitSuccess(kitClient.status);return true;
   }
 
+  function displayHardwareKey(p){
+    if(p?.command==="TM1637_SET")return `tm:${Number(p.clk??13)},${Number(p.dio??14)}`;
+    if(p?.command==="LCD1602_SET")return `lcd:${Number(p.bus??0)===1?1:0}:${Number(p.address??0x27)}`;
+    return "";
+  }
+
+  function isLatestDisplayVisual(p){
+    if(p?.command==="TM1637_SET"){
+      const key=`${Number(p.clk??13)},${Number(p.dio??14)}`,state=sensorState.special?.tm1637?.[key];
+      return Number(state?.__displaySeq??-1)===Number(p.__displaySeq??-2);
+    }
+    if(p?.command==="LCD1602_SET"){
+      const key=`${Number(p.bus??0)===1?1:0}:${Number(p.address??0x27)}`,state=sensorState.special?.lcd1602?.[key];
+      return Number(state?.__displaySeq??-1)===Number(p.__displaySeq??-2);
+    }
+    return false;
+  }
+
+  async function sendDisplayHardwareOnce(p){
+    if(!kitClient?.connected)return;
+    if(running&&currentRunNeedsKit&&!currentRunUsesKit)await beginHardwareRun();
+    const send=async()=>p.command==="TM1637_SET"?kitClient.tm1637(p):kitClient.lcd1602(p);
+    let result;
+    try{result=await send();}
+    catch(e){
+      if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await send();}
+      else throw e;
+    }
+    if(!result?.skipped&&isLatestDisplayVisual(p)){
+      if(p.command==="TM1637_SET")paintTM1637({...p,simulated:false,pending:false,hardwareSynced:true});
+      else paintLCD1602({...p,simulated:false,pending:false,hardwareSynced:true});
+    }
+    markKitSuccess(kitClient.status);
+  }
+
+  async function runDisplayHardwareQueue(key,q){
+    if(q.busy||!kitClient?.connected)return q.runner||null;q.busy=true;
+    q.runner=(async()=>{
+      try{
+        while(kitClient?.connected){
+          let next=null;
+          if(key.startsWith("tm:")){next=q.latest;q.latest=null;}
+          else next=q.pending.shift()||null;
+          if(!next)break;
+          try{await sendDisplayHardwareOnce(next);}
+          catch(e){if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);else scheduleSilentReconnect();break;}
+        }
+      }finally{
+        q.busy=false;q.runner=null;
+        if((q.latest||q.pending.length)&&kitClient?.connected)setTimeout(()=>runDisplayHardwareQueue(key,q),0);
+      }
+    })();
+    return q.runner;
+  }
+
+  async function flushDisplayHardwareQueues(){
+    const active=[...displayHardwareQueues.values()].map(q=>q.runner).filter(Boolean);
+    if(active.length)await Promise.allSettled(active);
+  }
+
+  function queueDisplayHardware(p){
+    const key=displayHardwareKey(p);if(!key)return;
+    let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[]};displayHardwareQueues.set(key,q);}
+    if(p.command==="TM1637_SET")q.latest={...p};
+    else{
+      const item={...p},action=String(item.action||"").toLowerCase();
+      if(action==="clear")q.pending=[];
+      if(action==="write"){
+        const idx=q.pending.findIndex(x=>String(x.action||"").toLowerCase()==="write"&&Number(x.row||0)===Number(item.row||0)&&Number(x.col||0)===Number(item.col||0));
+        if(idx>=0)q.pending[idx]=item;else q.pending.push(item);
+      }else q.pending.push(item);
+      if(q.pending.length>12)q.pending=q.pending.slice(-12);
+    }
+    if(kitClient?.connected)runDisplayHardwareQueue(key,q);
+  }
+
   async function handleKit(p){
     if(!p)return;
     const uiOnly=String(p.command||"").startsWith("UI_");
@@ -2416,6 +2497,10 @@ while True:
 
     if(kitClient?.connected){
       try{
+        if(p.command==="TM1637_SET"||p.command==="LCD1602_SET"){
+          const dp={...p,__displaySeq:++displayCommandSeq,simulated:false,pending:true};
+          applyDemo(dp);queueDisplayHardware(dp);return;
+        }
         if(running&&currentRunNeedsKit&&!currentRunUsesKit)await beginHardwareRun();
         if(String(p.command||"").startsWith("BRIDGE_")){await handleUniversalBridge(p);}
         else if(p.command==="LED_SET"){
@@ -2429,10 +2514,6 @@ while True:
           }
           if(!result?.skipped)applyDemo(p); // Mirror only after ESP32 acknowledges: screen and kit stay synchronized.
           markKitSuccess(kitClient.status);
-        }else if(p.command==="TM1637_SET"){
-          let result;try{result=await kitClient.tm1637(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.tm1637(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
-        }else if(p.command==="LCD1602_SET"){
-          let result;try{result=await kitClient.lcd1602(p);}catch(e){if(running&&e?.status===409&&/not running|run session/i.test(String(e?.message||""))){await kitClient.beginRun();currentRunUsesKit=true;result=await kitClient.lcd1602(p);}else throw e;}if(!result?.skipped)applyDemo(p);markKitSuccess(kitClient.status);
         }else if(String(p.command||"").startsWith("OLED_")){
           let result;
           try{result=await kitClient.oled(p);}
@@ -2457,7 +2538,7 @@ while True:
 
     // Offline Simulation: valid Python keeps running and every output is mirrored in Kit Output / Sensors.
     // Physical transmission resumes automatically after the saved kit reconnects.
-    applyDemo(p);
+    if(p.command==="TM1637_SET"||p.command==="LCD1602_SET"){const dp={...p,__displaySeq:++displayCommandSeq,simulated:true,pending:false};applyDemo(dp);queueDisplayHardware(dp);}else applyDemo(p);
     if(ws?.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:"command",kitId:prefs.kitName||prefs.kitId,...p}));
     else scheduleSilentReconnect();
   }

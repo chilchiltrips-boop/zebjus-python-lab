@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.3 FINAL
+# ZEBJUS Python Lab v6.3.1 FINAL
 
 ## Added
 - Native TM1637/HW-069 driver (`/api/tm1637`) with bidirectional DIO ACK handling.
@@ -15,8 +15,19 @@
 ## Fixed
 - Generic HardwareTransaction can hand a transaction-owned output pin back to input for protocols that require bidirectional ACK phases.
 - Old TM1637 `MODE input pin conflict: active output` path is therefore backward compatible.
-- Browser cache-busters updated to v6.3.0.
+- Browser cache-busters updated to v6.3.1.
 - Arduino compile script and GitHub Actions now target firmware v2.3.
 
 ## Retained
 All v6.2.2 real-sensor-sync, DHT11, ultrasonic, failsafe, Secure Mode, offline simulation, persistent live loop, I2C sharing and resource-manager fixes remain.
+
+
+## v6.3.1 Display synchronization / latency fix
+- Kit Output / Sensors TM1637/LCD preview updates immediately before network I/O.
+- TM1637 commands are latest-state coalesced to prevent HTTP backlog during fast counters.
+- LCD1602 commands are serialized with bounded/coalesced pending writes.
+- TM1637 Python packets include the human-readable displayed text for the UI label.
+- Stop drains in-flight display writes before end-run clear, preventing a stale frame race.
+- Firmware caches TM1637 data mode and brightness control state.
+- LCD1602 PCF8574 driver removes redundant expander writes per nibble.
+- Browser/firmware versions: 6.3.1 / 2.3.1.

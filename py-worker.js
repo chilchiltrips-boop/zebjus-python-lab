@@ -296,22 +296,22 @@ class TM1637:
     """HW-069 / TM1637 4-digit seven-segment display."""
     __zebjus_ui__={"type":"tm1637"}
     def __init__(self,clk=13,dio=14,brightness=7):
-        self.clk=int(clk);self.dio=int(dio);self._brightness=max(0,min(7,int(brightness)));self._segments=[0,0,0,0]
+        self.clk=int(clk);self.dio=int(dio);self._brightness=max(0,min(7,int(brightness)));self._segments=[0,0,0,0];self._display_text="    "
         if self.clk not in SUPPORTED_OUTPUT_PINS or self.dio not in SUPPORTED_OUTPUT_PINS or self.clk==self.dio: raise ValueError(f"TM1637 CLK/DIO must be different safe pins: {SUPPORTED_OUTPUT_PINS}")
         self._send("display")
     def _send(self,action="display"):
-        _send("TM1637_SET",action=str(action),clk=self.clk,dio=self.dio,brightness=self._brightness,segments=list(self._segments))
+        _send("TM1637_SET",action=str(action),clk=self.clk,dio=self.dio,brightness=self._brightness,segments=list(self._segments),text=self._display_text)
         return self
     def segments(self,values):
         vals=[int(x)&255 for x in list(values)]
         if len(vals)!=4: raise ValueError("TM1637 segments() needs exactly 4 bytes")
-        self._segments=vals;return self._send("segments")
+        self._segments=vals;self._display_text="";return self._send("segments")
     def brightness(self,level=None):
         if level is None:return self._brightness
         self._brightness=max(0,min(7,int(level)));return self._send("brightness")
-    def clear(self): self._segments=[0,0,0,0];return self._send("clear")
+    def clear(self): self._segments=[0,0,0,0];self._display_text="    ";return self._send("clear")
     def text(self,text,colon=False):
-        txt=str(text).upper()[:4].ljust(4);self._segments=[_TM1637_CHARS.get(ch,0x00) for ch in txt]
+        txt=str(text).upper()[:4].ljust(4);self._display_text=txt;self._segments=[_TM1637_CHARS.get(ch,0x00) for ch in txt]
         if colon:self._segments[1]|=0x80
         return self._send("display")
     def number(self,value,leading_zero=False,colon=False):

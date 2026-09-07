@@ -1,7 +1,7 @@
 {
-  "release": "ZEBJUS Python Lab v6.3 TM1637 + LCD1602 Display Bridge FINAL",
-  "ui_version": "6.3.0",
-  "firmware": "2.3.0",
+  "release": "ZEBJUS Python Lab v6.3.1 TM1637 + LCD1602 Display Bridge FINAL",
+  "ui_version": "6.3.1",
+  "firmware": "2.3.1",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 40,
   "features": {
