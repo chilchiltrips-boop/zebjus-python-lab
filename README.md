@@ -1,6 +1,6 @@
-# ZEBJUS Python Lab v6.2 — Offline Simulation + Sensor Studio + Optional Secure Mode
+# ZEBJUS Python Lab v6.2.2 — Real Hardware Sync + Offline Simulation + Sensor Studio + Optional Secure Mode
 
-v6.2 keeps the Universal Hardware Bridge architecture and adds three major upgrades: **offline hardware simulation**, **automatic sensor/module visual cards**, and **optional per-kit Secure Mode**. The v6.1 safety/runtime fixes remain in place, including active-low failsafe handling, persistent top-level `while True` state, shared I²C buses, central pin/resource ownership, 5-failure reconnect logic and the 10-second ESP32 output failsafe.
+v6.2.2 keeps the Universal Hardware Bridge architecture and adds three major upgrades: **offline hardware simulation**, **automatic sensor/module visual cards**, and **optional per-kit Secure Mode**. The v6.1 safety/runtime fixes remain in place, including active-low failsafe handling, persistent top-level `while True` state, shared I²C buses, central pin/resource ownership, 5-failure reconnect logic and the 10-second ESP32 output failsafe.
 
 ## Run with or without a physical kit
 
@@ -11,6 +11,16 @@ A valid Python program can run even when the ESP32 kit is disconnected.
 - **Kit reconnects during a live run:** the browser automatically starts/resumes the ESP32 run session, the heartbeat restarts, and later hardware commands are mirrored physically without restarting the Python program.
 
 This is especially useful for RGB effects, LEDs, servos, motors and classroom projects where students may write/test code before connecting hardware.
+
+
+## DHT11 real-hardware behavior in v6.2.2
+
+DHT11 no longer uses a `pulseIn()` response sequence that can miss the first sensor response pulse. Firmware 2.2.2 uses direct microsecond transition timing for the full 40-bit frame, validates the checksum and enforces a 1.2-second minimum hardware-read interval.
+
+- **Kit connected + valid DHT11:** terminal and **Kit Output / Sensors** show the same real temperature/humidity.
+- **Kit connected + failed read:** the card shows `READ ERROR` plus a diagnostic such as `sensor did not pull DATA low`, `checksum mismatch` or `bit timeout`; no demo temperature/humidity is substituted.
+- **Kit disconnected:** values are animated and explicitly marked `SIMULATION`.
+- For a raw 4-pin DHT11, use VCC, DATA, NC, GND and a 4.7k–10k pull-up from DATA to **3.3V**. Many 3-pin DHT11 modules already contain the pull-up resistor.
 
 ## Kit Output / Sensors — automatic cards
 
@@ -191,3 +201,10 @@ The packaging environment used to build this ZIP did not contain Arduino CLI, so
 ## Examples
 
 The package retains the 38 selectable examples from v6.1, including RGB, camera/AI, OLED, DHT11, ultrasonic, analog/digital inputs, PWM Servo, Motor Driver, I²C scanner/device, GPS/UART, MPU6050, SPI, pulse/frequency, interrupt counter/flow/RPM and hardware transaction projects.
+
+
+## v6.2.2 sensor-source rule
+
+- **Kit connected:** input values come from the physical ESP32 endpoints. Missing/invalid reads are shown as `READ ERROR` or `STALE`; demo constants are never substituted.
+- **Kit disconnected:** Python continues and visuals use changing, clearly labelled `SIMULATION` values.
+- **Kit reconnects:** simulated input/bridge snapshots are cleared and physical mirroring resumes automatically.

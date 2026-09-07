@@ -1,7 +1,7 @@
 {
-  "release": "ZEBJUS Python Lab v6.2 Offline Simulation + Sensor Studio + Secure Mode",
-  "ui_version": "6.2",
-  "firmware": "2.2",
+  "release": "ZEBJUS Python Lab v6.2.2 DHT11 Real Hardware + Real Sensor Sync + Offline Simulation + Sensor Studio + Secure Mode",
+  "ui_version": "6.2.2",
+  "firmware": "2.2.2",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 38,
   "features": {
@@ -44,10 +44,29 @@
   },
   "validation": {
     "javascript_syntax": "7/7 pass",
-    "pyodide_initialization_python": "pass (796 lines)",
+    "pyodide_initialization_python": "7/7 generated Python template blocks compile",
     "html_duplicate_ids": "pass",
     "local_asset_refs": "pass",
     "firmware_static_markers": "pass",
-    "arduino_cli_compile": "not run in packaging sandbox; local script and GitHub Actions workflow included"
+    "arduino_cli_compile": "not available in packaging runtime; compile helper and GitHub Actions workflow retained",
+    "sensor_runtime_stub_tests": "pass: DHT11, Ultrasonic, Analog, Digital, Rotary, ADC, GPIO, GPS, MPU6050 simulation/real-state paths",
+    "dht11_protocol_stub_compile": "pass (host C++ syntax/protocol simulation test in packaging runtime)"
+  },
+  "real_sensor_sync_fixes": {
+    "demo_mode_default_off": true,
+    "configured_kit_old_demo_setting_migrated_once": true,
+    "dht11_no_hardcoded_28c_65rh_fallback_online": true,
+    "ultrasonic_no_max_range_fake_read_on_echo_timeout": true,
+    "dht11_and_ultrasonic_last_valid_stale_cache": true,
+    "null_numeric_values_not_coerced_to_zero": true,
+    "sensor_errors_isolated_per_device": true,
+    "common_bridge_inputs_prefetched_before_first_python_cycle": true,
+    "simulated_values_cleared_on_real_kit_reconnect": true,
+    "gps_and_mpu6050_simulation_explicitly_labelled": true,
+    "mpu6050_short_i2c_read_not_zero_padded_as_real_data": true,
+    "online_real_offline_simulation_rule": true,
+    "dht11_direct_edge_timing_reader": true,
+    "dht11_error_diagnostics": true,
+    "dht11_min_read_interval_ms": 1200
   }
 }

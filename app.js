@@ -1,5 +1,6 @@
 (function(){
   const $=id=>document.getElementById(id),cfg=window.ZEBJUS_CONFIG||{};
+  const hasFiniteValue=v=>v!==null&&v!==undefined&&v!==""&&Number.isFinite(Number(v));
   const video=$("cameraVideo"),overlay=$("cameraOverlay"),terminal=$("terminal");
   let editor=null,worker=null,ws=null,running=false,cameraRunning=false,currentCameraIndex=null,cameras=[],liveMode=false,liveCode="",liveNeedsHand=false,liveNeedsFace=false,liveNeedsCamera=false,liveTimer=null,liveSessionId=0,lintTimer=null,lintSeq=0,lintWaiters=new Map(),editorIssue=null;
   const kitClient=window.ZebjusKit?new window.ZebjusKit.KitClient():null;
@@ -15,23 +16,20 @@
   const bridgeChannelName="zebjus-camera-"+Math.random().toString(36).slice(2);
   const bridgeChannel=("BroadcastChannel" in window)?new BroadcastChannel(bridgeChannelName):null;
   let bridgeWindow=null,bridgeWaiters=new Map();
-  let sensorState={ultrasonicCm:45,dhtTemperature:28,dhtHumidity:65,dhtPin:13,potValue:128,potRaw:2056,potPin:34,potPercent:50,potMillivolts:0,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}},special:{}};
+  let sensorState={simulationMode:true,ultrasonicCm:null,dhtTemperature:null,dhtHumidity:null,dhtPin:13,potValue:null,potRaw:null,potPin:34,potPercent:null,potMillivolts:null,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}},special:{}};
   const customDashboardCards=new Map();
   const plotter={series:new Map(),maxPoints:180,seq:0};
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
+    autoCamera:true,demoMode:false,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",
     demoUltrasonic:45,demoPot:128,demoDhtTemp:28,demoDhtHumidity:65
   };
   function getSettings(){let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(e){}return {...defaults,...s};}
   let prefs=getSettings();
   if(!prefs.kitName&&prefs.kitId&&!/^ZB-/i.test(prefs.kitId))prefs.kitName=prefs.kitId;
+  if(prefs.kitName&&prefs.demoMode===true&&!localStorage.getItem("zebjus.lab.v621DemoMigrated")){prefs.demoMode=false;localStorage.setItem("zebjus.lab.v621DemoMigrated","1");localStorage.setItem("zebjus.lab.settings",JSON.stringify(prefs));}
   if(kitClient){kitClient.name=prefs.kitName||"";kitClient.ipHint=prefs.kitIp||"";kitClient.chipId=String(prefs.kitChipId||"");kitClient.token=String(prefs.kitToken||"");}
-  sensorState.ultrasonicCm=Number(prefs.demoUltrasonic)||45;
-  sensorState.dhtTemperature=Number(prefs.demoDhtTemp)||28; sensorState.dhtHumidity=Number(prefs.demoDhtHumidity)||65;
-  sensorState.potValue=Math.max(0,Math.min(255,Number(prefs.demoPot)||0));
-  sensorState.potRaw=Math.round(sensorState.potValue*4095/255);
 
   const examples={
     ledBasic:`# RGB LED Basic Colors
@@ -265,12 +263,12 @@ b = DHT11(13)
 
 print("Listening for humidity/temp...")
 while True:
-    vals = b.get_values()
-    if len(vals) >= 2:
-        humidity = vals[0] / 10.0
-        temperature = vals[1] / 10.0
-        print(f"Humidity: {humidity:.1f}% | Temp: {temperature:.1f} °C")
-    sleep(1)`,
+    data = b.read()
+    if data["valid"] or data["stale"]:
+        print(f"Humidity: {data['humidity']:.1f}% | Temp: {data['temperature']:.1f} °C" + (" · STALE" if data["stale"] else ""))
+    else:
+        print("DHT11 READ ERROR:", data.get("message", "No sensor response"))
+    sleep(1.5)`,
 
     dht11Plotter:`# DHT11 Live Serial Plotter
 from zebjus import DHT11, plot, sleep
@@ -278,11 +276,14 @@ from zebjus import DHT11, plot, sleep
 dht = DHT11(13)
 
 while True:
-    temperature = dht.temperature()
-    humidity = dht.humidity()
-    print(f"Temp: {temperature:.1f} °C | Humidity: {humidity:.1f} %")
-    plot(Temperature=temperature, Humidity=humidity)
-    sleep(1)`,
+    data = dht.read()
+    if data["valid"] or data["stale"]:
+        temperature, humidity = data["temperature"], data["humidity"]
+        print(f"Temp: {temperature:.1f} °C | Humidity: {humidity:.1f} %" + (" · STALE" if data["stale"] else ""))
+        plot(Temperature=temperature, Humidity=humidity)
+    else:
+        print("DHT11 READ ERROR:", data.get("message", "No sensor response"))
+    sleep(1.5)`,
 
     dht11Oled:`# DHT11 Temperature + Humidity on OLED
 from zebjus import DHT11, OLED, sleep
@@ -303,16 +304,20 @@ dht = DHT11(13)
 rgb = RGBLED(25, 26, 27)
 
 while True:
-    t = dht.temperature()
-    h = dht.humidity()
-    if t >= 32:
-        rgb.color("red")
-    elif t >= 28:
-        rgb.color("yellow")
+    data = dht.read()
+    if data["valid"] or data["stale"]:
+        t, h = data["temperature"], data["humidity"]
+        if t >= 32:
+            rgb.color("red")
+        elif t >= 28:
+            rgb.color("yellow")
+        else:
+            rgb.color("green")
+        print(f"{t:.1f} °C | {h:.1f} %RH" + (" · STALE" if data["stale"] else ""))
     else:
-        rgb.color("green")
-    print(f"{t:.1f} °C | {h:.1f} %RH")
-    sleep(1)`,
+        rgb.off()
+        print("DHT11 READ ERROR:", data.get("message", "No sensor response"))
+    sleep(1.5)`,
 
     dht11Dashboard:`# DHT11 OpenCV Gauge Dashboard
 import cv2
@@ -1255,7 +1260,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.2",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.2.2",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -1316,6 +1321,7 @@ while True:
       else if(m.type==="plot")handlePlotPacket(m);
       else if(m.type==="plot-clear")clearPlotter();
       else if(m.type==="sensor-card"){updateCustomSensorCard(m.name,m.json);}
+      else if(m.type==="sensor-live"){let data={};try{data=JSON.parse(String(m.json||"{}"));}catch(_){data={};}updateSensorPacket({sensor:m.sensor||data.sensor||"",...data});}
       else if(m.type==="image"){
         // Keep Camera / MediaPipe as the live camera panel. cv2.imshow()/show() belongs in the dedicated output panel below Terminal.
         showImage(m.dataUrl);
@@ -1636,29 +1642,38 @@ while True:
   async function refreshInputsFromKit(src,showError=false){
     if(prefs.demoMode)return true;
     if(!kitClient?.connected)return false;
-    const specs=requestedInputs(src);
-    try{
-      for(const a of specs.analog){
-        const d=await kitClient.analog(a.pin);updateSensorPacket(d);
+    const specs=requestedInputs(src);let networkOk=true;
+    const readOne=async(label,fn,onError)=>{
+      try{const d=await fn();updateSensorPacket(d);return true;}
+      catch(e){
+        const msg=String(e?.message||e);if(typeof onError==="function")onError(e);
+        if(e?.status>=400&&e?.status<500){if(showError)log(`${label}: ${msg}`);return true;}
+        networkOk=false;if(showError)log(`${label}: ${msg}`);return false;
       }
-      for(const sw of specs.digital){
-        const d=await kitClient.digital(sw.pin,{pullup:sw.pullup,activeLow:sw.activeLow});updateSensorPacket(d);
+    };
+    for(const a of specs.analog)await readOne(`Analog GPIO${a.pin}`,()=>kitClient.analog(a.pin),e=>updateSensorPacket({sensor:"ANALOG",pin:a.pin,valid:false,message:String(e?.message||e)}));
+    for(const sw of specs.digital)await readOne(`Digital GPIO${sw.pin}`,()=>kitClient.digital(sw.pin,{pullup:sw.pullup,activeLow:sw.activeLow}),e=>updateSensorPacket({sensor:"DIGITAL",pin:sw.pin,valid:false,message:String(e?.message||e)}));
+    for(const r of specs.rotary)await readOne(`Rotary ${r.clk}/${r.dt}`,()=>kitClient.rotary(r.clk,r.dt,r.sw,{pullup:r.pullup}),e=>updateSensorPacket({sensor:"ROTARY",clk:r.clk,dt:r.dt,sw:r.sw,valid:false,message:String(e?.message||e)}));
+    for(const u of specs.ultrasonic)await readOne(`Ultrasonic ${u.trig}/${u.echo}`,()=>kitClient.ultrasonic(u.trig,u.echo,{maxCm:u.maxCm}),e=>updateSensorPacket({sensor:"ULTRASONIC",trig:u.trig,echo:u.echo,valid:false,maxCm:u.maxCm,message:String(e?.message||e)}));
+    for(const dht of specs.dht11)await readOne(`DHT11 GPIO${dht.pin}`,()=>kitClient.dht11(dht.pin),e=>updateSensorPacket({sensor:"DHT11",pin:dht.pin,valid:false,message:String(e?.message||e)}));
+
+    // Prefetch direct Universal Bridge sensor classes so their first Python read is real, not an empty one-cycle cache.
+    const cards=detectHardwareCards(src),seen=new Set();
+    for(const sp of cards){
+      if(["light","soil","gas","voltage","sound","rain","water","temperature","bridge_analog"].includes(sp.type)&&sp.pin!=null){
+        const k=`adc:${sp.pin}`;if(seen.has(k))continue;seen.add(k);await readOne(`ADC GPIO${sp.pin}`,async()=>{const d=await kitClient.adc(sp.pin);updateBridgeState("adc",k,{...d,valid:true,simulated:false});return {sensor:"BRIDGE_PREFETCH"};});
+      }else if(["motion","reed","touch","flame","bridge_input"].includes(sp.type)&&sp.pin!=null){
+        const k=`gpio:${sp.pin}`;if(seen.has(k))continue;seen.add(k);const mode=sp.className==="ReedSwitch"?"pullup":"input";await readOne(`GPIO${sp.pin}`,async()=>{const d=await kitClient.gpioRead(sp.pin,{mode});updateBridgeState("gpio",k,{...d,valid:true,simulated:false});return {sensor:"BRIDGE_PREFETCH"};});
+      }else if(sp.type==="joystick"){
+        for(const pin of [sp.xPin,sp.yPin]){const k=`adc:${pin}`;if(seen.has(k))continue;seen.add(k);await readOne(`Joystick ADC GPIO${pin}`,async()=>{const d=await kitClient.adc(pin);updateBridgeState("adc",k,{...d,valid:true,simulated:false});return {sensor:"BRIDGE_PREFETCH"};});}
+      }else if(["counter","flow","rpm"].includes(sp.type)&&sp.pin!=null){
+        const k=`counter:${sp.pin}:rising`;if(seen.has(k))continue;seen.add(k);await readOne(`Counter GPIO${sp.pin}`,async()=>{const d=await kitClient.counter({op:"read",pin:sp.pin,edge:"rising",pullup:false});updateBridgeState("counter",k,{...d,valid:true,simulated:false});return {sensor:"BRIDGE_PREFETCH"};});
+      }else if(sp.type==="pulse"&&sp.pin!=null){
+        const k=`pulse:${sp.pin}:1`;if(seen.has(k))continue;seen.add(k);await readOne(`Pulse GPIO${sp.pin}`,async()=>{const d=await kitClient.pulse({op:"frequency",pin:sp.pin,state:1,timeoutUs:100000});updateBridgeState("pulse",k,{...d,valid:true,simulated:false});return {sensor:"BRIDGE_PREFETCH"};});
       }
-      for(const r of specs.rotary){
-        const d=await kitClient.rotary(r.clk,r.dt,r.sw,{pullup:r.pullup});updateSensorPacket(d);
-      }
-      for(const u of specs.ultrasonic){
-        const d=await kitClient.ultrasonic(u.trig,u.echo,{maxCm:u.maxCm});updateSensorPacket(d);
-      }
-      for(const dht of specs.dht11){
-        const d=await kitClient.dht11(dht.pin);updateSensorPacket(d);
-      }
-      markKitSuccess(kitClient.status);
-      return true;
-    }catch(e){
-      if(showError)log("Input read error: "+(e?.message||e));
-      return false;
     }
+    if(networkOk)markKitSuccess(kitClient.status);
+    return networkOk;
   }
 
   async function startCamera(index=null){
@@ -1749,6 +1764,7 @@ while True:
   }
 
   function postProgramToWorker(code,frame){
+    sensorState.simulationMode=!!prefs.demoMode||!kitClient?.connected;
     worker.postMessage({
       type:"run",
       code,
@@ -1951,7 +1967,13 @@ while True:
     if($("kitNameText"))$("kitNameText").textContent=prefs.kitName||"No kit selected";
   }
 
+  function clearSimulatedSensorState(){
+    for(const group of Object.values(sensorState.inputs||{}))for(const [k,v] of Object.entries(group||{}))if(v?.simulated)delete group[k];
+    for(const group of Object.values(sensorState.bridge||{}))for(const [k,v] of Object.entries(group||{}))if(v?.simulated)delete group[k];
+    for(const [k,v] of Object.entries(sensorState.special||{}))if(String(v?.Mode||"").toUpperCase()==="SIMULATION"||v?.simulated)delete sensorState.special[k];
+  }
   function markKitSuccess(st=null){
+    if(sensorState.simulationMode)clearSimulatedSensorState();sensorState.simulationMode=false;
     kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;
     if(st)persistKitIdentity(st);
     if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
@@ -2056,54 +2078,55 @@ while True:
         const value=Math.max(0,Math.min(255,Number(d.value255??d.value??(fallback?sensorState.potValue:0))||0));
         const raw=Number(d.raw??(fallback?sensorState.potRaw:Math.round(value*4095/255)))||0;
         const percent=Math.max(0,Math.min(100,Number(d.percent??Math.round(value*100/255))||0));
-        if(role("analog-label"))role("analog-label").textContent=(!hasData&&!prefs.demoMode)?"WAITING":`${value} / 255 · ${percent}%`;
-        if(role("analog-detail"))role("analog-detail").textContent=(!hasData&&!prefs.demoMode)?`GPIO${sp.pin} · run code to read`:`GPIO${sp.pin} · raw ${raw}${d.millivolts!==undefined?` · ${Number(d.millivolts)} mV`:""}`;
+        const invalid=hasData&&d.valid===false,simulation=!!d.simulated;
+        if(role("analog-label"))role("analog-label").textContent=invalid?"READ ERROR":(!hasData?"WAITING":`${value} / 255 · ${percent}%`);
+        if(role("analog-detail"))role("analog-detail").textContent=!hasData?`GPIO${sp.pin} · waiting`:`GPIO${sp.pin} · raw ${raw}${d.millivolts!==undefined?` · ${Number(d.millivolts)} mV`:""}${simulation?" · SIMULATION":""}`;
         if(role("pot-needle"))role("pot-needle").style.transform=`rotate(${-135+(value/255)*270}deg)`;
         if(role("analog-fill"))role("analog-fill").style.width=percent+"%";
-        card.classList.toggle("live",hasData||prefs.demoMode);
+        card.classList.toggle("live",hasData&&d.valid!==false);card.classList.toggle("sensor-error",hasData&&d.valid===false);
       }else if(sp.type==="digital"){
         const d=sensorState.inputs?.digital?.[String(sp.pin)]||{};
         const active=!!d.active,state=Number(d.state??(active?1:0));
         if(role("switch-visual"))role("switch-visual").classList.toggle("active",active);
-        if(role("switch-label")){role("switch-label").textContent=Object.keys(d).length?(active?"ACTIVE / PRESSED":"RELEASED"):"WAITING";role("switch-label").style.color=active?"#62e9a2":"";}
-        card.classList.toggle("live",Object.keys(d).length>0);
+        if(role("switch-label")){role("switch-label").textContent=d.valid===false?"READ ERROR":(Object.keys(d).length?(active?"ACTIVE / PRESSED":"RELEASED")+(d.simulated?" · SIM":""):"WAITING");role("switch-label").style.color=active?"#62e9a2":"";}
+        card.classList.toggle("live",Object.keys(d).length>0&&d.valid!==false);card.classList.toggle("sensor-error",d.valid===false);
       }else if(sp.type==="rotary"){
         const key=`${sp.clk},${sp.dt},${sp.sw}`,d=sensorState.inputs?.rotary?.[key]||{};
         const pos=Number(d.position??0),delta=Number(d.delta??0),dir=String(d.direction||"NONE"),pressed=!!d.pressed;
         if(role("rotary-dial"))role("rotary-dial").style.transform=`rotate(${pos*18}deg)`;
         if(role("rotary-press"))role("rotary-press").classList.toggle("active",pressed);
-        if(role("rotary-label"))role("rotary-label").textContent=`Position ${pos} · ${dir}`;
+        if(role("rotary-label"))role("rotary-label").textContent=d.valid===false?"READ ERROR":`Position ${pos} · ${dir}${d.simulated?" · SIM":""}`;
         if(role("rotary-detail"))role("rotary-detail").textContent=`Δ${delta} · CLK ${sp.clk} · DT ${sp.dt}${sp.sw>=0?` · SW ${pressed?"pressed":"released"}`:""}`;
-        card.classList.toggle("live",Object.keys(d).length>0);
+        card.classList.toggle("live",Object.keys(d).length>0&&d.valid!==false);card.classList.toggle("sensor-error",d.valid===false);
       }else if(sp.type==="ultrasonic"){
-        const key=`${sp.trig},${sp.echo}`,data=sensorState.inputs?.ultrasonic?.[key]||{},hasData=Object.keys(data).length>0;
-        const isDefault=prefs.demoMode&&sp.trig===18&&sp.echo===19;
-        const d=Math.max(0,Number(data.distanceCm??data.ultrasonicCm??(isDefault?sensorState.ultrasonicCm:0))||0),max=Math.max(1,Number(sp.maxCm)||400),pct=Math.min(100,d/max*100);
-        if(role("ultra-label"))role("ultra-label").textContent=(!hasData&&!prefs.demoMode)?"WAITING":d.toFixed(1)+" cm";
-        if(role("ultra-fill"))role("ultra-fill").style.width=pct+"%";
-        if(role("ultra-beam")){role("ultra-beam").style.transform=`scaleX(${Math.max(.18,pct/100)})`;role("ultra-beam").style.opacity=String(.35+.65*Math.min(1,pct/100));}
-        card.classList.toggle("live",hasData||prefs.demoMode);
+        const key=`${sp.trig},${sp.echo}`,data=sensorState.inputs?.ultrasonic?.[key]||{},hasData=Object.keys(data).length>0,simulation=!!data.simulated;
+        const rawDistance=data.distanceCm??data.ultrasonicCm,hasValue=hasFiniteValue(rawDistance),valid=data.valid!==false&&hasValue,stale=!!data.stale&&hasValue,hardError=hasData&&!valid&&!stale;
+        const d=hasValue?Math.max(0,Number(rawDistance)):0,max=Math.max(1,Number(data.maxCm??sp.maxCm)||400),pct=Math.min(100,d/max*100);
+        if(role("ultra-label"))role("ultra-label").textContent=hardError?"READ ERROR":(!hasData?"WAITING":`${d.toFixed(1)} cm${simulation?" · SIM":""}`);
+        if(role("ultra-fill"))role("ultra-fill").style.width=(hasValue?pct:0)+"%";
+        if(role("ultra-beam")){role("ultra-beam").style.transform=`scaleX(${hasValue?Math.max(.18,pct/100):.18})`;role("ultra-beam").style.opacity=String(hasValue?.35+.65*Math.min(1,pct/100):.2);}
+        card.classList.toggle("live",(valid||stale||simulation)&&!hardError);card.classList.toggle("sensor-error",hardError);
       }else if(sp.type==="dht11"){
-        const data=sensorState.inputs?.dht11?.[String(sp.pin)]||{},hasData=Object.keys(data).length>0;
-        const isDefault=prefs.demoMode&&sp.pin===(sensorState.dhtPin||13);
-        const t=Number(data.temperature??(isDefault?sensorState.dhtTemperature:0))||0,h=Math.max(0,Math.min(100,Number(data.humidity??(isDefault?sensorState.dhtHumidity:0))||0));
-        if(role("dht-main"))role("dht-main").textContent=(!hasData&&!prefs.demoMode)?"WAITING":`${t.toFixed(1)} °C · ${h.toFixed(1)} %RH`;
-        if(role("dht-detail"))role("dht-detail").textContent=`DATA GPIO${sp.pin}${data.valid===false?" · read invalid":""}`;
-        if(role("temp-fill"))role("temp-fill").style.height=Math.max(4,Math.min(100,t/50*100))+"%";
-        if(role("hum-fill"))role("hum-fill").style.height=h+"%";
-        if(role("hum-mini"))role("hum-mini").textContent=Math.round(h)+"%";
-        card.classList.toggle("live",hasData||prefs.demoMode);
+        const data=sensorState.inputs?.dht11?.[String(sp.pin)]||{},hasData=Object.keys(data).length>0,simulation=!!data.simulated;
+        const hasValues=hasFiniteValue(data.temperature)&&hasFiniteValue(data.humidity),valid=data.valid!==false&&hasValues,stale=!!data.stale&&hasValues,hardError=hasData&&!valid&&!stale;
+        const t=hasValues?Number(data.temperature):0,h=hasValues?Math.max(0,Math.min(100,Number(data.humidity))):0;
+        if(role("dht-main"))role("dht-main").textContent=hardError?"READ ERROR":(!hasData?"WAITING":`${t.toFixed(1)} °C · ${h.toFixed(1)} %RH`);
+        if(role("dht-detail")){const why=String(data.error||"").trim();let suffix=simulation?" · SIMULATION":(stale?" · STALE":(hardError?` · ${why?why.toUpperCase():"NO RESPONSE"}`:" · HARDWARE"));role("dht-detail").textContent=`DATA GPIO${sp.pin}${suffix}`;role("dht-detail").title=String(data.message||"");}
+        if(role("temp-fill"))role("temp-fill").style.height=hasValues?Math.max(4,Math.min(100,t/50*100))+"%":"4%";
+        if(role("hum-fill"))role("hum-fill").style.height=(hasValues?h:0)+"%";
+        if(role("hum-mini"))role("hum-mini").textContent=hardError?"ERR":(hasValues?Math.round(h)+"%":"—");
+        card.classList.toggle("live",(valid||stale||simulation)&&!hardError);card.classList.toggle("sensor-error",hardError);
       }else if(["light","soil","gas","voltage","sound","rain","water","temperature","bridge_analog"].includes(sp.type)){
         const d=sensorState.bridge?.adc?.[`adc:${sp.pin}`]||{},raw=Math.max(0,Math.min(4095,Number(d.raw??0)||0)),pct=Math.max(0,Math.min(100,raw*100/4095)),mv=Math.max(0,Number(d.millivolts??0)||0),has=Object.keys(d).length>0;
         const labelMap={light:`${Math.round(pct)}% light`,soil:`${Math.round(pct)}% moisture`,gas:`${Math.round(pct)}% level`,voltage:mv?`${(mv/1000).toFixed(2)} V`:`${Math.round(pct)}%`,sound:`${Math.round(pct)}% sound`,rain:`${Math.round(pct)}% wet`,water:`${Math.round(pct)}% level`,temperature:`${Math.round(pct)}% raw`,bridge_analog:`${raw} raw`};
-        if(role("studio-value"))role("studio-value").textContent=has?labelMap[sp.type]:"WAITING";if(role("studio-fill"))role("studio-fill").style.width=pct+"%";if(role("studio-detail"))role("studio-detail").textContent=`ADC GPIO${sp.pin}${has?` · ${raw} · ${mv} mV`:""}`;card.classList.toggle("live",has);
+        if(role("studio-value"))role("studio-value").textContent=has?`${labelMap[sp.type]}${d.simulated?" · SIM":""}`:"WAITING";if(role("studio-fill"))role("studio-fill").style.width=pct+"%";if(role("studio-detail"))role("studio-detail").textContent=`ADC GPIO${sp.pin}${has?` · ${raw} · ${mv} mV`:""}`;card.classList.toggle("live",has);
       }else if(["motion","reed","touch","flame","bridge_input"].includes(sp.type)){
         const d=sensorState.bridge?.gpio?.[`gpio:${sp.pin}`]||{},has=Object.keys(d).length>0,state=!!Number(d.value??0),labels={motion:state?"MOTION":"CLEAR",reed:state?"OPEN / HIGH":"CLOSED / LOW",touch:state?"TOUCHED":"IDLE",flame:state?"DETECTED":"CLEAR",bridge_input:state?"HIGH":"LOW"};
-        if(role("digital-studio-value"))role("digital-studio-value").textContent=has?labels[sp.type]:"WAITING";if(role("digital-studio-icon"))role("digital-studio-icon").classList.toggle("active",has&&state);card.classList.toggle("live",has&&state);
+        if(role("digital-studio-value"))role("digital-studio-value").textContent=has?`${labels[sp.type]}${d.simulated?" · SIM":""}`:"WAITING";if(role("digital-studio-icon"))role("digital-studio-icon").classList.toggle("active",has&&state);card.classList.toggle("live",has&&state);
       }else if(["flow","rpm","counter","pulse"].includes(sp.type)){
         const all=sp.type==="pulse"?(sensorState.bridge?.pulse||{}):(sensorState.bridge?.counter||{});const d=Object.entries(all).find(([k])=>k.includes(`:${sp.pin}:`)||k===`counter:${sp.pin}`)?.[1]||{},hz=Number(d.hz??0)||0,count=Number(d.count??0)||0,has=Object.keys(d).length>0;
-        const special=sensorState.special?.[sp.type==="flow"?"flow sensor":sp.type==="rpm"?"rpm sensor":""]||{};let main=sp.type==="flow"&&special.Flow_L_min!==undefined?`${Number(special.Flow_L_min).toFixed(2)} L/min`:sp.type==="rpm"&&special.RPM!==undefined?`${Number(special.RPM).toFixed(0)} RPM`:has?`${hz.toFixed(2)} Hz`:"WAITING";
-        if(role("pulse-value"))role("pulse-value").textContent=main;if(role("pulse-detail"))role("pulse-detail").textContent=`GPIO${sp.pin}${has?` · count ${count}`:""}`;if(role("pulse-icon"))role("pulse-icon").style.transform=`rotate(${(Date.now()/18)*(hz?1:0)}deg)`;card.classList.toggle("live",has||!!Object.keys(special).length);
+        const special=sensorState.special?.[sp.type==="flow"?"flow sensor":sp.type==="rpm"?"rpm sensor":""]||{};let sim=!!d.simulated;let main=sp.type==="flow"&&special.Flow_L_min!==undefined?`${Number(special.Flow_L_min).toFixed(2)} L/min`:sp.type==="rpm"&&special.RPM!==undefined?`${Number(special.RPM).toFixed(0)} RPM`:has?`${hz.toFixed(2)} Hz`:"WAITING";
+        if(role("pulse-value"))role("pulse-value").textContent=main+(sim?" · SIM":"");if(role("pulse-detail"))role("pulse-detail").textContent=`GPIO${sp.pin}${has?` · count ${count}`:""}`;if(role("pulse-icon"))role("pulse-icon").style.transform=`rotate(${(Date.now()/18)*(hz?1:0)}deg)`;card.classList.toggle("live",has||!!Object.keys(special).length);
       }else if(sp.type==="digital_output"||sp.type==="relay"){
         const d=sensorState.bridge?.gpio?.[`gpio:${sp.pin}`]||{},has=Object.keys(d).length>0,on=!!Number(d.value??0);if(role("output-value"))role("output-value").textContent=has?(on?"ON / HIGH":"OFF / LOW"):"OFF";if(role("output-fill"))role("output-fill").style.width=on?"100%":"0%";if(role("output-icon"))role("output-icon").classList.toggle("active",on);card.classList.toggle("live",on);
       }else if(sp.type==="pwm_output"){
@@ -2113,11 +2136,11 @@ while True:
       }else if(sp.type==="joystick"){
         const dx=sensorState.bridge?.adc?.[`adc:${sp.xPin}`]||{},dy=sensorState.bridge?.adc?.[`adc:${sp.yPin}`]||{},x=Number(dx.raw??2048),y=Number(dy.raw??2048),has=Object.keys(dx).length>0||Object.keys(dy).length>0,nx=Math.max(-1,Math.min(1,(x-2048)/2048)),ny=Math.max(-1,Math.min(1,(y-2048)/2048));if(role("joystick-stick"))role("joystick-stick").style.transform=`translate(${nx*22}px,${ny*22}px)`;if(role("joystick-value"))role("joystick-value").textContent=has?`X ${Math.round(x)} · Y ${Math.round(y)}`:"WAITING";card.classList.toggle("live",has);
       }else if(sp.type==="gps"){
-        const d=sensorState.special?.gps||{},fix=d.Fix===true||String(d.Fix).toLowerCase()==="true",sat=Number(d.Satellites??0)||0,lat=d.Latitude,lon=d.Longitude,has=Object.keys(d).length>0;if(role("gps-fix"))role("gps-fix").textContent=has?`${fix?"FIX":"NO FIX"} · ${sat} SAT`:"WAITING FOR GPS";if(role("gps-coords"))role("gps-coords").textContent=(lat!=null&&lon!=null)?`${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}${d.Speed_kmh!==undefined?` · ${Number(d.Speed_kmh).toFixed(1)} km/h`:""}`:"Latitude — · Longitude —";if(role("gps-meter"))role("gps-meter").style.width=Math.min(100,sat/12*100)+"%";card.classList.toggle("live",has&&fix);
+        const d=sensorState.special?.gps||{},fix=d.Fix===true||String(d.Fix).toLowerCase()==="true",sat=Number(d.Satellites??0)||0,lat=d.Latitude,lon=d.Longitude,has=Object.keys(d).length>0;if(role("gps-fix"))role("gps-fix").textContent=has?`${fix?"FIX":"NO FIX"} · ${sat} SAT${String(d.Mode||"").toUpperCase()==="SIMULATION"?" · SIM":""}`:"WAITING FOR GPS";if(role("gps-coords"))role("gps-coords").textContent=(lat!=null&&lon!=null)?`${Number(lat).toFixed(6)}, ${Number(lon).toFixed(6)}${d.Speed_kmh!==undefined?` · ${Number(d.Speed_kmh).toFixed(1)} km/h`:""}`:"Latitude — · Longitude —";if(role("gps-meter"))role("gps-meter").style.width=Math.min(100,sat/12*100)+"%";card.classList.toggle("live",has&&fix);
       }else if(sp.type==="imu"){
-        const d=sensorState.special?.mpu6050||{},ax=Number(d.AccX??0),ay=Number(d.AccY??0),az=Number(d.AccZ??1),gx=Number(d.GyroX??0),gy=Number(d.GyroY??0),gz=Number(d.GyroZ??0),has=Object.keys(d).length>0,roll=Math.atan2(ay,az)*180/Math.PI,pitch=Math.atan2(-ax,Math.sqrt(ay*ay+az*az))*180/Math.PI;if(role("imu-cube"))role("imu-cube").style.transform=`rotateX(${pitch.toFixed(1)}deg) rotateZ(${-roll.toFixed(1)}deg)`;if(role("imu-main"))role("imu-main").textContent=has?`Roll ${roll.toFixed(1)}° · Pitch ${pitch.toFixed(1)}°`:"LEVEL · waiting";if(role("imu-detail"))role("imu-detail").textContent=has?`Acc ${ax.toFixed(2)},${ay.toFixed(2)},${az.toFixed(2)} · Gyro ${gx.toFixed(1)},${gy.toFixed(1)},${gz.toFixed(1)}`:"Acc — · Gyro —";card.classList.toggle("live",has);
+        const d=sensorState.special?.mpu6050||{},ax=Number(d.AccX??0),ay=Number(d.AccY??0),az=Number(d.AccZ??1),gx=Number(d.GyroX??0),gy=Number(d.GyroY??0),gz=Number(d.GyroZ??0),has=Object.keys(d).length>0,roll=Math.atan2(ay,az)*180/Math.PI,pitch=Math.atan2(-ax,Math.sqrt(ay*ay+az*az))*180/Math.PI;if(role("imu-cube"))role("imu-cube").style.transform=`rotateX(${pitch.toFixed(1)}deg) rotateZ(${-roll.toFixed(1)}deg)`;if(role("imu-main"))role("imu-main").textContent=has?`Roll ${roll.toFixed(1)}° · Pitch ${pitch.toFixed(1)}°${String(d.Mode||"").toUpperCase()==="SIMULATION"?" · SIM":""}`:"LEVEL · waiting";if(role("imu-detail"))role("imu-detail").textContent=has?`Acc ${ax.toFixed(2)},${ay.toFixed(2)},${az.toFixed(2)} · Gyro ${gx.toFixed(1)},${gy.toFixed(1)},${gz.toFixed(1)}`:"Acc — · Gyro —";card.classList.toggle("live",has);
       }else if(["i2c","uart","spi"].includes(sp.type)){
-        const group=sp.type,all=sensorState.bridge?.[group]||{},has=Object.keys(all).length>0;if(role("bus-label"))role("bus-label").textContent=has?"ACTIVE":"READY";card.classList.toggle("live",has);
+        const group=sp.type,all=sensorState.bridge?.[group]||{},vals=Object.values(all),has=vals.length>0,sim=has&&vals.every(x=>x?.simulated);if(role("bus-label"))role("bus-label").textContent=has?(sim?"SIMULATION":"ACTIVE"):"READY";card.classList.toggle("live",has);
       }
     }
   }
@@ -2228,7 +2251,17 @@ while True:
   }
 
   function applyDemo(p){
-    if(String(p.command||"").startsWith("BRIDGE_")){const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"};const group=map[p.command]||"gpio",key=String(p.key||p.command),prev=sensorState.bridge?.[group]?.[key]||{};let d={ok:true};if(p.command==="BRIDGE_GPIO_READ")d={...d,value:Number(prev.value??0),pin:Number(p.pin)};if(p.command==="BRIDGE_GPIO_WRITE")d={...d,value:Number(p.value?1:0),safeValue:Number(p.safeValue?1:0),pin:Number(p.pin)};if(p.command==="BRIDGE_ADC_READ"){const raw=Number(prev.raw??2048);d={...d,raw,millivolts:Number(prev.millivolts??Math.round(raw*3300/4095)),pin:Number(p.pin)}}if(p.command==="BRIDGE_PWM_SET")d={...d,pin:Number(p.pin),duty:Number(p.duty)||0,frequency:Number(p.frequency)||1000,resolution:Number(p.resolution)||8,safeDuty:Number(p.safeDuty)||0};if(p.command==="BRIDGE_I2C"&&p.op==="scan")d.addresses=[60,104];if(p.command==="BRIDGE_UART")d={...d,text:"",data:[],available:0};if(p.command==="BRIDGE_SPI")d.data=Array.isArray(p.data)?p.data:[];if(p.command==="BRIDGE_PULSE")d={...d,microseconds:1000,hz:50,pin:Number(p.pin)};if(p.command==="BRIDGE_COUNTER")d={...d,count:Number(prev.count??0)+3,delta:3,hz:12.0,pin:Number(p.pin)};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;}
+    if(String(p.command||"").startsWith("BRIDGE_")){
+      const map={BRIDGE_GPIO_READ:"gpio",BRIDGE_GPIO_WRITE:"gpio",BRIDGE_ADC_READ:"adc",BRIDGE_PWM_SET:"pwm",BRIDGE_I2C:"i2c",BRIDGE_UART:"uart",BRIDGE_SPI:"spi",BRIDGE_PULSE:"pulse",BRIDGE_COUNTER:"counter",BRIDGE_TRANSACTION:"transaction"},group=map[p.command]||"gpio",key=String(p.key||p.command),prev=sensorState.bridge?.[group]?.[key]||{},phase=Date.now()/1000+Number(p.pin||0)*.17;let d={ok:true,valid:true,simulated:true};
+      if(p.command==="BRIDGE_GPIO_READ")d={...d,value:(Math.floor(phase/1.5)%2),pin:Number(p.pin)};
+      if(p.command==="BRIDGE_GPIO_WRITE")d={...d,value:Number(p.value?1:0),safeValue:Number(p.safeValue?1:0),pin:Number(p.pin)};
+      if(p.command==="BRIDGE_ADC_READ"){const raw=Math.max(0,Math.min(4095,Math.round(2048+1850*Math.sin(phase*.7))));d={...d,raw,millivolts:Math.round(raw*3300/4095),pin:Number(p.pin)};}
+      if(p.command==="BRIDGE_PWM_SET")d={...d,pin:Number(p.pin),duty:Number(p.duty)||0,frequency:Number(p.frequency)||1000,resolution:Number(p.resolution)||8,safeDuty:Number(p.safeDuty)||0};
+      if(p.command==="BRIDGE_I2C"){if(p.op==="scan")d.addresses=[60,104];else if(String(p.op||"").includes("read"))d.data=Array.from({length:Math.max(0,Number(p.length)||0)},(_,i)=>(Math.floor(phase*13)+i*17)&255);}
+      if(p.command==="BRIDGE_UART")d={...d,text:"",data:[],available:0};if(p.command==="BRIDGE_SPI")d.data=Array.isArray(p.data)?p.data:[];
+      if(p.command==="BRIDGE_PULSE")d={...d,microseconds:Math.round(900+250*Math.sin(phase)),hz:Number((12+4*Math.sin(phase*.6)).toFixed(2)),pin:Number(p.pin)};
+      if(p.command==="BRIDGE_COUNTER")d={...d,count:Number(prev.count??0)+2,delta:2,hz:Number((8+3*Math.sin(phase*.5)).toFixed(2)),pin:Number(p.pin)};if(p.command==="BRIDGE_TRANSACTION")d.results=[];updateBridgeState(group,key,d);return;
+    }
     if(p.command&&String(p.command).startsWith("OLED_")){applyOledCommand(p);document.querySelectorAll('.hardware-card[data-hw-type="oled"]').forEach(c=>c.classList.add("live"));}
     if(p.command==="RGB_LED_SET")updateRgbCommand(p);
     if(p.command==="LED_SET"){
@@ -2265,18 +2298,20 @@ while True:
     const sensor=String(data.sensor||data.name||"").toUpperCase();
     sensorState.inputs=sensorState.inputs||{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}};
     if(sensor==="ULTRASONIC"||data.distanceCm!==undefined||data.ultrasonicCm!==undefined){
-      sensorState.ultrasonicCm=Number(data.distanceCm??data.ultrasonicCm??sensorState.ultrasonicCm);
+      if(hasFiniteValue(data.distanceCm??data.ultrasonicCm))sensorState.ultrasonicCm=Number(data.distanceCm??data.ultrasonicCm);
       const key=`${Number(data.trig??18)},${Number(data.echo??19)}`;sensorState.inputs.ultrasonic[key]={...data};
     }
     if(sensor==="DHT11"||data.temperature!==undefined||data.humidity!==undefined){
-      const pin=Number(data.pin??13);sensorState.dhtPin=pin;
-      sensorState.dhtTemperature=Number(data.temperature??sensorState.dhtTemperature);sensorState.dhtHumidity=Number(data.humidity??sensorState.dhtHumidity);
-      sensorState.inputs.dht11[String(pin)]={...data,pin};
+      const pin=Number(data.pin??13),key=String(pin),prev=sensorState.inputs.dht11[key]||{};sensorState.dhtPin=pin;
+      const hasT=hasFiniteValue(data.temperature),hasH=hasFiniteValue(data.humidity);
+      if(hasT&&hasH){sensorState.dhtTemperature=Number(data.temperature);sensorState.dhtHumidity=Number(data.humidity);sensorState.inputs.dht11[key]={...prev,...data,pin,temperature:Number(data.temperature),humidity:Number(data.humidity)};}
+      else if(data.valid===false&&hasFiniteValue(prev.temperature)&&hasFiniteValue(prev.humidity)){sensorState.inputs.dht11[key]={...prev,...data,pin,temperature:Number(prev.temperature),humidity:Number(prev.humidity),stale:true};}
+      else sensorState.inputs.dht11[key]={...data,pin};
     }
     if(sensor==="ANALOG"||sensor==="POT"||sensor==="POTENTIOMETER"||data.value255!==undefined){
       const pin=Number(data.pin??34),d={...data,pin};sensorState.inputs.analog[String(pin)]=d;
-      sensorState.potValue=Math.max(0,Math.min(255,Number(data.potValue??data.value255??data.value??sensorState.potValue)));
-      sensorState.potRaw=Number(data.raw??data.potRaw??Math.round(sensorState.potValue*4095/255));
+      if(hasFiniteValue(data.potValue??data.value255??data.value))sensorState.potValue=Math.max(0,Math.min(255,Number(data.potValue??data.value255??data.value)));
+      sensorState.potRaw=hasFiniteValue(data.raw??data.potRaw)?Number(data.raw??data.potRaw):Math.round((Number(sensorState.potValue)||0)*4095/255);
       sensorState.potPin=pin;sensorState.potPercent=Number(data.percent??Math.round(sensorState.potValue*100/255));sensorState.potMillivolts=Number(data.millivolts??sensorState.potMillivolts??0);
       if($("potTitle"))$("potTitle").textContent="Analog Input";
     }

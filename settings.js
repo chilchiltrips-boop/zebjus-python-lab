@@ -5,7 +5,7 @@
   const client=Kit?new Kit.KitClient():null;
 
   const defaults={
-    autoCamera:true,demoMode:true,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
+    autoCamera:true,demoMode:false,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
     cameraIndex:0,fontSize:14,autoSave:true,stdin:"",demoUltrasonic:45,demoPot:128
   };
 
@@ -13,6 +13,7 @@
     let s={};try{s=JSON.parse(localStorage.getItem("zebjus.lab.settings")||"{}");}catch(_){s={};}
     const out={...defaults,...s};
     if(!out.kitName&&out.kitId&&!/^ZB-/i.test(out.kitId))out.kitName=out.kitId;
+    if(out.kitName&&out.demoMode===true&&!localStorage.getItem("zebjus.lab.v621DemoMigrated")){out.demoMode=false;localStorage.setItem("zebjus.lab.v621DemoMigrated","1");localStorage.setItem("zebjus.lab.settings",JSON.stringify(out));}
     return out;
   }
 

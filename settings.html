@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1020">
-  <title>ZEBJUS Python Lab Settings v6.2</title>
+  <title>ZEBJUS Python Lab Settings v6.2.2</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body class="settings-page">
@@ -47,7 +47,7 @@
         <label class="switch-row">
           <div>
             <strong>Demo mode</strong>
-            <span>ON = on-screen kit only. OFF = send Python hardware commands to the selected ESP32 kit.</span>
+            <span>ON = force on-screen simulation only. OFF = use the selected ESP32 kit when connected, and automatically fall back to clearly labelled Offline Simulation when it is disconnected.</span>
           </div>
           <input id="demoMode" type="checkbox">
         </label>
@@ -209,7 +209,7 @@
       <span id="settingsSaved" class="muted"></span>
     </div>
   </main>
-  <script src="./kit-client.js?v=6.1"></script>
-  <script src="./settings.js?v=6.1"></script>
+  <script src="./kit-client.js?v=6.2.2"></script>
+  <script src="./settings.js?v=6.2.2"></script>
 </body>
 </html>

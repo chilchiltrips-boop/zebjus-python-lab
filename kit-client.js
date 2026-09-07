@@ -136,7 +136,7 @@
     constructor(){
       this.base="";this.status=null;this.name="";this.ipHint="";this.chipId="";this.token="";
       this._commandChain=Promise.resolve();this._commandEpoch=0;this._reconnectPromise=null;
-      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";this._dhtCache=new Map();
+      this._lastRgb={rPin:25,gPin:26,bPin:27,commonAnode:false};this._oledInitialized=false;this._oledConfig="";this._dhtCache=new Map();this._ultraCache=new Map();
     }
     get connected(){return !!this.base&&!!this.status;}
     _accept(status,base){
@@ -249,13 +249,17 @@
       trig=Number(trig);echo=Number(echo);maxCm=Math.max(2,Math.min(600,Number(maxCm)||400));
       if(!SAFE_RGB_PINS.includes(trig))throw new Error("Ultrasonic TRIG must use an output-capable pin: "+SAFE_RGB_PINS.join(", "));
       if(!SAFE_ULTRASONIC_ECHO_PINS.includes(echo)||trig===echo)throw new Error("Invalid ultrasonic ECHO pin.");
-      const q=`trig=${encodeURIComponent(trig)}&echo=${encodeURIComponent(echo)}&maxCm=${encodeURIComponent(maxCm)}`;
-      return this._request(`/api/input/ultrasonic?${q}`,{timeout:1800});
+      const key=`${trig},${echo}`,cached=this._ultraCache.get(key),q=`trig=${encodeURIComponent(trig)}&echo=${encodeURIComponent(echo)}&maxCm=${encodeURIComponent(maxCm)}`;
+      const data=await this._request(`/api/input/ultrasonic?${q}`,{timeout:1800});
+      const hasDistance=data?.distanceCm!==null&&data?.distanceCm!==undefined&&Number.isFinite(Number(data.distanceCm));
+      if(data?.valid!==false&&hasDistance)this._ultraCache.set(key,{at:Date.now(),data});
+      else if(cached)return {...cached.data,valid:false,stale:true,message:data?.message||"Ultrasonic echo missed; using the last valid distance."};
+      return data;
     }
     async dht11(pin=13){
       pin=Number(pin);if(!SAFE_RGB_PINS.includes(pin))throw new Error("DHT11 DATA must use an output-capable pin: "+SAFE_RGB_PINS.join(", "));
       const now=Date.now(),cached=this._dhtCache.get(pin);
-      if(cached&&now-cached.at<1000)return {...cached.data,cached:true};
+      if(cached&&now-cached.at<1200)return {...cached.data,cached:true};
       const data=await this._request(`/api/input/dht11?pin=${encodeURIComponent(pin)}`,{timeout:1800});
       if(data?.valid!==false)this._dhtCache.set(pin,{at:Date.now(),data});
       else if(cached)return {...cached.data,valid:false,stale:true,message:data?.message||"DHT11 read missed; using previous value."};

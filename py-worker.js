@@ -21,7 +21,7 @@ from pyodide.ffi import to_js
 _ai_state={"detected":False,"fingers":0,"side":"","landmarks":[]}
 _face_state=[]
 _hand_landmarks=[]
-_sensor_state={"ultrasonic_cm":45.0,"dht_temperature":28.0,"dht_humidity":65.0,"dht_pin":13,"pot_value":128,"pot_raw":2056,"pot_pin":34,"pot_percent":50,"pot_mv":0}
+_sensor_state={"simulation":True,"ultrasonic_cm":None,"dht_temperature":None,"dht_humidity":None,"dht_pin":13,"pot_value":None,"pot_raw":None,"pot_pin":34,"pot_percent":None,"pot_mv":None}
 _input_state={"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
 _bridge_state={"gpio":{},"adc":{},"pwm":{},"i2c":{},"uart":{},"spi":{},"pulse":{},"counter":{},"transaction":{}}
 _i2c_bus_defaults={0:(21,22),1:(25,26)}
@@ -52,6 +52,22 @@ def _send(command,**kwargs):
         {"type":"kit-command","payload":{"command":command,**kwargs}},
         dict_converter=js.Object.fromEntries
     ))
+
+
+def _sensor_live(sensor,**values):
+    clean={"sensor":str(sensor)}
+    for k,v in values.items():
+        if isinstance(v,float) and (math.isnan(v) or math.isinf(v)): clean[str(k)]=None
+        elif isinstance(v,(int,float,bool,str)) or v is None: clean[str(k)]=v
+        else: clean[str(k)]=str(v)
+    postMessage(to_js({"type":"sensor-live","sensor":str(sensor),"json":json.dumps(clean)},dict_converter=js.Object.fromEntries))
+    return clean
+
+def _simulating(): return bool(_sensor_state.get("simulation",False))
+def _sim_phase(seed=0.0,speed=1.0): return time.monotonic()*float(speed)+float(seed)
+def _finite_number(v):
+    try: return math.isfinite(float(v))
+    except Exception: return False
 
 SUPPORTED_RGB_PINS=(4,13,14,16,17,18,19,21,22,23,25,26,27,32,33)
 _RGB_COLORS={
@@ -174,32 +190,45 @@ class Ultrasonic:
         if self.trig==self.echo: raise ValueError("Ultrasonic TRIG and ECHO pins must be different")
     def read(self):
         d=_ultrasonic_data(self.trig,self.echo)
-        return float(d.get("distanceCm",d.get("distance_cm",_sensor_state.get("ultrasonic_cm",0.0))))
+        if _simulating():
+            cm=max(2.0,min(float(self.max_cm),35.0+25.0*(1.0+math.sin(_sim_phase(self.trig*.17,.8)))))
+            _sensor_live("ULTRASONIC",trig=self.trig,echo=self.echo,distanceCm=round(cm,1),valid=True,simulated=True,maxCm=self.max_cm)
+            return cm
+        valid=bool(d.get("valid",False)) and _finite_number(d.get("distanceCm",d.get("distance_cm")))
+        stale=bool(d.get("stale",False)) and _finite_number(d.get("distanceCm",d.get("distance_cm")))
+        cm=float(d.get("distanceCm",d.get("distance_cm"))) if (valid or stale) else float("nan")
+        _sensor_live("ULTRASONIC",trig=self.trig,echo=self.echo,distanceCm=cm if math.isfinite(cm) else None,valid=valid,stale=stale,simulated=False,maxCm=self.max_cm,message=str(d.get("message","")))
+        return cm
     def centimeters(self): return self.read()
     @property
     def distance_cm(self): return self.read()
 
 class DHT11:
-    """DHT11 temperature/humidity sensor. Values are direct °C and %RH."""
+    """DHT11 temperature/humidity sensor. Offline runs are simulated; connected runs never substitute fake values for failed hardware reads."""
     def __init__(self,pin=13):
         self.pin=int(pin)
         if self.pin not in SUPPORTED_OUTPUT_PINS: raise ValueError(f"DHT11 DATA pin {self.pin} must be output-capable. Use one of {SUPPORTED_OUTPUT_PINS}")
     def read(self):
-        d=_dht_data(self.pin)
-        return {
-            "temperature":float(d.get("temperature",_sensor_state.get("dht_temperature",0.0))),
-            "humidity":float(d.get("humidity",_sensor_state.get("dht_humidity",0.0))),
-            "valid":bool(d.get("valid",True)),"pin":self.pin
-        }
+        if _simulating():
+            ph=_sim_phase(self.pin*.11,.16);temperature=27.0+2.2*math.sin(ph);humidity=60.0+8.0*math.cos(ph*.83)
+            out={"temperature":temperature,"humidity":humidity,"valid":True,"stale":False,"simulated":True,"pin":self.pin}
+            _sensor_live("DHT11",**out);return out
+        d=_dht_data(self.pin);has_t=_finite_number(d.get("temperature"));has_h=_finite_number(d.get("humidity"));has_values=has_t and has_h
+        valid=bool(d.get("valid",False)) and has_values;stale=bool(d.get("stale",False)) and has_values
+        temperature=float(d.get("temperature")) if has_values else float("nan");humidity=float(d.get("humidity")) if has_values else float("nan")
+        out={"temperature":temperature,"humidity":humidity,"valid":valid,"stale":stale,"simulated":False,"pin":self.pin,"message":str(d.get("message",""))}
+        _sensor_live("DHT11",temperature=temperature if math.isfinite(temperature) else None,humidity=humidity if math.isfinite(humidity) else None,valid=valid,stale=stale,simulated=False,pin=self.pin,message=out["message"]);return out
     def temperature(self): return float(self.read()["temperature"])
     def humidity(self): return float(self.read()["humidity"])
     def get_values(self):
-        # Legacy project compatibility: [653,287] -> 65.3 %RH, 28.7 °C after /10.
-        d=self.read(); return [int(round(d["humidity"]*10)),int(round(d["temperature"]*10))]
+        d=self.read()
+        if not (_finite_number(d.get("humidity")) and _finite_number(d.get("temperature"))): return []
+        return [int(round(d["humidity"]*10)),int(round(d["temperature"]*10))]
     @property
     def temperature_c(self): return self.temperature()
     @property
     def humidity_percent(self): return self.humidity()
+
 
 def plot(*values,**series):
     data={}
@@ -261,16 +290,25 @@ class AnalogInput:
         pin=int(pin)
         if pin not in SUPPORTED_ADC_PINS: raise ValueError(f"Unsupported analog input pin {pin}. Use one of {SUPPORTED_ADC_PINS}")
         self.pin=pin
+    def _sample(self):
+        d=_analog_data(self.pin)
+        if _simulating():
+            raw=int(round(2047.5+1900.0*math.sin(_sim_phase(self.pin*.13,.45))));raw=max(0,min(4095,raw));value=round(raw*255/4095);pct=round(raw*100/4095);mv=round(raw*3300/4095)
+            out={"sensor":"ANALOG","pin":self.pin,"raw":raw,"value255":value,"value":value,"percent":pct,"millivolts":mv,"valid":True,"simulated":True};_sensor_live("ANALOG",**{k:v for k,v in out.items() if k!="sensor"});return out
+        out=dict(d) if d else {"pin":self.pin,"valid":False,"simulated":False}
+        if d: out.setdefault("valid",True);out["simulated"]=False
+        _sensor_live("ANALOG",**out);return out
     def read(self):
-        d=_analog_data(self.pin); return int(d.get("value255",d.get("value",_sensor_state.get("pot_value",0))))
+        d=self._sample();return int(d.get("value255",d.get("value",0)))
     def raw(self):
-        d=_analog_data(self.pin); return int(d.get("raw",_sensor_state.get("pot_raw",self.read()*4095//255)))
+        d=self._sample();return int(d.get("raw",round(self.read()*4095/255)))
     def percent(self):
-        d=_analog_data(self.pin); return int(d.get("percent",round(self.read()*100/255)))
+        d=self._sample();return int(d.get("percent",round(self.read()*100/255)))
     def millivolts(self):
-        d=_analog_data(self.pin); return int(d.get("millivolts",d.get("mv",_sensor_state.get("pot_mv",0))))
+        d=self._sample();return int(d.get("millivolts",d.get("mv",0)))
     @property
     def value(self): return self.read()
+
 
 class Potentiometer(AnalogInput):
     def __init__(self,pin=34):
@@ -283,11 +321,21 @@ class DigitalInput:
         pin=int(pin)
         if pin not in SUPPORTED_DIGITAL_PINS: raise ValueError(f"Unsupported digital input pin {pin}. Use one of {SUPPORTED_DIGITAL_PINS}")
         self.pin=pin; self.pullup=bool(pullup); self.active_low=bool(active_low)
-    def state(self): return int(_digital_data(self.pin).get("state",1 if self.pullup else 0))
-    def read(self): return bool(_digital_data(self.pin).get("active", self.state()==(0 if self.active_low else 1)))
+    def _sample(self):
+        d=_digital_data(self.pin)
+        if _simulating():
+            active=(int(_sim_phase(self.pin*.07,.5))%2)==0;state=(0 if active else 1) if self.active_low else (1 if active else 0);out={"pin":self.pin,"state":state,"active":active,"pressed":active,"valid":True,"simulated":True};_sensor_live("DIGITAL",**out);return out
+        out=dict(d) if d else {"pin":self.pin,"valid":False,"simulated":False};out["simulated"]=False;_sensor_live("DIGITAL",**out);return out
+    def state(self):
+        d=self._sample();return int(d.get("state",1 if self.pullup else 0))
+    def read(self):
+        d=self._sample()
+        if "active" in d:return bool(d.get("active"))
+        state=int(d.get("state",1 if self.pullup else 0));return state==(0 if self.active_low else 1)
     def active(self): return self.read()
     @property
     def value(self): return self.read()
+
 
 class Switch(DigitalInput):
     def __init__(self,pin=32,pullup=True,active_low=True): super().__init__(pin,pullup,active_low)
@@ -298,14 +346,20 @@ class RotaryEncoder:
         clk,dt=int(clk),int(dt); sw=-1 if switch is None else int(switch)
         if clk not in SUPPORTED_DIGITAL_PINS or dt not in SUPPORTED_DIGITAL_PINS or clk==dt: raise ValueError("Invalid rotary CLK/DT pins")
         if sw>=0 and (sw not in SUPPORTED_DIGITAL_PINS or sw in (clk,dt)): raise ValueError("Invalid rotary switch pin")
-        self.clk=clk; self.dt=dt; self.switch=None if sw<0 else sw; self.pullup=bool(pullup); self._sw=sw
-    def position(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("position",0))
-    def delta(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("delta",0))
-    def direction(self): return str(_rotary_data(self.clk,self.dt,self._sw).get("direction","NONE"))
-    def pressed(self): return bool(_rotary_data(self.clk,self.dt,self._sw).get("pressed",False))
-    def switch_state(self): return int(_rotary_data(self.clk,self.dt,self._sw).get("switchState",1))
+        self.clk=clk; self.dt=dt; self.switch=None if sw<0 else sw; self.pullup=bool(pullup); self._sw=sw;self._sim_last=0
+    def _sample(self):
+        d=_rotary_data(self.clk,self.dt,self._sw)
+        if _simulating():
+            pos=int(_sim_phase((self.clk+self.dt)*.05,.6))%24;delta=pos-self._sim_last;self._sim_last=pos;direction="CW" if delta>0 else ("CCW" if delta<0 else "NONE");pressed=(int(_sim_phase(self.clk,.2))%7)==0;out={"clk":self.clk,"dt":self.dt,"sw":self._sw,"position":pos,"delta":delta,"direction":direction,"pressed":pressed,"switchState":0 if pressed else 1,"valid":True,"simulated":True};_sensor_live("ROTARY",**out);return out
+        out=dict(d) if d else {"clk":self.clk,"dt":self.dt,"sw":self._sw,"valid":False,"simulated":False};out["simulated"]=False;_sensor_live("ROTARY",**out);return out
+    def position(self): return int(self._sample().get("position",0))
+    def delta(self): return int(self._sample().get("delta",0))
+    def direction(self): return str(self._sample().get("direction","NONE"))
+    def pressed(self): return bool(self._sample().get("pressed",False))
+    def switch_state(self): return int(self._sample().get("switchState",1))
     @property
     def value(self): return self.position()
+
 
 
 # ---------------- UNIVERSAL HARDWARE BRIDGE v2 ----------------
@@ -355,6 +409,7 @@ class GPIOInput:
         if self.pin not in SUPPORTED_ULTRASONIC_ECHO_PINS: raise ValueError("Unsupported GPIO input pin")
     def state(self):
         key=f"gpio:{self.pin}";_bridge_cmd("BRIDGE_GPIO_READ",key,pin=self.pin,mode=self.pull)
+        if _simulating(): return 1 if (int(_sim_phase(self.pin*.09,.45))%2)==0 else 0
         d=_bridge_get("gpio",key,{}) or {};return int(d.get("value",0))
     def read(self):
         v=bool(self.state());return not v if self.active_low else v
@@ -367,7 +422,10 @@ class ADC:
         self.pin=int(pin)
         if self.pin not in SUPPORTED_ADC_PINS: raise ValueError(f"ADC pin must be one of {SUPPORTED_ADC_PINS}")
     def _read(self):
-        key=f"adc:{self.pin}";_bridge_cmd("BRIDGE_ADC_READ",key,pin=self.pin);return _bridge_get("adc",key,{}) or {}
+        key=f"adc:{self.pin}";_bridge_cmd("BRIDGE_ADC_READ",key,pin=self.pin)
+        if _simulating():
+            raw=max(0,min(4095,int(round(2048+1850*math.sin(_sim_phase(self.pin*.13,.45))))));return {"raw":raw,"millivolts":round(raw*3300/4095),"valid":True,"simulated":True}
+        return _bridge_get("adc",key,{}) or {}
     def raw(self): return int(self._read().get("raw",0))
     def millivolts(self): return int(self._read().get("millivolts",0))
     def read(self): return self.raw()
@@ -467,8 +525,14 @@ class PulseInput:
     def __init__(self,pin,state=1,timeout_us=100000): self.pin=int(pin);self.state=1 if state else 0;self.timeout_us=int(timeout_us)
     @property
     def key(self): return f"pulse:{self.pin}:{self.state}"
-    def read_us(self): _bridge_cmd("BRIDGE_PULSE",self.key,op="in",pin=self.pin,state=self.state,timeoutUs=self.timeout_us);return int((_bridge_get("pulse",self.key,{}) or {}).get("microseconds",0))
-    def frequency(self): _bridge_cmd("BRIDGE_PULSE",self.key,op="frequency",pin=self.pin,state=self.state,timeoutUs=self.timeout_us);return float((_bridge_get("pulse",self.key,{}) or {}).get("hz",0.0))
+    def read_us(self):
+        _bridge_cmd("BRIDGE_PULSE",self.key,op="in",pin=self.pin,state=self.state,timeoutUs=self.timeout_us)
+        if _simulating(): return int(900+250*math.sin(_sim_phase(self.pin*.07,.8)))
+        return int((_bridge_get("pulse",self.key,{}) or {}).get("microseconds",0))
+    def frequency(self):
+        _bridge_cmd("BRIDGE_PULSE",self.key,op="frequency",pin=self.pin,state=self.state,timeoutUs=self.timeout_us)
+        if _simulating(): return 12.0+4.0*math.sin(_sim_phase(self.pin*.05,.6))
+        return float((_bridge_get("pulse",self.key,{}) or {}).get("hz",0.0))
 
 class PulseOutput:
     def __init__(self,pin,idle=0):
@@ -488,6 +552,8 @@ class CounterInput:
         now=time.time()
         if now-self._last_request>0.03:
             _bridge_cmd("BRIDGE_COUNTER",self.key,op="read",pin=self.pin,edge=self.edge,pullup=self.pullup);self._last_request=now
+        if _simulating():
+            hz=max(0.1,8.0+3.0*math.sin(_sim_phase(self.pin*.06,.5)));count=int(time.monotonic()*hz);return {"count":count,"delta":1,"hz":hz,"valid":True,"simulated":True}
         return _bridge_get("counter",self.key,{}) or {}
     def snapshot(self): return dict(self._sample())
     def read(self): return int(self._sample().get("count",0))
@@ -513,7 +579,11 @@ class GPS:
             v=float(raw);deg=int(v//100);mins=v-deg*100;out=deg+mins/60.0;return -out if hemi in ("S","W") else out
         except Exception:return None
     def read(self):
-        text=self.uart.readline(220);st=_gps_state.setdefault(self.key,{"latitude":None,"longitude":None,"altitude":None,"speed":0.0,"course":0.0,"satellites":0,"hdop":None,"fix":False,"utc":""})
+        st=_gps_state.setdefault(self.key,{"latitude":None,"longitude":None,"altitude":None,"speed":0.0,"course":0.0,"satellites":0,"hdop":None,"fix":False,"utc":""})
+        if _simulating():
+            ph=_sim_phase(self.uart.rx*.09,.05);st.update(latitude=10.0500+0.0015*math.sin(ph),longitude=76.6200+0.0015*math.cos(ph),altitude=42.0+2.0*math.sin(ph*.7),speed=5.0+2.0*math.sin(ph*1.3),course=(ph*20.0)%360,satellites=8+(int(ph)%4),hdop=1.1,fix=True,utc="SIM")
+            dashboard("GPS",Latitude=st["latitude"],Longitude=st["longitude"],Satellites=st["satellites"],Speed_kmh=round(st["speed"],2),Fix=True,Mode="SIMULATION");return dict(st)
+        text=self.uart.readline(220)
         for line in str(text).splitlines():
             parts=line.strip().split(",");
             if not parts: continue
@@ -524,7 +594,7 @@ class GPS:
                 elif typ=="RMC" and len(parts)>8:
                     st.update(latitude=self._coord(parts[3],parts[4]),longitude=self._coord(parts[5],parts[6]),fix=parts[2]=="A",speed=float(parts[7] or 0)*1.852,course=float(parts[8] or 0),utc=parts[1])
             except Exception: pass
-        dashboard("GPS",Latitude=st.get("latitude"),Longitude=st.get("longitude"),Satellites=st.get("satellites",0),Speed_kmh=round(float(st.get("speed",0)),2),Fix=st.get("fix",False))
+        dashboard("GPS",Latitude=st.get("latitude"),Longitude=st.get("longitude"),Satellites=st.get("satellites",0),Speed_kmh=round(float(st.get("speed",0)),2),Fix=st.get("fix",False),Mode="HARDWARE")
         return dict(st)
     @property
     def latitude(self): return self.read().get("latitude")
@@ -539,8 +609,13 @@ class MPU6050:
     def _s16(a,b):
         v=(int(a)<<8)|int(b);return v-65536 if v&0x8000 else v
     def read(self):
-        d=self.dev.read_registers(0x3B,14);d=(d+[0]*14)[:14];ax=self._s16(d[0],d[1])/16384.0;ay=self._s16(d[2],d[3])/16384.0;az=self._s16(d[4],d[5])/16384.0;temp=self._s16(d[6],d[7])/340.0+36.53;gx=self._s16(d[8],d[9])/131.0;gy=self._s16(d[10],d[11])/131.0;gz=self._s16(d[12],d[13])/131.0
-        out={"accel_x":ax,"accel_y":ay,"accel_z":az,"gyro_x":gx,"gyro_y":gy,"gyro_z":gz,"temperature":temp};dashboard("MPU6050",AccX=round(ax,3),AccY=round(ay,3),AccZ=round(az,3),GyroX=round(gx,2),GyroY=round(gy,2),GyroZ=round(gz,2));return out
+        if _simulating():
+            ph=_sim_phase(self.dev.address*.03,.7);roll=18.0*math.sin(ph);pitch=12.0*math.cos(ph*.8);rr=math.radians(roll);pr=math.radians(pitch);ax=-math.sin(pr);ay=math.sin(rr)*math.cos(pr);az=math.cos(rr)*math.cos(pr);gx=8.0*math.cos(ph);gy=-6.0*math.sin(ph*.8);gz=3.0*math.sin(ph*.5);temp=28.0+0.8*math.sin(ph*.2);out={"accel_x":ax,"accel_y":ay,"accel_z":az,"gyro_x":gx,"gyro_y":gy,"gyro_z":gz,"temperature":temp,"valid":True,"simulated":True};dashboard("MPU6050",AccX=round(ax,3),AccY=round(ay,3),AccZ=round(az,3),GyroX=round(gx,2),GyroY=round(gy,2),GyroZ=round(gz,2),Mode="SIMULATION");return out
+        d=self.dev.read_registers(0x3B,14)
+        if len(d)<14:
+            out={"accel_x":float("nan"),"accel_y":float("nan"),"accel_z":float("nan"),"gyro_x":float("nan"),"gyro_y":float("nan"),"gyro_z":float("nan"),"temperature":float("nan"),"valid":False,"simulated":False};dashboard("MPU6050",Status="WAITING / READ ERROR",Mode="HARDWARE");return out
+        ax=self._s16(d[0],d[1])/16384.0;ay=self._s16(d[2],d[3])/16384.0;az=self._s16(d[4],d[5])/16384.0;temp=self._s16(d[6],d[7])/340.0+36.53;gx=self._s16(d[8],d[9])/131.0;gy=self._s16(d[10],d[11])/131.0;gz=self._s16(d[12],d[13])/131.0
+        out={"accel_x":ax,"accel_y":ay,"accel_z":az,"gyro_x":gx,"gyro_y":gy,"gyro_z":gz,"temperature":temp,"valid":True,"simulated":False};dashboard("MPU6050",AccX=round(ax,3),AccY=round(ay,3),AccZ=round(az,3),GyroX=round(gx,2),GyroY=round(gy,2),GyroZ=round(gz,2),Mode="HARDWARE");return out
 
 # Common modules share the universal bridge; sensor-specific UI is handled in the browser.
 class LDR(ADC): __zebjus_ui__={"type":"light"}
@@ -898,6 +973,7 @@ cv2.destroyAllWindows=_browser_close_windows
   pyodide.globals.set("__ai_side",String(m.aiState?.side||""));
   pyodide.globals.set("__faces_json",JSON.stringify(m.aiState?.faces||[]));
   pyodide.globals.set("__hand_landmarks_json",JSON.stringify(m.aiState?.landmarks||[]));
+  pyodide.globals.set("__simulation_mode",!!m.sensorState?.simulationMode);
   pyodide.globals.set("__ultra",Number(m.sensorState?.ultrasonicCm)||0);
   pyodide.globals.set("__dht_t",Number(m.sensorState?.dhtTemperature)||0);
   pyodide.globals.set("__dht_h",Number(m.sensorState?.dhtHumidity)||0);
@@ -917,7 +993,7 @@ sys.stderr=_zebjus_stderr
 _hand_landmarks=json.loads(str(__hand_landmarks_json)) if str(__hand_landmarks_json) else []
 _ai_state={"detected":bool(__ai_detected),"fingers":int(__ai_fingers),"side":str(__ai_side),"landmarks":_hand_landmarks}
 _face_state=json.loads(str(__faces_json)) if str(__faces_json) else []
-_sensor_state={"ultrasonic_cm":float(__ultra),"dht_temperature":float(__dht_t),"dht_humidity":float(__dht_h),"dht_pin":int(__dht_pin),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
+_sensor_state={"simulation":bool(__simulation_mode),"ultrasonic_cm":float(__ultra),"dht_temperature":float(__dht_t),"dht_humidity":float(__dht_h),"dht_pin":int(__dht_pin),"pot_value":int(__pot),"pot_raw":int(__pot_raw),"pot_pin":int(__pot_pin),"pot_percent":int(__pot_percent),"pot_mv":int(__pot_mv)}
 _input_state=json.loads(str(__inputs_json)) if str(__inputs_json) else {"analog":{},"digital":{},"rotary":{},"ultrasonic":{},"dht11":{}}
 _bridge_state=json.loads(str(__bridge_json)) if str(__bridge_json) else {"gpio":{},"adc":{},"pwm":{},"i2c":{},"uart":{},"spi":{},"pulse":{},"counter":{},"transaction":{}}
 _current_frame=None
