@@ -29,10 +29,10 @@
     debugEvents.push(item);if(debugEvents.length>DEBUG_EVENT_LIMIT)debugEvents.splice(0,debugEvents.length-DEBUG_EVENT_LIMIT);
   }
   function sanitizedKitStatus(){const st={...(kitClient?.status||{})};delete st.token;delete st.secureToken;delete st.password;return st;}
-  function displayQueueSnapshot(){return [...displayHardwareQueues.entries()].map(([key,q])=>({key,busy:!!q.busy,paused:!!q.paused,pending:Number(q.pending?.length||0),hasLatest:!!q.latest}));}
+  function displayQueueSnapshot(){return [...displayHardwareQueues.entries()].map(([key,q])=>({key,busy:!!q.busy,paused:!!q.paused,pauseReason:String(q.pauseReason||""),pending:Number(q.pending?.length||0),hasLatest:!!q.latest,deviceError:String(q.deviceError||""),retryInMs:q.retryAfter?Math.max(0,Math.round(q.retryAfter-Date.now())):0}));}
   function buildDebugReport(){
     const now=Date.now(),code=getCode?.()||"";
-    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.4.5",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
+    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.4.6",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
       page:{url:location.href,protocol:location.protocol,embedded:isEmbedded,visibility:document.visibilityState,userAgent:navigator.userAgent,online:navigator.onLine},
       run:{running,liveMode,currentRunUsesKit,currentRunNeedsKit,liveSessionId},
       kit:{name:prefs.kitName||prefs.kitId||"",chipId:String(prefs.kitChipId||""),cachedIp:prefs.kitIp||"",base:kitClient?.base||"",connected:!!kitClient?.connected,lastGoodAgeMs:Number.isFinite(kitClient?.lastGoodAgeMs)?Math.round(kitClient.lastGoodAgeMs):null,failureCount:kitFailureCount,failureLimit:KIT_FAILURE_LIMIT,everConnected:kitEverConnected,reconnectBusy:kitReconnectBusy,heartbeatBusy:kitHeartbeatPingBusy,status:sanitizedKitStatus()},
@@ -1336,7 +1336,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.4.5",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.4.6",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -2063,7 +2063,11 @@ while True:
     const recovered=kitFailureCount>0;kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;if(recovered)debugEvent("kit-recovered","Local kit response restored",{base:kitClient?.base||""});
     if(st)persistKitIdentity(st);
     if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
-    for(const [key,q] of displayHardwareQueues){q.paused=false;if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);}
+    for(const [key,q] of displayHardwareQueues){
+      // A healthy status/heartbeat only resumes queues paused by a LAN transport miss.
+      // Device faults (for example LCD address/wiring NACK) use their own cooldown and must not flood reconnect/run-start.
+      if(q.pauseReason==="transport"){q.paused=false;q.pauseReason="";if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);}
+    }
   }
 
   function markKitFailure(reason=""){
@@ -2381,7 +2385,7 @@ while True:
     if(action==="clear"){lines=[lcdBlank(),lcdBlank()];cursorCol=0;cursorRow=0;}else if(action==="home"){cursorCol=0;cursorRow=0;}else if(action==="cursor"){cursorCol=Math.max(0,Math.min(15,Number(p.col)||0));cursorRow=Math.max(0,Math.min(1,Number(p.row)||0));}else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");cursorRow=row;cursorCol=Math.max(0,Math.min(15,col+Math.min(text.length,16-col)));}
     const state={...prev,...p,bus,address,lines,cursorCol,cursorRow,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled,cursor:p.cursor===undefined?prev.cursor:!!p.cursor,blink:p.blink===undefined?prev.blink:!!p.blink};sensorState.special.lcd1602[key]=state;
     const cards=new Set();for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const c=findHardwareCard(sp);if(c)cards.add(c);}for(const c of displayCardsByPins("lcd1602",{lcdBus:bus,lcdAddress:address}))cards.add(c);
-    for(const card of cards){for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);screen.classList.toggle("cursor-on",!!state.cursor);screen.classList.toggle("cursor-blink",!!state.cursor&&!!state.blink);}const cursorEl=card.querySelector('[data-role="lcd-cursor"]');if(cursorEl){cursorEl.style.transform=`translate(${Math.max(0,Math.min(15,Number(state.cursorCol)||0))*11.1}px,${Math.max(0,Math.min(1,Number(state.cursorRow)||0))*23.4}px)`;cursorEl.style.opacity=state.cursor&&state.enabled!==false?"1":"0";}card.dataset.effect=String(state.effect||"");const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":"KIT",effect=String(state.effect||"").toUpperCase();label.textContent=`16×2 LCD · ${effect?effect+" · ":""}${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
+    for(const card of cards){for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);screen.classList.toggle("cursor-on",!!state.cursor);screen.classList.toggle("cursor-blink",!!state.cursor&&!!state.blink);}const cursorEl=card.querySelector('[data-role="lcd-cursor"]');if(cursorEl){cursorEl.style.transform=`translate(${Math.max(0,Math.min(15,Number(state.cursorCol)||0))*11.1}px,${Math.max(0,Math.min(1,Number(state.cursorRow)||0))*23.4}px)`;cursorEl.style.opacity=state.cursor&&state.enabled!==false?"1":"0";}card.dataset.effect=String(state.effect||"");const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":"KIT",effect=String(state.effect||"").toUpperCase();const fault=String(state.hardwareError||"");label.textContent=fault?`16×2 LCD · DEVICE ERROR · ${mode}`:`16×2 LCD · ${effect?effect+" · ":""}${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;label.title=fault;}card.classList.add("live");}
   }
 
   function applyDemo(p){
@@ -2527,10 +2531,16 @@ while True:
           if(!next)break;
           try{await sendDisplayHardwareOnce(next);}
           catch(e){
-            if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);
-            else{
-              // Preserve the latest physical frame instead of dropping it on a transient LAN timeout.
-              q.paused=true;debugEvent("display-queue","Display hardware queue paused after transient request failure",{key,message:String(e?.message||e)});
+            if(e?.status){
+              // ESP32 replied: the kit link is healthy. This is a module/application fault, not a reconnect event.
+              markKitSuccess(kitClient.status);warnHardwareCommand(e?.message||e);
+              q.paused=true;q.pauseReason="device";q.deviceError=String(e?.message||e);q.retryAfter=Date.now()+5000;
+              debugEvent("display-device-error","Display device fault isolated from kit connection",{key,status:e.status,message:q.deviceError,retryAfterMs:5000});
+              if(next.command==="LCD1602_SET")paintLCD1602({...next,simulated:false,pending:false,hardwareSynced:false,hardwareError:q.deviceError});
+              else if(next.command==="TM1637_SET")paintTM1637({...next,simulated:false,pending:false,hardwareSynced:false,hardwareError:q.deviceError});
+            }else{
+              // Preserve the latest physical frame instead of dropping it on a genuine LAN timeout.
+              q.paused=true;q.pauseReason="transport";debugEvent("display-queue","Display hardware queue paused after transport failure",{key,message:String(e?.message||e)});
               if(key.startsWith("tm:")){if(next.ordered)q.pending.unshift(next);else if(!q.latest)q.latest=next;}
               else{
                 const action=String(next.action||"").toLowerCase();
@@ -2557,7 +2567,9 @@ while True:
 
   function queueDisplayHardware(p){
     const key=displayHardwareKey(p);if(!key)return;
-    let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[],paused:false};displayHardwareQueues.set(key,q);}
+    let q=displayHardwareQueues.get(key);if(!q){q={busy:false,runner:null,latest:null,pending:[],paused:false,pauseReason:"",retryAfter:0,deviceError:""};displayHardwareQueues.set(key,q);}
+    // Device faults are circuit-broken: new frames keep the browser preview fresh but physical retries are limited to once per cooldown.
+    if(q.pauseReason==="device"&&Date.now()>=Number(q.retryAfter||0)){q.paused=false;q.pauseReason="";q.deviceError="";}
     if(p.command==="TM1637_SET"){
       if(p.ordered){q.pending.push({...p});if(q.pending.length>64)q.pending=q.pending.slice(-64);}else{q.pending=[];q.latest={...p};}
     }else{
@@ -2614,8 +2626,9 @@ while True:
           applyDemo(p);
         }
       }catch(e){
-        // A temporary API miss must not stop the Python program or blink the UI. Hardware 4xx errors are shown but also do not stop Python.
-        if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);else scheduleSilentReconnect();
+        // Any HTTP response means the ESP32 is reachable; isolate module/application errors from LAN transport recovery.
+        if(e?.status){markKitSuccess(kitClient.status);warnHardwareCommand(e?.message||e);}
+        else scheduleSilentReconnect();
       }
       return;
     }

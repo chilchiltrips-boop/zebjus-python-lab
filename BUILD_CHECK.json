@@ -1,6 +1,6 @@
 {
-  "release": "ZEBJUS Python Lab v6.4.5 Stable Status + Debug Trace FINAL",
-  "ui_version": "6.4.5",
+  "release": "ZEBJUS Python Lab v6.4.6 Device Fault Isolation FINAL",
+  "ui_version": "6.4.6",
   "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
   "examples_count": 41,
@@ -69,5 +69,6 @@
     "bootstrap_failure_recovery": "pass: runtimeReady set only after bootstrap success; failed init clears readyPromise; session prepared flag set after reset succeeds",
     "connection_stability_regression": "pass: display cards never expose per-command SYNCING; 1-4 misses retain KIT mode; 5th miss hard-offlines; debug trace records request latency and queue state"
   },
-  "runtime_io_hotfix": "v6.4.5 retains protected runtime/bootstrap fixes, stable local-link hysteresis, and adds no-blink display status + copyable diagnostics."
+  "runtime_io_hotfix": "v6.4.6 retains protected runtime/bootstrap fixes, stable local-link hysteresis, and adds no-blink display status + copyable diagnostics.",
+  "device_fault_isolation": "HTTP module errors are isolated from LAN reconnect; LCD NACK cannot flood run/start or disturb TM1637."
 }

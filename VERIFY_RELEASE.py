@@ -27,7 +27,7 @@ for h in ('index.html','settings.html','camera-bridge.html'):
     text=(ROOT/h).read_text(errors='ignore')
     for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1','?v=6.4.2','?v=6.4.3','?v=6.4.4'):
         if stale in text: raise SystemExit(f'Stale cache-buster remains in {h}: {stale}')
-    if '?v=6.4.5' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
+    if '?v=6.4.6' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
 
 # Generated Pyodide Python blocks: validate raw source AND actual JS-decoded templates.
 s=(ROOT/'py-worker.js').read_text();blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
@@ -41,7 +41,7 @@ for i,b in enumerate(decoded,1):
     if b is not None: compile(b,f'<decoded-pyodide-block-{i}>', 'exec')
 
 app=(ROOT/'app.js').read_text();settings=(ROOT/'settings.js').read_text();client=(ROOT/'kit-client.js').read_text();styles=(ROOT/'styles.css').read_text()
-for marker in ('One local HTTP miss must not erase a healthy cached connection.','localAddressSpaceMode','this._lastGoodAt=Date.now()'):
+for marker in ('HTTP 4xx/5xx is an application/device response, not a lost kit.','localAddressSpaceMode','this._lastGoodAt=Date.now()'):
     if marker not in client: raise SystemExit('Missing stable-link client marker: '+marker)
 for marker in ('kitClient.disconnect({forgetIdentity:false})','q.paused=true','q.paused=false','Stable-link hysteresis'):
     if marker not in app: raise SystemExit('Missing stable-link app marker: '+marker)
@@ -106,10 +106,20 @@ if 'preparedRunSession=session;await pyodide.runPythonAsync' in worker_text:
     raise SystemExit('Run session is marked prepared before reset helper succeeds')
 if 'globals(), globals())' in worker_text: raise SystemExit('Student code still executes in runtime globals')
 for marker in ('copyDebugBtn','buildDebugReport','DEBUG_EVENT_LIMIT','zebjus.lab.lastDebugReport','heartbeat","Heartbeat OK','mode=state.simulated?"SIMULATION":"KIT"','mode=state.simulated?"SIM":"KIT"'):
-    if marker not in app and marker not in (ROOT/'index.html').read_text(): raise SystemExit('Missing v6.4.5 diagnostics/no-blink marker: '+marker)
+    if marker not in app and marker not in (ROOT/'index.html').read_text(): raise SystemExit('Missing v6.4.6 diagnostics/no-blink marker: '+marker)
 if 'SYNCING' in app: raise SystemExit('User-facing per-command SYNCING label remains in app')
 if 'zebjus-kit-diagnostic' not in client or 'latencyMs' not in client: raise SystemExit('Kit HTTP diagnostics instrumentation missing')
 if 'Copy Latest Report' not in (ROOT/'diagnostics.html').read_text(): raise SystemExit('Diagnostics copy UI missing')
+
+for marker in (
+    'err.reachable=true;err.transport=false',
+    'HTTP 4xx/5xx is an application/device response, not a lost kit.',
+    'q.pauseReason="device"',
+    'q.pauseReason="transport"',
+    'Display device fault isolated from kit connection',
+    'if(q.pauseReason==="transport")',
+):
+    if marker not in client and marker not in app: raise SystemExit('Missing device-fault isolation marker: '+marker)
 bc=json.loads((ROOT/'BUILD_CHECK.json').read_text())
-assert bc['ui_version']=='6.4.5' and bc['firmware']=='2.4.0' and bc['examples_count']==41
-print(f'ZEBJUS v6.4.5 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')
+assert bc['ui_version']=='6.4.6' and bc['firmware']=='2.4.0' and bc['examples_count']==41
+print(f'ZEBJUS v6.4.6 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')

@@ -88,7 +88,9 @@
     if(!res.ok){
       emitDiagnostic({kind:"http-error",message:payload?.message||`Kit HTTP ${res.status}`,path,method,base,status:res.status,latencyMs:Math.round(performance.now()-started)});
       const err=new Error(payload?.message||`Kit HTTP ${res.status}`);
-      err.status=res.status;err.payload=payload;throw err;
+      // Any HTTP response proves the ESP32/local link is reachable.
+      // Keep application/device errors (for example LCD I2C NACK -> HTTP 502) separate from LAN transport failures.
+      err.status=res.status;err.payload=payload;err.reachable=true;err.transport=false;throw err;
     }
     emitDiagnostic({kind:"http-ok",message:`${method} ${path}`,path,method,base,status:res.status,latencyMs:Math.round(performance.now()-started)});
     return payload||{};
@@ -201,12 +203,14 @@
       const base=this.base;
       try{const r=await requestBase(base,path,{...opts,token:this.token});this._lastGoodAt=Date.now();return r;}
       catch(e){
-        if(!retry||(e?.status&&e.status<500))throw e;
-        // One local HTTP miss must not erase a healthy cached connection.
-        // Retry the same cached IP/mDNS target once; app-level background reconnect handles DHCP/name recovery.
+        // HTTP 4xx/5xx is an application/device response, not a lost kit.
+        // Do not retry or trigger reconnect floods merely because a module (e.g. LCD backpack) NACKs.
+        if(e?.status){this._lastGoodAt=Date.now();throw e;}
+        if(!retry)throw e;
+        // Only genuine transport failures get one cached-target retry.
         await new Promise(r=>setTimeout(r,80));
         try{const r=await requestBase(base,path,{...opts,timeout:Math.max(Number(opts.timeout)||0,1800),token:this.token});this._lastGoodAt=Date.now();return r;}
-        catch(second){second.transient=true;throw second;}
+        catch(second){second.transient=true;second.transport=true;throw second;}
       }
     }
     async beginRun(){
