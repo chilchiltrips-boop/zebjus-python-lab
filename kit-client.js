@@ -51,6 +51,7 @@
   }
 
   let localAddressSpaceMode=null;
+  function emitDiagnostic(detail){try{global.dispatchEvent(new CustomEvent("zebjus-kit-diagnostic",{detail:{ts:new Date().toISOString(),...(detail||{})}}));}catch(_){}}
   async function fetchLocal(url,options={},timeoutMs=2400){
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
@@ -70,6 +71,7 @@
   }
 
   async function requestBase(base,path,{method="GET",data=null,timeout=2200,token=""}={}){
+    const started=performance.now();
     const headers={"Accept":"application/json"};
     if(token)headers["X-Zebjus-Token"]=String(token);
     const opts={method,headers};
@@ -77,14 +79,18 @@
       headers["Content-Type"]="application/x-www-form-urlencoded;charset=UTF-8";
       opts.body=formBody(data);
     }
-    const res=await fetchLocal(base+path,opts,timeout);
+    let res;
+    try{res=await fetchLocal(base+path,opts,timeout);}
+    catch(e){emitDiagnostic({kind:"http-fail",message:String(e?.name==="AbortError"?"Local request timeout":(e?.message||e)),path,method,base,latencyMs:Math.round(performance.now()-started),timeoutMs:timeout});throw e;}
     let payload=null;
     const text=await res.text();
     try{payload=text?JSON.parse(text):{};}catch(_){payload={ok:res.ok,message:text};}
     if(!res.ok){
+      emitDiagnostic({kind:"http-error",message:payload?.message||`Kit HTTP ${res.status}`,path,method,base,status:res.status,latencyMs:Math.round(performance.now()-started)});
       const err=new Error(payload?.message||`Kit HTTP ${res.status}`);
       err.status=res.status;err.payload=payload;throw err;
     }
+    emitDiagnostic({kind:"http-ok",message:`${method} ${path}`,path,method,base,status:res.status,latencyMs:Math.round(performance.now()-started)});
     return payload||{};
   }
 

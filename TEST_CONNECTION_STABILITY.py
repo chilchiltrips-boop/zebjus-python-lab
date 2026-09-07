@@ -15,3 +15,9 @@ assert 'await new Promise(r=>setTimeout(r,80))' in client
 assert 'this._lastGoodAt=Date.now()' in client
 assert 'localAddressSpaceMode' in client
 print('Connection stability regression PASS')
+
+assert 'state.pending?"SYNCING":"KIT"' not in app
+assert 'state.pending?"SYNCING":"KIT"' not in app
+assert 'buildDebugReport' in app and 'copyDebugReport' in app
+assert 'zebjus-kit-diagnostic' in client and 'latencyMs' in client
+print('No-blink + debug trace regression PASS')

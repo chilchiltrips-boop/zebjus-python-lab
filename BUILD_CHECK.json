@@ -1,9 +1,9 @@
 {
-  "release": "ZEBJUS Python Lab v6.4.4 Stable Local Link FINAL",
-  "ui_version": "6.4.4",
+  "release": "ZEBJUS Python Lab v6.4.5 Stable Status + Debug Trace FINAL",
+  "ui_version": "6.4.5",
   "firmware": "2.4.0",
   "architecture": "Universal Hardware Bridge",
-  "examples_count": 40,
+  "examples_count": 41,
   "features": {
     "tm1637_native_driver": true,
     "tm1637_hw069": true,
@@ -35,7 +35,13 @@
     "cached_ip_retained_on_transient_miss": true,
     "display_queue_pause_resume_on_network_miss": true,
     "single_background_reconnect": true,
-    "no_kit_simulation_blink_1_to_4_failures": true
+    "no_kit_simulation_blink_1_to_4_failures": true,
+    "stable_display_kit_label_no_sync_blink": true,
+    "copy_debug_report": true,
+    "timestamped_connection_trace": true,
+    "heartbeat_api_latency_trace": true,
+    "diagnostic_clock_example": true,
+    "saved_debug_snapshot": true
   },
   "retained_safety_fixes": {
     "active_low_digital_failsafe": true,
@@ -49,7 +55,7 @@
   "validation": {
     "javascript_syntax": "7/7 pass",
     "pyodide_initialization_python": "raw + JavaScript-decoded generated Pyodide Python blocks compile",
-    "examples": "40/40 Python examples compile",
+    "examples": "41/41 Python examples compile",
     "arduino_cli_compile": "not executed in packaging runtime because arduino-cli is not installed; local helper and GitHub Actions real compile workflow included",
     "html_duplicate_ids_and_assets": "pass",
     "sensor_and_display_runtime_stub_tests": "pass",
@@ -61,7 +67,7 @@
     "firmware": "v2.4.0 cursor/display control + visible-row write boundary",
     "protected_runtime_namespace_test": "pass: user io/time/json/math/private helper names cannot overwrite runtime globals; LIVE state persists and resets per session",
     "bootstrap_failure_recovery": "pass: runtimeReady set only after bootstrap success; failed init clears readyPromise; session prepared flag set after reset succeeds",
-    "connection_stability_regression": "pass: 1-4 misses retain connected state; 5th miss hard-offlines; display latest state retained across reconnect"
+    "connection_stability_regression": "pass: display cards never expose per-command SYNCING; 1-4 misses retain KIT mode; 5th miss hard-offlines; debug trace records request latency and queue state"
   },
-  "runtime_io_hotfix": "v6.4.4 retains protected runtime/bootstrap fixes and adds stable local-link hysteresis."
+  "runtime_io_hotfix": "v6.4.5 retains protected runtime/bootstrap fixes, stable local-link hysteresis, and adds no-blink display status + copyable diagnostics."
 }

@@ -25,9 +25,9 @@ for h in ROOT.glob('*.html'):
         if r and not (ROOT/r).exists(): raise SystemExit(f'Missing local ref in {h.name}: {r}')
 for h in ('index.html','settings.html','camera-bridge.html'):
     text=(ROOT/h).read_text(errors='ignore')
-    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1','?v=6.4.2','?v=6.4.3'):
+    for stale in ('?v=6.1','?v=6.2.2','?v=6.3.0','?v=6.3.1','?v=6.4.0','?v=6.4.1','?v=6.4.2','?v=6.4.3','?v=6.4.4'):
         if stale in text: raise SystemExit(f'Stale cache-buster remains in {h}: {stale}')
-    if '?v=6.4.4' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
+    if '?v=6.4.5' not in text: raise SystemExit(f'Current cache-buster missing in {h}')
 
 # Generated Pyodide Python blocks: validate raw source AND actual JS-decoded templates.
 s=(ROOT/'py-worker.js').read_text();blocks=re.findall(r'runPythonAsync\(`([\s\S]*?)`\)',s)
@@ -47,9 +47,9 @@ for marker in ('kitClient.disconnect({forgetIdentity:false})','q.paused=true','q
     if marker not in app: raise SystemExit('Missing stable-link app marker: '+marker)
 start=app.find('const examples={');end=app.find('\n  };',start);example_block=app[start:end]
 examples=re.findall(r'\n\s*([A-Za-z0-9_]+):`([\s\S]*?)`(?:,|\s*$)',example_block)
-if len(examples)!=40: raise SystemExit(f'Expected 40 Python examples, found {len(examples)}')
+if len(examples)!=41: raise SystemExit(f'Expected 41 Python examples, found {len(examples)}')
 for name,code in examples: compile(code,f'<example:{name}>','exec')
-for ex in ('tm1637Display','lcd1602Display'):
+for ex in ('tm1637Display','lcd1602Display','diagnosticClock'):
     if ex not in dict(examples): raise SystemExit('Missing display example: '+ex)
 
 # Retained real-sensor / offline rules
@@ -105,6 +105,11 @@ for marker in ('def _zebjus_new_student_namespace():','def _zebjus_ensure_termin
 if 'preparedRunSession=session;await pyodide.runPythonAsync' in worker_text:
     raise SystemExit('Run session is marked prepared before reset helper succeeds')
 if 'globals(), globals())' in worker_text: raise SystemExit('Student code still executes in runtime globals')
+for marker in ('copyDebugBtn','buildDebugReport','DEBUG_EVENT_LIMIT','zebjus.lab.lastDebugReport','heartbeat","Heartbeat OK','mode=state.simulated?"SIMULATION":"KIT"','mode=state.simulated?"SIM":"KIT"'):
+    if marker not in app and marker not in (ROOT/'index.html').read_text(): raise SystemExit('Missing v6.4.5 diagnostics/no-blink marker: '+marker)
+if 'SYNCING' in app: raise SystemExit('User-facing per-command SYNCING label remains in app')
+if 'zebjus-kit-diagnostic' not in client or 'latencyMs' not in client: raise SystemExit('Kit HTTP diagnostics instrumentation missing')
+if 'Copy Latest Report' not in (ROOT/'diagnostics.html').read_text(): raise SystemExit('Diagnostics copy UI missing')
 bc=json.loads((ROOT/'BUILD_CHECK.json').read_text())
-assert bc['ui_version']=='6.4.4' and bc['firmware']=='2.4.0' and bc['examples_count']==40
-print(f'ZEBJUS v6.4.4 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')
+assert bc['ui_version']=='6.4.5' and bc['firmware']=='2.4.0' and bc['examples_count']==41
+print(f'ZEBJUS v6.4.5 release verification PASS ({len(js_files)} JS, {len(examples)} examples)')

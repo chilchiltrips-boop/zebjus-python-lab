@@ -1,7 +1,15 @@
-# ZEBJUS Python Lab v6.4.4 Stable Local Link FINAL
+# ZEBJUS Python Lab v6.4.5 Stable Status + Debug Trace FINAL
+
+## v6.4.5 Stable Status / Debug Trace
+- TM1637/LCD cards no longer show per-command `SYNCING`; connected output stays visually `KIT`.
+- Background queue/ACK activity is hidden from the user-facing mode label, preventing clock projects from blinking.
+- `🐞 Copy Debug` captures current main.py, terminal tail, timestamps, kit identity/IP, failure counter, heartbeat/API latency, display queue state, and recent runtime/network errors. Security tokens are excluded.
+- Diagnostics page stores and copies the latest snapshot.
+- Added built-in `Clock + Connection Stability Test` example for reproducible long-run testing.
 
 
-## v6.4.4 Stable Local Link / No-Blink Connection Fix
+
+## v6.4.5 Stable Local Link / No-Blink Connection Fix
 
 - Fixed false `KIT ↔ SIMULATION` switching when one local ESP32 HTTP request times out.
 - Cached IP, base URL, status and kit identity remain active through the first 1–4 consecutive local misses.

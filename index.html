@@ -8,7 +8,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
-  <link rel="stylesheet" href="./styles.css?v=6.4.4">
+  <link rel="stylesheet" href="./styles.css?v=6.4.5">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
@@ -17,13 +17,15 @@
 
   <header class="topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.4.4</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.4.5</span>
       <p>Python • OpenCV • MediaPipe • RGB • DHT11 • Ultrasonic • OLED • Inputs • Plotter</p>
     </div>
     <div class="top-actions">
       <span id="pythonStatus" class="badge warn">Python loading…</span>
       <span id="kitStatus" class="badge">Demo mode</span>
       <span id="aiStatus" class="badge">Camera off</span>
+      <button id="copyDebugBtn" class="btn" type="button" title="Copy live kit/runtime diagnostics">🐞 Copy Debug</button>
+      <a class="btn" href="./diagnostics.html">Diagnostics</a>
       <a class="btn settings-btn" href="./settings.html">⚙ Settings</a>
     </div>
   </header>
@@ -62,6 +64,7 @@
             <optgroup label="Displays">
               <option value="tm1637Display">TM1637 / HW-069 4-Digit Display</option>
               <option value="lcd1602Display">LCD1602 16×2 I²C Display</option>
+              <option value="diagnosticClock">Clock + Connection Stability Test</option>
             </optgroup>
             <optgroup label="OLED 128×64">
               <option value="oledText">OLED Text Display</option>
@@ -214,9 +217,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=6.4.4"></script>
-  <script src="./kit-client.js?v=6.4.4"></script>
-  <script src="./ai.js?v=6.4.4"></script>
-  <script src="./app.js?v=6.4.4"></script>
+  <script src="./config.js?v=6.4.5"></script>
+  <script src="./kit-client.js?v=6.4.5"></script>
+  <script src="./ai.js?v=6.4.5"></script>
+  <script src="./app.js?v=6.4.5"></script>
 </body>
 </html>

@@ -1,36 +1,17 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ZEBJUS Lab Diagnostics</title>
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body class="settings-page">
-  <header class="topbar"><div><h1>Lab Diagnostics</h1><p>Quick deployment checks</p></div><a class="btn" href="./index.html">← Lab</a></header>
-  <main class="settings-layout">
-    <section class="panel settings-card"><div class="panel-title"><strong>Checks</strong></div><div class="settings-body">
-      <div id="diagResults">Running checks…</div>
-      <button id="workerTestBtn" class="btn primary">Test Python Worker</button>
-      <pre id="diagConsole" class="diag-console"></pre>
-    </div></section>
-  </main>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
-  <script>
-    const out=document.getElementById("diagResults");
-    const tests=[
-      ["HTTPS", location.protocol==="https:" || location.hostname==="localhost"],
-      ["CodeMirror loaded", typeof CodeMirror!=="undefined"],
-      ["Camera API", !!navigator.mediaDevices?.getUserMedia],
-      ["Worker API", typeof Worker!=="undefined"]
-    ];
-    out.innerHTML=tests.map(([n,ok])=>`<p>${ok?"✅":"❌"} ${n}</p>`).join("");
-    document.getElementById("workerTestBtn").onclick=()=>{
-      const c=document.getElementById("diagConsole");c.textContent="Starting worker…\n";
-      const w=new Worker("./py-worker.js",{type:"module"});
-      w.onmessage=e=>{c.textContent+=JSON.stringify(e.data)+"\n";if(e.data?.type==="ready"){w.postMessage({type:"run",code:'print("Python worker OK")',stdin:"",aiState:{},frame:null});}};
-      w.onerror=e=>c.textContent+="Worker error: "+e.message+"\n";
-    };
-  </script>
-</body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ZEBJUS Lab Diagnostics v6.4.5</title><link rel="stylesheet" href="./styles.css?v=6.4.5"></head>
+<body class="settings-page"><header class="topbar"><div><h1>ZEBJUS Lab Diagnostics</h1><p>Connection trace, runtime checks and copyable bug report</p></div><div class="top-actions"><a class="btn" href="./index.html">← Lab</a></div></header>
+<main class="settings-layout"><section class="panel settings-card"><div class="panel-title"><strong>Latest Debug Report</strong></div><div class="settings-body">
+<p class="muted">When an issue happens, click <b>🐞 Copy Debug</b> on the Lab page. This report includes timestamps, heartbeat/API latency, failure count, display queues, terminal output and current main.py. Security tokens are excluded.</p>
+<div class="settings-actions"><button id="copyReportBtn" class="btn primary">Copy Latest Report</button><button id="refreshReportBtn" class="btn">Refresh</button><button id="workerTestBtn" class="btn">Test Python Worker</button></div>
+<div id="diagResults"></div><pre id="diagConsole" class="diag-console"></pre><pre id="reportBox" class="diag-console" style="max-height:520px"></pre>
+</div></section></main>
+<script>
+const reportBox=document.getElementById("reportBox"),out=document.getElementById("diagResults"),c=document.getElementById("diagConsole");
+function loadReport(){let r=null;try{r=JSON.parse(localStorage.getItem("zebjus.lab.lastDebugReport")||"null");}catch(_){};reportBox.textContent=r?JSON.stringify(r,null,2):"No saved report yet. Open Lab, reproduce the issue, then click 🐞 Copy Debug.";return r;}
+function checks(){const tests=[["HTTPS / localhost",location.protocol==="https:"||location.hostname==="localhost"],["Worker API",typeof Worker!=="undefined"],["Local report available",!!loadReport()]];out.innerHTML=tests.map(([n,ok])=>`<p>${ok?"✅":"⚠️"} ${n}</p>`).join("");}
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true;}catch(_){const x=document.createElement("textarea");x.value=t;document.body.appendChild(x);x.select();const ok=document.execCommand("copy");x.remove();return ok;}}
+document.getElementById("copyReportBtn").onclick=async()=>{const ok=await copyText(reportBox.textContent);c.textContent+=ok?"Debug report copied. Paste it into ChatGPT.\n":"Copy failed.\n";};
+document.getElementById("refreshReportBtn").onclick=checks;
+document.getElementById("workerTestBtn").onclick=()=>{c.textContent+="Starting worker…\n";const w=new Worker("./py-worker.js?v=6.4.5",{type:"module"});w.onmessage=e=>{c.textContent+=JSON.stringify(e.data)+"\n";if(e.data?.type==="ready")w.postMessage({type:"run",code:'print("Python worker OK")',stdin:"",aiState:{},frame:null});};w.onerror=e=>c.textContent+="Worker error: "+e.message+"\n";};checks();
+</script></body></html>

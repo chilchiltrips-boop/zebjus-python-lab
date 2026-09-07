@@ -20,6 +20,26 @@
   let sensorState={simulationMode:true,ultrasonicCm:null,dhtTemperature:null,dhtHumidity:null,dhtPin:13,potValue:null,potRaw:null,potPin:34,potPercent:null,potMillivolts:null,inputs:{analog:{},digital:{},rotary:{},ultrasonic:{},dht11:{}},bridge:{gpio:{},adc:{},pwm:{},i2c:{},uart:{},spi:{},pulse:{},counter:{},transaction:{}},special:{}};
   const customDashboardCards=new Map();
   const plotter={series:new Map(),maxPoints:180,seq:0};
+  const DEBUG_EVENT_LIMIT=900;
+  const debugEvents=[];
+  const debugStartedAt=Date.now();
+  function debugEvent(kind,message,data=null){
+    const item={ts:new Date().toISOString(),ms:Date.now()-debugStartedAt,kind:String(kind||"event"),message:String(message||"")};
+    if(data!==null&&data!==undefined){try{item.data=JSON.parse(JSON.stringify(data));}catch(_){item.data=String(data);}}
+    debugEvents.push(item);if(debugEvents.length>DEBUG_EVENT_LIMIT)debugEvents.splice(0,debugEvents.length-DEBUG_EVENT_LIMIT);
+  }
+  function sanitizedKitStatus(){const st={...(kitClient?.status||{})};delete st.token;delete st.secureToken;delete st.password;return st;}
+  function displayQueueSnapshot(){return [...displayHardwareQueues.entries()].map(([key,q])=>({key,busy:!!q.busy,paused:!!q.paused,pending:Number(q.pending?.length||0),hasLatest:!!q.latest}));}
+  function buildDebugReport(){
+    const now=Date.now(),code=getCode?.()||"";
+    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.4.5",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
+      page:{url:location.href,protocol:location.protocol,embedded:isEmbedded,visibility:document.visibilityState,userAgent:navigator.userAgent,online:navigator.onLine},
+      run:{running,liveMode,currentRunUsesKit,currentRunNeedsKit,liveSessionId},
+      kit:{name:prefs.kitName||prefs.kitId||"",chipId:String(prefs.kitChipId||""),cachedIp:prefs.kitIp||"",base:kitClient?.base||"",connected:!!kitClient?.connected,lastGoodAgeMs:Number.isFinite(kitClient?.lastGoodAgeMs)?Math.round(kitClient.lastGoodAgeMs):null,failureCount:kitFailureCount,failureLimit:KIT_FAILURE_LIMIT,everConnected:kitEverConnected,reconnectBusy:kitReconnectBusy,heartbeatBusy:kitHeartbeatPingBusy,status:sanitizedKitStatus()},
+      mode:{demoMode:!!prefs.demoMode,simulationMode:!!sensorState.simulationMode},displays:displayQueueSnapshot(),hardwareCards:activeHardwareCards.map(x=>({...x})),recentEvents:debugEvents.slice(-DEBUG_EVENT_LIMIT),terminal:String(terminal?.textContent||"").slice(-18000),mainPy:code};
+  }
+  function saveDebugReport(){try{localStorage.setItem("zebjus.lab.lastDebugReport",JSON.stringify(buildDebugReport()));}catch(_){}}
+  async function copyDebugReport(){const text=JSON.stringify(buildDebugReport(),null,2);saveDebugReport();const ok=await copyText(text);if(ok){debugEvent("debug","Debug report copied");log("Debug report copied. Paste it into ChatGPT when KIT/display blinking or a hardware issue happens.");}else log("Could not copy debug report. Open Diagnostics and copy the report manually.");return ok;}
 
   const defaults={
     autoCamera:true,demoMode:false,kitName:"",kitId:"",kitChipId:"",kitIp:"",kitToken:"",wsUrl:"",
@@ -603,6 +623,22 @@ sleep(1)
 
 while True:
     lcd.marquee(1, "ZEBJUS PYTHON LAB", speed=0.2, loops=1)`,
+
+    diagnosticClock:`# Clock + Connection Stability Test
+from zebjus import TM1637, LCD1602, sleep
+from js import Date
+
+tm = TM1637(clk=13, dio=14, brightness=6)
+lcd = LCD1602(sda=21, scl=22, address=0x27, bus=0)
+
+while True:
+    now = Date.new()
+    h, m, sec = now.getHours(), now.getMinutes(), now.getSeconds()
+    tm.clock(h, m, colon=(sec % 2 == 0))
+    lcd.line(0, f"ZEBJUS {h:02d}:{m:02d}:{sec:02d}")
+    lcd.line(1, "LINK STABILITY")
+    print(f"CLOCK {h:02d}:{m:02d}:{sec:02d}")
+    sleep(0.5)`,
 
     customTransaction:`# Custom Timing Sensor - Local ESP32 Transaction VM
 from zebjus import HardwareTransaction, sleep
@@ -1218,7 +1254,7 @@ while True:
   }
   function undoEditor(){if(editor){editor.undo();editor.focus();updateHistoryButtons();}}
   function redoEditor(){if(editor){editor.redo();editor.focus();updateHistoryButtons();}}
-  function log(t){terminal.textContent+=(terminal.textContent?"\n":"")+String(t);terminal.scrollTop=terminal.scrollHeight;}
+  function log(t){const text=String(t);terminal.textContent+=(terminal.textContent?"\n":"")+text;terminal.scrollTop=terminal.scrollHeight;debugEvent("terminal",text);}
   function writeTerminalChunk(t){
     const s=String(t??"");
     if(!s)return;
@@ -1300,7 +1336,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.4.4",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.4.5",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -2024,14 +2060,14 @@ while True:
   }
   function markKitSuccess(st=null){
     if(sensorState.simulationMode)clearSimulatedSensorState();sensorState.simulationMode=false;
-    kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;
+    const recovered=kitFailureCount>0;kitFailureCount=0;kitEverConnected=true;kitCommandErrorShown=false;if(recovered)debugEvent("kit-recovered","Local kit response restored",{base:kitClient?.base||""});
     if(st)persistKitIdentity(st);
     if(!prefs.demoMode)badge($("kitStatus"),"Kit connected","ok");
     for(const [key,q] of displayHardwareQueues){q.paused=false;if(q.latest||q.pending?.length)runDisplayHardwareQueue(key,q);}
   }
 
   function markKitFailure(reason=""){
-    kitFailureCount=Math.min(KIT_FAILURE_LIMIT,kitFailureCount+1);
+    kitFailureCount=Math.min(KIT_FAILURE_LIMIT,kitFailureCount+1);debugEvent("kit-miss",`Local kit response missed (${kitFailureCount}/${KIT_FAILURE_LIMIT})`,{reason,lastGoodAgeMs:Number.isFinite(kitClient?.lastGoodAgeMs)?Math.round(kitClient.lastGoodAgeMs):null});
     if(kitEverConnected&&kitFailureCount<KIT_FAILURE_LIMIT){
       // Stable-link hysteresis: 1–4 local HTTP misses keep the cached kit session alive.
       // Do not switch Python to simulation, clear the cached IP, or blink the UI.
@@ -2052,7 +2088,7 @@ while True:
 
   async function resumeRunSessionAfterReconnect(){
     if(!running||!currentRunUsesKit)return;
-    try{await kitClient.pingRun();markKitSuccess(kitClient.status);}
+    try{const t0=performance.now();await kitClient.pingRun();debugEvent("heartbeat","Heartbeat OK",{latencyMs:Math.round(performance.now()-t0)});markKitSuccess(kitClient.status);}
     catch(e){
       if(e?.status===409){await kitClient.beginRun();markKitSuccess(kitClient.status);}
       else throw e;
@@ -2336,7 +2372,7 @@ while True:
   function paintTM1637(p={}){
     const clk=Number(p.clk??13),dio=Number(p.dio??14),key=`${clk},${dio}`;sensorState.special=sensorState.special||{};sensorState.special.tm1637=sensorState.special.tm1637||{};sensorState.special.tm1637[key]={...sensorState.special.tm1637[key],...p,clk,dio};const state=sensorState.special.tm1637[key],seg=normalizeSegmentArray(state.segments);while(seg.length<4)seg.push(0);
     const cards=new Set();for(const sp of activeHardwareCards.filter(x=>x.type==="tm1637"&&Number(x.clk)===clk&&Number(x.dio)===dio)){const c=findHardwareCard(sp);if(c)cards.add(c);}for(const c of displayCardsByPins("tm1637",{tmClk:clk,tmDio:dio}))cards.add(c);
-    for(const card of cards){for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]'),detail=card.querySelector('[data-role="tm-detail"]');if(label){const shown=String(state.text??"").replace(/\s+$/g,"")||"----",mode=state.simulated?"SIMULATION":(state.pending?"SYNCING":"KIT"),effect=String(state.effect||"").toUpperCase();label.textContent=`${shown} · brightness ${Number(state.brightness??7)} · ${effect?effect+" · ":""}${mode}`;}if(detail)detail.textContent=`CLK ${clk} · DIO ${dio} · ${state.hardwareSynced?"physical synced":"native ACK driver"}`;card.dataset.effect=String(state.effect||"");card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
+    for(const card of cards){for(let i=0;i<4;i++)tmSegmentBits(card,i,seg[i]||0);const colon=card.querySelector('[data-role="tm-colon"]');if(colon)colon.classList.toggle("on",!!(seg[1]&0x80));const label=card.querySelector('[data-role="tm-label"]'),detail=card.querySelector('[data-role="tm-detail"]');if(label){const shown=String(state.text??"").replace(/\s+$/g,"")||"----",mode=state.simulated?"SIMULATION":"KIT",effect=String(state.effect||"").toUpperCase();label.textContent=`${shown} · brightness ${Number(state.brightness??7)} · ${effect?effect+" · ":""}${mode}`;}if(detail)detail.textContent=`CLK ${clk} · DIO ${dio} · native driver${state.simulated?" · offline preview":""}`;card.dataset.effect=String(state.effect||"");card.classList.toggle("live",seg.some(v=>Number(v)&0x7F));}
   }
   function lcdBlank(){return " ".repeat(16);}
   function paintLCD1602(p={}){
@@ -2345,7 +2381,7 @@ while True:
     if(action==="clear"){lines=[lcdBlank(),lcdBlank()];cursorCol=0;cursorRow=0;}else if(action==="home"){cursorCol=0;cursorRow=0;}else if(action==="cursor"){cursorCol=Math.max(0,Math.min(15,Number(p.col)||0));cursorRow=Math.max(0,Math.min(1,Number(p.row)||0));}else if(action==="write"){const row=Math.max(0,Math.min(1,Number(p.row)||0)),col=Math.max(0,Math.min(15,Number(p.col)||0)),text=String(p.text??"");const chars=lines[row].padEnd(16).slice(0,16).split("");for(let i=0;i<text.length&&col+i<16;i++)chars[col+i]=text[i];lines[row]=chars.join("");cursorRow=row;cursorCol=Math.max(0,Math.min(15,col+Math.min(text.length,16-col)));}
     const state={...prev,...p,bus,address,lines,cursorCol,cursorRow,backlight:p.backlight===undefined?prev.backlight:!!p.backlight,enabled:p.enabled===undefined?prev.enabled:!!p.enabled,cursor:p.cursor===undefined?prev.cursor:!!p.cursor,blink:p.blink===undefined?prev.blink:!!p.blink};sensorState.special.lcd1602[key]=state;
     const cards=new Set();for(const sp of activeHardwareCards.filter(x=>x.type==="lcd1602"&&Number(x.bus)===bus&&Number(x.address)===address)){const c=findHardwareCard(sp);if(c)cards.add(c);}for(const c of displayCardsByPins("lcd1602",{lcdBus:bus,lcdAddress:address}))cards.add(c);
-    for(const card of cards){for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);screen.classList.toggle("cursor-on",!!state.cursor);screen.classList.toggle("cursor-blink",!!state.cursor&&!!state.blink);}const cursorEl=card.querySelector('[data-role="lcd-cursor"]');if(cursorEl){cursorEl.style.transform=`translate(${Math.max(0,Math.min(15,Number(state.cursorCol)||0))*11.1}px,${Math.max(0,Math.min(1,Number(state.cursorRow)||0))*23.4}px)`;cursorEl.style.opacity=state.cursor&&state.enabled!==false?"1":"0";}card.dataset.effect=String(state.effect||"");const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":(state.pending?"SYNCING":"KIT"),effect=String(state.effect||"").toUpperCase();label.textContent=`16×2 LCD · ${effect?effect+" · ":""}${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
+    for(const card of cards){for(let r=0;r<2;r++){const el=card.querySelector(`[data-role="lcd-line-${r}"]`);if(el)el.textContent=(state.enabled===false?lcdBlank():lines[r]).padEnd(16).slice(0,16);}const screen=card.querySelector('[data-role="lcd-screen"]');if(screen){screen.classList.toggle("backlight-off",state.backlight===false);screen.classList.toggle("display-off",state.enabled===false);screen.classList.toggle("cursor-on",!!state.cursor);screen.classList.toggle("cursor-blink",!!state.cursor&&!!state.blink);}const cursorEl=card.querySelector('[data-role="lcd-cursor"]');if(cursorEl){cursorEl.style.transform=`translate(${Math.max(0,Math.min(15,Number(state.cursorCol)||0))*11.1}px,${Math.max(0,Math.min(1,Number(state.cursorRow)||0))*23.4}px)`;cursorEl.style.opacity=state.cursor&&state.enabled!==false?"1":"0";}card.dataset.effect=String(state.effect||"");const label=card.querySelector('[data-role="lcd-label"]');if(label){const mode=state.simulated?"SIM":"KIT",effect=String(state.effect||"").toUpperCase();label.textContent=`16×2 LCD · ${effect?effect+" · ":""}${state.backlight===false?"BACKLIGHT OFF":"ACTIVE"} · ${mode}`;}card.classList.add("live");}
   }
 
   function applyDemo(p){
@@ -2494,7 +2530,7 @@ while True:
             if(e?.status>=400&&e?.status<500)warnHardwareCommand(e?.message||e);
             else{
               // Preserve the latest physical frame instead of dropping it on a transient LAN timeout.
-              q.paused=true;
+              q.paused=true;debugEvent("display-queue","Display hardware queue paused after transient request failure",{key,message:String(e?.message||e)});
               if(key.startsWith("tm:")){if(next.ordered)q.pending.unshift(next);else if(!q.latest)q.latest=next;}
               else{
                 const action=String(next.action||"").toLowerCase();
@@ -2652,6 +2688,10 @@ while True:
   }
   function switchOutput(id){document.querySelectorAll(".output-view").forEach(x=>x.classList.toggle("active",x.id===id));document.querySelectorAll(".output-tab").forEach(x=>x.classList.toggle("active",x.dataset.view===id));}
 
+  window.addEventListener("zebjus-kit-diagnostic",e=>{const d=e.detail||{};debugEvent(d.kind||"kit-http",d.message||d.path||"Kit HTTP",d);});
+  window.addEventListener("error",e=>debugEvent("window-error",e.message||"Window error",{file:e.filename||"",line:e.lineno||0,col:e.colno||0}));
+  window.addEventListener("unhandledrejection",e=>debugEvent("promise-error",String(e.reason?.message||e.reason||"Unhandled promise rejection")));
+
   window.addEventListener("zebjus-ai-state",e=>{
     const d=e.detail||{};aiState={detected:!!d.detected,fingers:Number(d.fingers)||0,side:d.side||"",faces:Array.isArray(d.faces)?d.faces:[],landmarks:Array.isArray(d.landmarks)?d.landmarks:[]};
     $("handDetected").textContent=aiState.detected?"Yes":"No";$("fingerCount").textContent=aiState.fingers;$("handSide").textContent=aiState.side||"—";$("faceCount").textContent=aiState.faces.length;
@@ -2667,6 +2707,7 @@ while True:
   if($("hardwarePicker"))$("hardwarePicker").onchange=updateHardwarePickerInfo;
   if($("addHardwareBtn"))$("addHardwareBtn").onclick=addSelectedHardware;
   if($("undoBtn"))$("undoBtn").onclick=undoEditor;if($("redoBtn"))$("redoBtn").onclick=redoEditor;
+  if($("copyDebugBtn"))$("copyDebugBtn").onclick=copyDebugReport;
   $("imageInput").onchange=e=>loadImageFiles(e.target.files).catch(err=>log("Image upload error: "+err.message));
   $("uploadedFileList").onclick=async e=>{
     const copy=e.target.closest("[data-copy-path]");
@@ -2686,6 +2727,7 @@ while True:
 
   document.documentElement.style.setProperty("--editor-font",(prefs.fontSize||14)+"px");
   $("kitNameText").textContent=prefs.kitName||prefs.kitId||"No kit selected";$("kitStatus").textContent=prefs.demoMode?"Demo mode":"Kit disconnected";
-  window.addEventListener("pagehide",()=>{stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
+  window.addEventListener("pagehide",()=>{saveDebugReport();stopKitHeartbeat();if(currentRunUsesKit&&kitClient?.connected)kitClient.endRun().catch(()=>{});});
+  setInterval(saveDebugReport,5000);
   initEditor();renderHardwareCards(getCode());initOledPreview();updateRgb(0,0,0);updateSensorGraphics();drawSerialPlotter();setupCameraBridge();createWorker();enumerateCameras();connectRealKit();startKitHealthMonitor();
 })();
