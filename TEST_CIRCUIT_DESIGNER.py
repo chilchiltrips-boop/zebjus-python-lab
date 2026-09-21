@@ -1,0 +1,100 @@
+from pathlib import Path
+import subprocess, json, sys, types, xml.etree.ElementTree as ET, re
+ROOT=Path(__file__).resolve().parent
+NODE=r'''
+const fs=require('fs'),vm=require('vm');
+global.localStorage={m:new Map(),getItem(k){return this.m.has(k)?this.m.get(k):null},setItem(k,v){this.m.set(k,String(v))},removeItem(k){this.m.delete(k)}};
+global.StorageEvent=function(t,o){this.type=t;Object.assign(this,o||{})};global.dispatchEvent=()=>{};
+global.document={};global.BroadcastChannel=class{constructor(name){this.name=name;global.__designBus=this}addEventListener(type,fn){if(type==='message')this.listener=fn}postMessage(data){this.sent=data}};
+vm.runInThisContext(fs.readFileSync(process.argv[1],'utf8'));
+vm.runInThisContext(fs.readFileSync(process.argv[2],'utf8'));
+function one(type){const d=ZebjusCircuit.newDesign(),c=ZebjusCircuit.addComponent(d,type);let error=null,issues=[],code='';try{ZebjusCircuit.autoWireComponent(d,c.id);issues=ZebjusCircuit.validateDesign(d);code=ZebjusCircuit.generatePython(d);}catch(e){error=String(e.message||e)}return {type,error,issues,code,connections:d.connections};}
+const out=ZebjusCircuitLibrary.COMPONENTS.map(m=>one(m.type));
+// shared I2C with unique addresses reuses one pair
+const sd=ZebjusCircuit.newDesign();for(const t of ['OLED','LCD1602','MPU6050','I2CDevice']){const c=ZebjusCircuit.addComponent(sd,t);ZebjusCircuit.autoWireComponent(sd,c.id)}const si=ZebjusCircuit.validateDesign(sd),pairs={};for(const w of sd.connections){if(w.kind==='i2cSda'||w.kind==='i2cScl')(pairs[w.kind]??=new Set()).add(w.boardPin)}
+// incompatible pin rejection
+let adcRejected=false,outRejected=false,i2cConflictRejected=false;try{const d=ZebjusCircuit.newDesign(),c=ZebjusCircuit.addComponent(d,'ADC');ZebjusCircuit.connect(d,c.id,'AO','GPIO13')}catch(e){adcRejected=true}try{const d=ZebjusCircuit.newDesign(),c=ZebjusCircuit.addComponent(d,'PWM');ZebjusCircuit.connect(d,c.id,'PWM','GPIO34')}catch(e){outRejected=true}try{const d=ZebjusCircuit.newDesign(),a=ZebjusCircuit.addComponent(d,'OLED');ZebjusCircuit.autoWireComponent(d,a.id);const b=ZebjusCircuit.addComponent(d,'PWM');ZebjusCircuit.connect(d,b.id,'PWM','GPIO21')}catch(e){i2cConflictRejected=true}
+// I2C duplicate address on same bus must error
+const id=ZebjusCircuit.newDesign();for(let i=0;i<2;i++){const c=ZebjusCircuit.addComponent(id,'LCD1602');ZebjusCircuit.autoWireComponent(id,c.id)}const i2cDup=ZebjusCircuit.validateDesign(id).filter(x=>x.level==='error').map(x=>x.message);
+// UART: two auto devices -> ports 1,2; third must error
+const ud=ZebjusCircuit.newDesign();for(const t of ['UART','GPS']){const c=ZebjusCircuit.addComponent(ud,t);ZebjusCircuit.autoWireComponent(ud,c.id)}const uartCode=ZebjusCircuit.generatePython(ud);const u3=ZebjusCircuit.addComponent(ud,'UART');try{ZebjusCircuit.autoWireComponent(ud,u3.id)}catch(_){}const uart3Issues=ZebjusCircuit.validateDesign(ud).filter(x=>x.level==='error').map(x=>x.message);
+// SPI: auto devices share SCK/MISO/MOSI and get different CS on bus 1
+const sp=ZebjusCircuit.newDesign();for(let i=0;i<3;i++){const c=ZebjusCircuit.addComponent(sp,'SPI');ZebjusCircuit.autoWireComponent(sp,c.id)}const spiIssues=ZebjusCircuit.validateDesign(sp).filter(x=>x.level==='error');const spiCode=ZebjusCircuit.generatePython(sp);const spiLines={};for(const c of sp.components){spiLines[c.id]={};for(const n of ['SCK','MISO','MOSI','CS'])spiLines[c.id][n]=ZebjusCircuit.connectionFor(sp,c.id,n)?.boardPin}
+// bus 2 explicitly must use a separately allocated triplet
+const sp2=ZebjusCircuit.newDesign(),s1=ZebjusCircuit.addComponent(sp2,'SPI'),s2=ZebjusCircuit.addComponent(sp2,'SPI');ZebjusCircuit.setProperty(sp2,s2.id,'bus',2);ZebjusCircuit.autoWireComponent(sp2,s1.id);ZebjusCircuit.autoWireComponent(sp2,s2.id);const spi2Issues=ZebjusCircuit.validateDesign(sp2).filter(x=>x.level==='error'),spi2Code=ZebjusCircuit.generatePython(sp2);
+// SingleLED numbering is based on LED ordinal, not overall component index
+const ld=ZebjusCircuit.newDesign();for(const t of ['SingleLED','RGBLED','SingleLED']){const c=ZebjusCircuit.addComponent(ld,t);ZebjusCircuit.autoWireComponent(ld,c.id)}const ledCode=ZebjusCircuit.generatePython(ld);
+// generated block must be before the first top-level LIVE loop
+const live='from js import Date\n\nprint("start")\n\nwhile True:\n    print(Date.new())\n';const inserted=ZebjusCircuit.applyGeneratedBlock(live,'from zebjus import DHT11\n\ndht11 = DHT11(pin=13)\n');const whilePos=inserted.indexOf('while True:'),blockPos=inserted.indexOf('# === ZEBJUS CIRCUIT AUTO-GENERATED START ===');
+// property editing and migration
+const pd=ZebjusCircuit.newDesign(),pc=ZebjusCircuit.addComponent(pd,'I2CDevice');ZebjusCircuit.setProperty(pd,pc.id,'address',0x55);const propAddress=pc.properties.address;localStorage.setItem(ZebjusCircuit.LEGACY_STORAGE,JSON.stringify({version:1,name:'Old',width:1800,height:1000,components:[{id:'LCD16021',type:'LCD1602',x:2,y:3,properties:{}}],connections:[]}));localStorage.removeItem(ZebjusCircuit.STORAGE);const migrated=ZebjusCircuit.loadDesign();const od=ZebjusCircuit.newDesign(),oc=ZebjusCircuit.addComponent(od,'DHT11');oc.rotation=90;oc.flipX=true;oc.flipY=false;const orient=ZebjusCircuit.normalizeDesign(od).components[0];
+const zeroBoard=ZebjusCircuit.normalizeDesign({version:2,name:'Edge',width:2400,height:1600,board:{x:0,y:0},components:[],connections:[]}).board;
+// BroadcastChannel shared-page design propagation.
+let broadcastSeen=null;const stopListen=ZebjusCircuit.onDesignChange(x=>broadcastSeen=x);const bd=ZebjusCircuit.newDesign();bd.name='From schematic';__designBus.listener({data:{type:'design',design:bd}});stopListen();const savedBroadcast=ZebjusCircuit.newDesign();savedBroadcast.name='From circuit';ZebjusCircuit.saveDesign(savedBroadcast);const broadcast={channel:__designBus.name,seen:broadcastSeen?.name,sent:__designBus.sent?.design?.name};
+// resource limits
+const td=ZebjusCircuit.newDesign();for(let i=0;i<5;i++){const c=ZebjusCircuit.addComponent(td,'TM1637');try{ZebjusCircuit.autoWireComponent(td,c.id)}catch(_){}}const tmLimit=ZebjusCircuit.validateDesign(td).some(x=>x.level==='error'&&/TM1637 limit exceeded/.test(x.message));
+const cd=ZebjusCircuit.newDesign();for(let i=0;i<9;i++){const c=ZebjusCircuit.addComponent(cd,'CounterInput');try{ZebjusCircuit.autoWireComponent(cd,c.id)}catch(_){}}const counterLimit=ZebjusCircuit.validateDesign(cd).some(x=>x.level==='error'&&/Counter-input limit exceeded/.test(x.message));
+// live capability profile update
+ZebjusCircuit.setBridgeCapabilities({gpioOut:[13,14],gpioIn:[13,14,34],adc1:[34],counterPins:[34],uartPorts:[1],spiBuses:[1],counterSlots:2,tm1637Slots:2,lcd1602Slots:2});const caps=ZebjusCircuit.getCapabilities();
+process.stdout.write(JSON.stringify({out,sharedIssues:si,pairs:{sda:[...(pairs.i2cSda||[])],scl:[...(pairs.i2cScl||[])]},adcRejected,outRejected,i2cConflictRejected,i2cDup,uartCode,uart3Issues,spiIssues,spiCode,spiLines,spi2Issues,spi2Code,ledCode,inserted,whilePos,blockPos,propAddress,migrated,zeroBoard,broadcast,tmLimit,counterLimit,caps,orient,count:ZebjusCircuitLibrary.COMPONENTS.length}));
+'''
+raw=subprocess.check_output(['node','-e',NODE,str(ROOT/'component-library.js'),str(ROOT/'circuit-sync.js')],text=True)
+data=json.loads(raw)
+assert data['count']==45
+fail=[]
+for item in data['out']:
+    errs=[x for x in item['issues'] if x.get('level')=='error']
+    if item['error'] or errs: fail.append((item['type'],item['error'],errs))
+if fail: raise SystemExit(f'Circuit auto-wire failures: {fail}')
+assert data['pairs']['sda']==['GPIO21'] and data['pairs']['scl']==['GPIO22'],data['pairs']
+assert not [x for x in data['sharedIssues'] if x.get('level')=='error']
+assert data['adcRejected'] and data['outRejected'] and data['i2cConflictRejected']
+assert any('address' in x.lower() for x in data['i2cDup']),data['i2cDup']
+assert 'port=1' in data['uartCode'] and 'port=2' in data['uartCode'],data['uartCode']
+assert any('only 2 UART ports' in x for x in data['uart3Issues']),data['uart3Issues']
+assert not data['spiIssues'],data['spiIssues']
+vals=list(data['spiLines'].values());assert len({v['SCK'] for v in vals})==1 and len({v['MISO'] for v in vals})==1 and len({v['MOSI'] for v in vals})==1;assert len({v['CS'] for v in vals})==3
+assert data['spiCode'].count('bus=1')==3
+assert not data['spi2Issues'];assert 'bus=1' in data['spi2Code'] and 'bus=2' in data['spi2Code']
+assert 'from zebjus import LED1, RGBLED, LED2' in data['ledCode'],data['ledCode']
+assert data['blockPos']>=0 and data['blockPos']<data['whilePos'],data['inserted']
+assert data['propAddress']==0x55 and data['migrated']['version']==2 and data['migrated']['components'][0]['properties']['address']==0x27
+assert data['zeroBoard']=={'x':0,'y':0},data['zeroBoard']
+assert data['broadcast']=={'channel':'zebjus-circuit-design-v2','seen':'From schematic','sent':'From circuit'},data['broadcast']
+assert data['tmLimit'] and data['counterLimit']
+assert data['caps']['gpioOut']==[13,14] and data['caps']['uartPorts']==[1]
+assert data['orient']['rotation']==90 and data['orient']['flipX'] is True and data['orient']['flipY'] is False
+
+# Generated code compilation plus keyword-signature validation.
+allowed={
+'RGBLED':set(),'TM1637':{'clk','dio','brightness'},'LCD1602':{'sda','scl','address','bus'},'OLED':{'sda','scl','address'},'DHT11':{'pin'},'Ultrasonic':{'trig','echo'},
+'Potentiometer':{'pin'},'AnalogInput':{'pin'},'Switch':{'pin'},'DigitalInput':{'pin'},'RotaryEncoder':{'clk','dt','switch'},'DigitalOutput':{'pin'},'GPIOInput':{'pin'},'PulseInput':{'pin'},'PulseOutput':{'pin'},'CounterInput':{'pin','edge','pullup'},'Relay':{'pin'},'ADC':{'pin'},'LDR':{'pin'},'SoilMoisture':{'pin'},'GasSensor':{'pin'},'VoltageSensor':{'pin'},'SoundSensor':{'pin'},'RainSensor':{'pin'},'WaterLevelSensor':{'pin'},'Thermistor':{'pin'},'PWM':{'pin','frequency','resolution'},'PWMServo':{'pin','min_us','max_us','frequency'},'MotorDriver':{'in1','in2','pwm_pin','frequency'},'I2C':{'sda','scl','frequency','bus'},'I2CDevice':{'address','sda','scl','frequency','bus'},'UART':{'rx','tx','baud','port'},'GPS':{'rx','tx','baud','port'},'SPI':{'sck','miso','mosi','cs','frequency','mode','bus','lsb_first','active_low'},'HardwareTransaction':set(),'MPU6050':{'sda','scl','address','bus'},'PIRSensor':{'pin'},'ReedSwitch':{'pin'},'TouchSensor':{'pin'},'FlameSensor':{'pin'},'FlowSensor':{'pin','pulses_per_liter','edge','pullup'},'RPMSensor':{'pin','pulses_per_revolution','edge','pullup'},'Buzzer':{'pin','frequency'},'Joystick':{'x_pin','y_pin','switch_pin'}
+}
+class Stub:
+    def __init__(self,*args,**kwargs): self.args=args;self.kwargs=kwargs
+
+def make(name):
+    class S:
+        def __init__(self,*args,**kwargs):
+            if name.startswith('LED') and name[3:].isdigit(): return
+            bad=set(kwargs)-allowed.get(name,set())
+            if bad: raise TypeError(f'{name} unexpected kwargs {sorted(bad)}')
+    S.__name__=name;return S
+z=types.ModuleType('zebjus')
+all_codes=[x['code'] for x in data['out']]+[data['uartCode'],data['spiCode'],data['spi2Code'],data['ledCode']]
+for code in all_codes:
+    compile(code,'<circuit-generated>','exec')
+    m=re.search(r'^from zebjus import (.+)$',code,re.M)
+    if m:
+        for name in [x.strip() for x in m.group(1).split(',')]: setattr(z,name,make(name))
+sys.modules['zebjus']=z
+for code in all_codes: exec(compile(code,'<circuit-exec>','exec'),{}, {})
+# 2D-only SVG validation + pin-label evidence.
+svg=list(ROOT.glob('*.svg'));assert len(svg)==46
+assert not list(ROOT.glob('*-3d.svg'))
+assert all(f.name.endswith('-2d.svg') for f in svg)
+for f in svg:
+    r=ET.parse(f).getroot();assert r.tag.endswith('svg') and r.attrib.get('data-realistic')=='top-view'
+for name in ('tm1637-2d.svg','lcd1602-2d.svg','ultrasonic-2d.svg','esp32-devkit-2d.svg'):
+    txt=(ROOT/name).read_text();assert '<text' in txt and ('GPIO' in txt or 'VCC' in txt or name=='esp32-devkit-2d.svg')
+print(f'Circuit Designer v6.7.0 regression PASS: 45/45 devices; UART/SPI/I2C combinations; BroadcastChannel sync; LIVE insertion; limits; migration; generated Python compile/signature execution; {len(svg)} realistic 2D SVG/XML assets valid')

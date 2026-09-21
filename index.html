@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>ZEBJUS Python Lab</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
+  <link rel="stylesheet" href="./styles.css?v=6.7.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+</head>
+<body>
+  <div id="editorLoadError" class="fatal-banner" hidden>
+    Code editor library failed to load. Check internet/CDN access, then hard-refresh.
+  </div>
+
+  <header class="topbar student-topbar">
+    <div>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.7.0</span>
+      <p>Write and run student Python projects</p>
+    </div>
+    <nav class="workspace-nav" aria-label="Student workspace">
+      <div class="workspace-tabs">
+        <a class="workspace-tab active" aria-current="page" href="./index.html">Python Lab</a>
+        <a class="workspace-tab" href="./circuit.html">Circuit Design</a>
+        <a class="workspace-tab" href="./schematic.html">Schematic</a>
+      </div>
+    </nav>
+    <div class="top-actions">
+      <span id="pythonStatus" class="badge warn">Python loading…</span>
+      <span id="kitStatus" class="badge">Demo mode</span>
+      <span id="aiStatus" class="badge">Camera off</span>
+      <button id="copyDebugBtn" class="btn optional-link" type="button" title="Copy live kit/runtime diagnostics">Copy Debug</button>
+      <a class="btn optional-link" href="./firmware.html">Firmware</a>
+      <a class="btn optional-link" href="./diagnostics.html">Diagnostics</a>
+      <a class="btn settings-btn" href="./settings.html">Settings</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="panel project-bar">
+      <div class="project-left">
+        <label>
+          <span>Learning example</span>
+          <select id="exampleSelect">
+            <optgroup label="RGB LED">
+              <option value="ledBasic">LED Basic Colors</option>
+              <option value="ledBlink">LED Blink</option>
+              <option value="ledAnimation">LED Animation</option>
+              <option value="ledEffects">LED Indication & Effects</option>
+              <option value="ledFade">LED Fade / Breathing</option>
+            </optgroup>
+            <optgroup label="Inputs">
+              <option value="analogRead">Generic Analog Input</option>
+              <option value="potRead">Potentiometer / Analog Knob</option>
+              <option value="digitalRead">Generic Digital Input</option>
+              <option value="switchRead">Push Switch Input</option>
+              <option value="switchLed">Switch → RGB LED</option>
+              <option value="rotaryRead">Rotary Encoder + Switch</option>
+              <option value="rotaryLed">Rotary → RGB LED</option>
+              <option value="analogLed">Analog → RGB LED</option>
+              <option value="ultrasonicRead">Ultrasonic Distance</option>
+            </optgroup>
+            <optgroup label="DHT11 Temperature / Humidity">
+              <option value="dht11Read">DHT11 Temperature + Humidity</option>
+              <option value="dht11Plotter">DHT11 Live Serial Plotter</option>
+              <option value="dht11Oled">DHT11 → OLED Monitor</option>
+              <option value="dht11Rgb">DHT11 → RGB Temperature Alert</option>
+              <option value="dht11Dashboard">DHT11 OpenCV Gauge Dashboard</option>
+            </optgroup>
+            <optgroup label="Displays">
+              <option value="tm1637Display">TM1637 / HW-069 4-Digit Display</option>
+              <option value="lcd1602Display">LCD1602 16×2 I²C Display</option>
+              <option value="diagnosticClock">Clock + Connection Stability Test</option>
+            </optgroup>
+            <optgroup label="OLED 128×64">
+              <option value="oledText">OLED Text Display</option>
+              <option value="oledTextAnimation">OLED Text Animation</option>
+              <option value="oledShapes">OLED Drawing Primitives</option>
+              <option value="ultrasonicOled">Ultrasonic → OLED Text</option>
+              <option value="ultrasonicRadar">Ultrasonic Radar Animation</option>
+              <option value="ultrasonicDistanceBar">Ultrasonic Distance Bar</option>
+            </optgroup>
+            <optgroup label="Universal Hardware Bridge">
+              <option value="universalDigitalOutput">Digital Output / Relay</option>
+              <option value="universalAdcPlot">Any Analog Sensor → Plotter</option>
+              <option value="pwmServo">Physical Servo via PWM</option>
+              <option value="motorDriverUniversal">Motor Driver via GPIO + PWM</option>
+              <option value="i2cScan">I²C Bus Scanner</option>
+              <option value="customI2cDevice">Custom I²C Register Device</option>
+              <option value="gpsUniversal">GPS / GNSS via UART</option>
+              <option value="mpu6050Universal">MPU6050 IMU via I²C</option>
+              <option value="uartUniversal">Generic UART Module</option>
+              <option value="spiUniversal">Generic SPI Module</option>
+              <option value="pulseFrequency">Pulse / Frequency Sensor</option>
+              <option value="counterInput">Interrupt Counter / Flow / RPM</option>
+              <option value="customTransaction">Custom Timing Transaction</option>
+            </optgroup>
+          </select>
+        </label>
+        <button id="loadExampleBtn" class="btn">Load Example</button>
+      </div>
+
+      <div class="project-actions">
+        <button id="newProjectBtn" class="btn primary" title="Create a blank custom project">+ New Project</button>
+        <button id="undoBtn" class="btn" title="Undo (⌘Z / Ctrl+Z)">↶ Undo</button>
+        <button id="redoBtn" class="btn" title="Redo (⌘⇧Z / Ctrl+Y)">↷ Redo</button>
+        <button id="autocompleteBtn" class="btn" title="Show code suggestions">Suggestions</button>
+        <button id="resetBtn" class="btn">Reset</button>
+        <button id="runBtn" class="btn success">▶ Run Code</button>
+        <button id="stopBtn" class="btn danger">■ Stop</button>
+      </div>
+    </section>
+
+    <section class="primary-workspace">
+      <div class="panel editor-panel editor-main-panel">
+        <div class="panel-title editor-title">
+          <div>
+            <strong>main.py</strong>
+            <span class="muted">Student types code here • Live error markers • Variables/functions autocomplete • Ctrl/⌘ + Space suggestions</span>
+          </div>
+          <span id="saveState" class="save-state">Saved</span>
+        </div>
+        <textarea id="codeEditor" spellcheck="false"></textarea>
+        <div id="editorIssueBar" class="editor-issue-bar" hidden></div>
+        <details class="editor-quick-help">
+          <summary>Quick Reference</summary>
+          <div class="help-grid">
+            <code>RGBLED(25,26,27)</code><code>DHT11(13)</code><code>Ultrasonic(14,12)</code><code>OLED(21,22,0x3C)</code>
+            <code>TM1637(13,14)</code><code>LCD1602(21,22,0x27)</code>
+            <code>AnalogInput(34)</code><code>Switch(32)</code><code>RotaryEncoder(32,33,14)</code><code>plot(Temperature=t)</code>
+            <code>dht.temperature()</code><code>dht.humidity()</code><code>dht.get_values()</code><code>oled.display_text("Hello")</code>
+          </div>
+        </details>
+      </div>
+
+      <aside class="utility-column">
+        <section class="panel camera-panel compact-section utility-panel camera-utility">
+          <div class="panel-title compact-title">
+            <strong>Camera / MediaPipe</strong>
+            <div class="camera-head-actions"><span id="cameraIndexText" class="muted">Camera 0</span><button id="cameraToggleBtn" class="btn tiny">Start</button></div>
+          </div>
+          <div class="camera-compact-body">
+            <div class="camera-wrap">
+              <video id="cameraVideo" playsinline muted></video><canvas id="cameraOverlay"></canvas>
+              <img id="cameraResultImage" class="camera-result-image" alt="OpenCV / MediaPipe output">
+              <div id="cameraPlaceholder" class="camera-placeholder">Camera preview</div><div id="cameraResultLabel" class="camera-result-label" hidden>OpenCV Output</div>
+            </div>
+            <div class="ai-stats">
+              <div><span>Hand</span><strong id="handDetected">—</strong></div><div><span>Fingers</span><strong id="fingerCount">0</strong></div>
+              <div><span>Side</span><strong id="handSide">—</strong></div><div><span>Faces</span><strong id="faceCount">0</strong></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel image-load-panel compact-section utility-panel upload-utility">
+          <div class="panel-title compact-title"><strong>Image Upload</strong><button id="clearImageBtn" class="btn tiny">Clear</button></div>
+          <div class="image-loader compact-image-loader">
+            <label class="file-btn"><input id="imageInput" type="file" accept="image/*" multiple><span>Upload Images</span></label>
+            <div class="source-image-wrap"><img id="sourceImagePreview" alt="Loaded source"><div id="sourceImagePlaceholder">No image uploaded</div></div>
+            <div class="image-info-row"><span id="sourceImageInfo" class="muted">Upload image → copy path → use cv2.imread().</span><div class="upload-path-hint"><code>cv2.imread("uploads/image.jpg")</code></div></div>
+            <div id="uploadedFileList" class="uploaded-file-list"><div class="uploaded-empty">Uploaded paths appear here.</div></div>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="panel demo-panel compact-section kit-output-panel">
+      <div class="panel-title compact-title kit-output-title">
+        <div class="kit-title-copy"><strong>Kit Output / Sensors</strong> <span class="muted">auto-arranged from main.py imports / instances</span></div>
+        <div class="hardware-picker-wrap">
+          <select id="hardwarePicker" class="hardware-picker" aria-label="Add kit component"><option value="">+ Add component to main.py…</option></select>
+          <button id="addHardwareBtn" class="btn tiny hardware-add-btn">+ Add</button>
+          <span id="hardwareLimitInfo" class="hardware-limit-info">Select a component</span>
+        </div>
+        <span id="kitNameText" class="muted kit-name-text">ZB-000123</span>
+      </div>
+      <div id="sensorGrid" class="demo-items sensor-grid" aria-live="polite"></div>
+    </section>
+
+    <section class="results-workspace">
+      <section class="panel image-result-panel compact-section imshow-panel">
+        <div class="panel-title compact-title"><strong>OpenCV / imshow Output</strong><span class="muted">cv2.imshow() / show()</span></div>
+        <div id="imageOutput" class="output-view image-output active">
+          <p id="imagePlaceholder">Use <code>cv2.imshow()</code> or <code>show(image)</code> to display a result.</p>
+          <img id="resultImage" alt="OpenCV output">
+        </div>
+      </section>
+
+      <div class="data-output-column">
+        <section class="panel plotter-panel compact-section plotter-lower-panel">
+          <div class="panel-title compact-title">
+            <div><strong>Serial Plotter</strong> <span class="muted">Python <code>plot(...)</code></span></div>
+            <button id="clearPlotterBtn" class="btn tiny">Clear</button>
+          </div>
+          <div class="plotter-body">
+            <canvas id="serialPlotterCanvas" width="1200" height="360" aria-label="Serial Plotter"></canvas>
+            <div id="serialPlotterLegend" class="plotter-legend"><span>No plot data yet</span></div>
+          </div>
+        </section>
+
+        <section class="panel output-panel compact-section terminal-lower-panel">
+          <div class="panel-title compact-title"><strong>Output / Terminal</strong><button id="clearBtn" class="btn tiny">Clear</button></div>
+          <pre id="terminal" class="output-view active">Starting Python worker…</pre>
+        </section>
+      </div>
+    </section>
+
+    <section class="panel workspace-tools-panel compact-section">
+      <div class="panel-title compact-title"><strong>Quick Tools / Project Reference</strong><span class="muted">Useful while building projects</span></div>
+      <div class="workspace-tool-grid">
+        <div class="workspace-tool"><strong>Run</strong><span>▶ Run / ■ End · draft auto-saves</span></div>
+        <div class="workspace-tool"><strong>Sensors</strong><span>DHT11 · Ultrasonic · Analog · Switch · Rotary</span></div>
+        <div class="workspace-tool"><strong>Outputs</strong><span>RGB LED · OLED · OpenCV / imshow</span></div>
+        <div class="workspace-tool"><strong>Graph</strong><span><code>plot(Name=value)</code> for any numeric value</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/mode/python/python.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/closebrackets.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
+
+  <script src="./config.js?v=6.7.0"></script>
+  <script src="./kit-client.js?v=6.7.0"></script>
+  <script src="./ai.js?v=6.7.0"></script>
+  <script src="./app.js?v=6.7.0"></script>
+</body>
+</html>

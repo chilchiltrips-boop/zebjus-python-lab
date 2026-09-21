@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1020">
+  <title>ZEBJUS Python Lab Settings v6.7.0</title>
+  <link rel="stylesheet" href="./styles.css?v=6.7.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+</head>
+<body class="settings-page">
+  <header class="topbar student-topbar settings-topbar">
+    <div>
+      <h1>Student Settings</h1>
+      <p>Simple camera, editor, and kit setup</p>
+    </div>
+    <nav class="workspace-nav" aria-label="Student workspace"><div class="workspace-tabs"><a class="workspace-tab" href="./index.html">Python Lab</a><a class="workspace-tab" href="./circuit.html">Circuit Design</a><a class="workspace-tab" href="./schematic.html">Schematic</a></div></nav>
+    <div class="top-actions"><a class="btn optional-link" href="./firmware.html">Firmware</a><a class="btn primary" href="./index.html">Done</a></div>
+  </header>
+
+  <main class="settings-layout">
+    <section class="panel settings-card">
+      <div class="panel-title"><strong>Camera</strong></div>
+      <div class="settings-body">
+        <label>
+          <span>Camera index / device</span>
+          <select id="cameraSelect">
+            <option value="0">Camera 0 (default)</option>
+          </select>
+        </label>
+        <div class="settings-inline">
+          <button id="allowCameraBtn" class="btn primary">Allow Camera / Detect</button>
+          <button id="refreshCameraBtn" class="btn">Refresh List</button>
+        </div>
+        <label class="switch-row">
+          <div>
+            <strong>Auto-start camera when Run is pressed</strong>
+            <span>If camera permission fails, normal Python can still run; camera projects will stop.</span>
+          </div>
+          <input id="autoCamera" type="checkbox">
+        </label>
+        <p class="muted settings-note">Student code may override this selection with <code>Camera(0)</code>, <code>Camera(1)</code>, etc.</p>
+      </div>
+    </section>
+
+    <section class="panel settings-card kit-settings-card">
+      <div class="panel-title"><strong>Kit Connection</strong><span id="kitConnBadge" class="badge">Not connected</span></div>
+      <div class="settings-body">
+        <label class="switch-row">
+          <div>
+            <strong>Demo mode</strong>
+            <span>ON = force on-screen simulation only. OFF = use the selected ESP32 kit when connected, and automatically fall back to clearly labelled Offline Simulation when it is disconnected.</span>
+          </div>
+          <input id="demoMode" type="checkbox">
+        </label>
+
+        <div class="kit-grid-two">
+          <label>
+            <span>Kit name</span>
+            <input id="kitName" placeholder="zebjus_kit_1" autocomplete="off">
+          </label>
+          <label>
+            <span>Cached IP (primary)</span>
+            <input id="kitIp" placeholder="192.168.1.7" inputmode="decimal">
+          </label>
+        </div>
+
+        <div class="settings-inline">
+          <button id="connectKitBtn" class="btn primary">Connect Kit</button>
+          <button id="scanKitsBtn" class="btn">Scan Default Kits</button>
+          <button id="disconnectKitBtn" class="btn">Disconnect</button>
+        </div>
+
+        <label>
+          <span>Kits found on this Wi-Fi</span>
+          <select id="kitSelect">
+            <option value="">No scan yet</option>
+          </select>
+        </label>
+
+        <div id="kitInfo" class="kit-info-box">Select or enter a kit name, then connect.</div>
+        <p class="muted settings-note">Connection order is cached IP first, then mDNS <code>kit-name.local</code>. The physical Kit ID is verified before the cached address is accepted. Default kits are named <code>zebjus_kit_1</code>, <code>zebjus_kit_2</code>… The browser scans these names plus kits previously used on this device.</p>
+
+        <details class="settings-advanced">
+          <summary><strong>Advanced kit settings</strong><span>Kit name, Wi-Fi, security, and hardware notes</span></summary>
+          <div class="advanced-settings-body">
+        <div class="kit-subsection">
+          <strong>Change unique kit name</strong>
+          <div class="kit-grid-two">
+            <input id="newKitName" placeholder="example: class_a_kit_3" autocomplete="off">
+            <div class="settings-inline">
+              <button id="renameKitBtn" class="btn">Check & Save Name</button>
+              <button id="resetKitNameBtn" class="btn">Reset Auto Name</button>
+            </div>
+          </div>
+          <span id="kitNameMessage" class="muted"></span>
+          <p class="muted settings-note">The Lab saves this kit name/IP locally and verifies the physical chip ID when reconnecting after a temporary reset or power interruption.</p>
+        </div>
+
+        <div class="kit-subsection">
+          <strong>Change Wi-Fi network</strong>
+          <div class="settings-inline">
+            <button id="scanWifiBtn" class="btn">Scan Wi-Fi</button>
+            <button id="resetWifiBtn" class="btn">Forget All Wi-Fi</button>
+          </div>
+          <label>
+            <span>Wi-Fi network</span>
+            <select id="wifiSelect"><option value="">Connect kit first</option></select>
+          </label>
+          <label>
+            <span>Wi-Fi password</span>
+            <input id="wifiPassword" type="password" placeholder="Password">
+          </label>
+          <button id="saveWifiBtn" class="btn primary">Save & Connect to This Wi-Fi</button>
+
+          <div class="saved-wifi-box">
+            <strong>Saved Wi-Fi profiles on this kit</strong>
+            <p class="muted settings-note">SSID + password are saved separately inside this ESP32 kit (NVS). Passwords are never shown back to the browser.</p>
+            <label>
+              <span>Saved network</span>
+              <select id="savedWifiSelect"><option value="">Connect kit first</option></select>
+            </label>
+            <div class="settings-inline">
+              <button id="refreshSavedWifiBtn" class="btn">Refresh Saved</button>
+              <button id="useSavedWifiBtn" class="btn">Use Selected</button>
+              <button id="forgetSavedWifiBtn" class="btn">Forget Selected</button>
+            </div>
+          </div>
+          <span id="wifiMessage" class="muted"></span>
+        </div>
+
+        <div class="kit-subsection">
+          <strong>Optional Per-Kit Secure Mode</strong>
+          <p class="muted settings-note">Default is Trusted LAN, so the existing same-Wi-Fi workflow stays unchanged. Enable Secure Mode when you want this kit to require a private browser token for control, sensor, name and Wi-Fi APIs. Setup AP recovery always remains available.</p>
+          <label>
+            <span>Kit security token</span>
+            <input id="kitToken" type="password" placeholder="32-character token" autocomplete="off">
+          </label>
+          <div class="settings-inline">
+            <button id="generateTokenBtn" class="btn">Generate Token</button>
+            <button id="enableSecurityBtn" class="btn primary">Enable / Save Secure Mode</button>
+            <button id="disableSecurityBtn" class="btn">Disable Secure Mode</button>
+          </div>
+          <span id="securityMessage" class="muted">Trusted LAN mode is the default.</span>
+        </div>
+
+        <div class="kit-subsection">
+          <strong>RGB LED hardware</strong>
+          <p class="muted settings-note">Default physical pins: R=25, G=26, B=27. Student-safe PWM pins: 4, 13, 14, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33.</p>
+          <code>rgb = RGBLED(25, 26, 27)</code>
+          <code>rgb.write(255, 0, 0)</code>
+        </div>
+
+        <label>
+          <span>Secure WebSocket URL (legacy / optional)</span>
+          <input id="wsUrl" placeholder="wss://lab-api.zebjus.com/ws">
+        </label>
+          </div>
+        </details>
+      </div>
+    </section>
+
+
+    <details class="panel settings-card settings-collapsible">
+      <summary class="panel-title"><strong>Demo Sensors</strong><span>Optional</span></summary>
+      <div class="settings-body">
+        <label>
+          <span>Ultrasonic distance: <strong id="demoUltrasonicLabel">45 cm</strong></span>
+          <input id="demoUltrasonic" type="range" min="2" max="400" step="1">
+        </label>
+        <label>
+          <span>Analog demo value: <strong id="demoPotLabel">128 / 255</strong></span>
+          <input id="demoPot" type="range" min="0" max="255" step="1">
+        </label>
+        <p class="muted settings-note">These demo values are used for ultrasonic and analog-input examples while Demo mode is enabled. Physical Switch and RotaryEncoder values require a connected kit.</p>
+      </div>
+    </details>
+
+    <section class="panel settings-card">
+      <div class="panel-title"><strong>Editor</strong></div>
+      <div class="settings-body">
+        <label>
+          <span>Font size</span>
+          <select id="fontSize">
+            <option value="13">13 px</option>
+            <option value="14">14 px</option>
+            <option value="15">15 px</option>
+            <option value="16">16 px</option>
+            <option value="17">17 px</option>
+          </select>
+        </label>
+        <label class="switch-row">
+          <div>
+            <strong>Auto-save student code</strong>
+            <span>Keep code after refresh in this browser.</span>
+          </div>
+          <input id="autoSave" type="checkbox">
+        </label>
+      </div>
+    </section>
+
+    <details class="panel settings-card settings-collapsible">
+      <summary class="panel-title"><strong>Python input()</strong><span>Optional</span></summary>
+      <div class="settings-body">
+        <label>
+          <span>Program Input</span>
+          <textarea id="stdinBox" rows="6" placeholder="One input value per line"></textarea>
+        </label>
+        <p class="muted settings-note">The first line is used by the first <code>input()</code>, the second line by the next one.</p>
+      </div>
+    </details>
+
+    <div class="settings-actions">
+      <button id="saveSettingsBtn" class="btn success">Save Settings</button>
+      <button id="resetSettingsBtn" class="btn">Reset Defaults</button>
+      <span id="settingsSaved" class="muted"></span>
+    </div>
+  </main>
+  <script src="./kit-client.js?v=6.7.0"></script>
+  <script src="./settings.js?v=6.7.0"></script>
+</body>
+</html>

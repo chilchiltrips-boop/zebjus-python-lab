@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <title>ZEBJUS Schematic v6.7.0</title>
+  <link rel="stylesheet" href="./schematic.css?v=6.7.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+</head>
+<body>
+<header class="sch-top student-topbar">
+  <div class="sch-brand"><div class="sch-mark">Z</div><div><h1>Schematic <span>v6.7.0</span></h1><p>Logical view of the same student circuit</p></div></div>
+  <nav class="workspace-nav" aria-label="Student workspace">
+    <div class="workspace-tabs">
+      <a class="workspace-tab" href="./index.html">Python Lab</a>
+      <a class="workspace-tab" href="./circuit.html">Circuit Design</a>
+      <a class="workspace-tab active" aria-current="page" href="./schematic.html">Schematic</a>
+    </div>
+  </nav>
+  <nav class="schematic-actions" aria-label="Schematic actions">
+    <span id="status" class="status-pill">READY</span>
+    <button id="syncBtn" class="primary">Update Python</button>
+    <a class="optional-link" href="./settings.html">Settings</a>
+  </nav>
+</header>
+<div class="mobile-sch"><button id="componentsToggle">Components</button><strong>Schematic</strong><button id="checkToggle">Design Check</button></div>
+<main>
+  <aside id="componentsPanel" class="components-panel">
+    <div class="side-title">Components <span id="count"></span></div>
+    <input id="search" type="search" placeholder="Search component…">
+    <div id="shelf"></div>
+    <p class="aside-note">Click a component to add it. It is added to the same circuit used by Circuit Design and Python Lab.</p>
+  </aside>
+  <section class="sheet-wrap">
+    <div class="sheet-tools">
+      <button id="fitBtn">Fit</button><button id="zoomOutBtn">−</button><span id="zoomLabel">85%</span><button id="zoomInBtn">＋</button><button id="expandBtn">Expand</button>
+      <span class="zoom-note">Mouse wheel: zoom · drag empty space: pan</span>
+      <a href="./circuit.html">Edit wiring</a>
+    </div>
+    <div id="viewport" aria-label="Schematic drawing canvas"><div id="schWorld" class="sch-world" style="width:2040px;height:1360px"><div id="sheet"><svg id="wireSvg"></svg><div id="boardSymbol" class="sch-board"></div><div id="nodes"></div></div></div></div>
+  </section>
+  <aside id="checkPanel" class="right">
+    <div class="side-title">Design Check <span id="issueCount">0</span></div><div id="issues"></div>
+    <div class="side-title top-gap">Shared Project</div><p>Move or add a part here and it appears on Circuit Design too. A valid circuit also updates the generated block in main.py.</p>
+    <div class="aside-actions"><button id="saveBtn">Save</button><button id="reloadBtn">Reload</button><button id="tidyBtn">Tidy</button></div>
+    <div class="side-title top-gap">ESP32 Pin Map</div><div id="pinSummary" class="pin-summary"></div>
+  </aside>
+</main>
+<div id="toast" hidden></div>
+<script src="./component-library.js?v=6.7.0"></script>
+<script src="./circuit-sync.js?v=6.7.0"></script>
+<script src="./schematic.js?v=6.7.0"></script>
+</body>
+</html>
