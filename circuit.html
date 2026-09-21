@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07101d">
+  <title>ZEBJUS Circuit Design v6.7.0</title>
+  <link rel="stylesheet" href="./circuit.css?v=6.7.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+</head>
+<body>
+<header class="c-topbar student-topbar">
+  <div class="brand"><div class="brand-mark">Z</div><div class="brand-copy"><h1>Circuit Design <span>v6.7.0</span></h1><p>Drag 2D parts, connect pins, and build safely</p></div></div>
+  <nav class="workspace-nav" aria-label="Student workspace">
+    <div class="workspace-tabs">
+      <a class="workspace-tab" href="./index.html">Python Lab</a>
+      <a class="workspace-tab active" aria-current="page" href="./circuit.html">Circuit Design</a>
+      <a class="workspace-tab" href="./schematic.html">Schematic</a>
+    </div>
+  </nav>
+  <div class="top-actions">
+    <span id="capabilityBadge" class="status-pill subtle optional-link">Firmware profile</span>
+    <span id="designStatus" class="status-pill">READY</span>
+    <button id="validateBtn" class="tool-btn good optional-link">Check</button>
+    <button id="autoWireBtn" class="tool-btn">Auto Wire</button>
+    <button id="syncBtn" class="tool-btn primary">Update Python</button>
+    <a class="tool-btn optional-link" href="./settings.html">Settings</a>
+  </div>
+</header>
+<div class="mobile-bar">
+  <button id="leftPanelToggle" class="mini-btn">☰ Design</button><strong>Circuit Canvas</strong><button id="shelfPanelToggle" class="mini-btn">Components ▤</button>
+</div>
+<div class="c-shell">
+  <aside id="leftPanel" class="left-panel">
+    <section class="side-section">
+      <div class="section-title"><strong>Design</strong><span id="designName">Circuit 1</span></div>
+      <div class="button-grid"><button id="newCircuitBtn">New</button><button id="saveBtn">Save</button><button id="loadBtn">Reload</button><button id="tidyBtn">Auto Tidy</button></div>
+      <div class="history-row"><button id="undoBtn" class="mini-btn" disabled>↶ Undo</button><button id="redoBtn" class="mini-btn" disabled>↷ Redo</button></div>
+      <label class="toggle-row"><input id="autoSyncToggle" type="checkbox" checked><span>Auto-sync valid circuit block to main.py</span></label>
+    </section>
+    <section class="side-section inspector-section">
+      <div class="section-title"><strong>Inspector</strong><span id="selectionKind">Nothing selected</span></div>
+      <div id="inspectorEmpty" class="empty-card">Select a component, wire, or board pin. Component settings such as I²C address, bus, UART port, baud and SPI mode appear here.</div>
+      <div id="inspector" hidden></div>
+    </section>
+    <details class="side-section compact-rules">
+      <summary class="section-title"><strong>Pin Rules</strong><span>Show guide</span></summary>
+      <div class="rule-list">
+        <div><i class="dot adc"></i><b>ADC1</b><span>32, 33, 34, 35, 36, 39</span></div>
+        <div><i class="dot pwm"></i><b>PWM / OUT</b><span>Output-capable GPIO only</span></div>
+        <div><i class="dot input"></i><b>Digital IN</b><span>Input-capable GPIO only</span></div>
+        <div><i class="dot i2c"></i><b>I²C / SPI</b><span>Bus lines may be shared correctly</span></div>
+        <div><i class="dot warning"></i><b>34/35/36/39</b><span>Input-only · GPIO12 boot-sensitive special input</span></div>
+      </div>
+    </details>
+    <section class="side-section issues-section">
+      <div class="section-title"><strong>Design Check</strong><span id="issueCount">0 issues</span></div>
+      <div id="issueList" class="issue-list"><div class="ok-message">No circuit issues detected.</div></div>
+    </section>
+  </aside>
+  <main class="designer-main">
+    <div class="canvas-toolbar">
+      <div class="wire-tools"><button id="selectToolBtn" class="mini-btn active">Select</button><button id="wireToolBtn" class="mini-btn">Wire</button><button id="deleteBtn" class="mini-btn danger">Delete</button><button id="focusBtn" class="mini-btn">Focus Wires</button></div>
+      <div class="canvas-size"><span>Canvas <b id="canvasSizeLabel">2400×1600</b></span><button id="expandCanvasBtn" class="mini-btn">＋ Expand</button><button id="fitBtn" class="mini-btn">Fit</button></div>
+      <div class="zoom-tools"><button id="zoomOutBtn" class="mini-btn">−</button><input id="zoomRange" aria-label="Canvas zoom" type="range" min="35" max="180" value="80"><span id="zoomLabel">80%</span><button id="zoomInBtn" class="mini-btn">＋</button></div>
+    </div>
+    <div id="canvasViewport" class="canvas-viewport" aria-label="Circuit drawing canvas">
+      <div id="canvasWorld" class="canvas-world" style="width:1920px;height:1280px">
+      <div id="canvasStage" class="canvas-stage" style="width:2400px;height:1600px">
+        <svg id="wireLayer" class="wire-layer" width="2400" height="1600" viewBox="0 0 2400 1600" aria-label="Circuit wiring"></svg>
+        <div id="boardNode" class="board-node" data-node-id="board">
+          <div class="node-drag-handle board-drag"><span>MAIN CONTROLLER</span><b>ZEBJUS ESP32</b></div>
+          <img src="./esp32-devkit-2d.svg" alt="ESP32 DevKit pin layout">
+          <div id="boardPorts" class="board-ports"></div>
+        </div>
+        <div id="componentLayer" class="component-layer"></div>
+        <div id="wireHint" class="wire-hint" hidden>Choose a highlighted compatible ESP32 pin.</div>
+        <div id="canvasResizeHandle" class="canvas-resize-handle" title="Drag to resize drawing area">↘</div>
+      </div>
+      </div>
+    </div>
+    <footer class="canvas-footer">
+      <div class="legend"><span><i data-sig="adc"></i>Analog</span><span><i data-sig="digitalIn"></i>Input</span><span><i data-sig="digitalOut"></i>Output</span><span><i data-sig="pwmOut"></i>PWM</span><span><i data-sig="i2cSda"></i>Bus</span><span><i data-sig="gnd"></i>GND</span><span><i data-sig="3v3"></i>Power</span></div>
+      <div id="canvasMessage">Drag a part to move it. Drag empty space to pan. Mouse wheel zooms. Click a part pin, then a green board pin.</div>
+    </footer>
+  </main>
+  <aside id="shelfPanel" class="shelf-panel">
+    <div class="shelf-head"><div><strong>2D Components</strong><span id="componentCount">0 devices</span></div><span class="shelf-mode">2D ONLY</span></div>
+    <div class="shelf-search"><input id="componentSearch" type="search" placeholder="Search component…"><select id="groupFilter"><option value="">All groups</option></select></div>
+    <div id="componentShelf" class="component-shelf"></div>
+    <div class="shelf-note"><b>How to use:</b> drag a part onto the canvas, move it where you want, then click its pin and a green ESP32 pin. Wires follow while parts move.</div>
+  </aside>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="./kit-client.js?v=6.7.0"></script>
+<script src="./component-library.js?v=6.7.0"></script>
+<script src="./circuit-sync.js?v=6.7.0"></script>
+<script src="./circuit.js?v=6.7.0"></script>
+</body>
+</html>
