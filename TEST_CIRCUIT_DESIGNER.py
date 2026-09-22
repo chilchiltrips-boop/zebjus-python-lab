@@ -98,4 +98,27 @@ for f in svg:
     r=ET.parse(f).getroot();assert r.tag.endswith('svg') and r.attrib.get('data-realistic')=='top-view'
 for name in ('tm1637-2d.svg','lcd1602-2d.svg','ultrasonic-2d.svg','zebjus-custom-board-38pin-2d.svg'):
     txt=(ROOT/name).read_text();assert '<text' in txt and ('GPIO' in txt or 'VCC' in txt or name=='zebjus-custom-board-38pin-2d.svg')
-print(f'Circuit Designer v6.8.0 regression PASS: 80/80 devices; 38-pin custom board; UART/SPI/I2C combinations; BroadcastChannel sync; LIVE insertion; limits; migration; generated Python compile/signature execution; {len(svg)} realistic 2D SVG/XML assets valid')
+
+# Pin-safe shared router + interactive simulation profiles cover every component.
+SIM_NODE=r'''
+const fs=require('fs'),vm=require('vm');
+for(const file of process.argv.slice(1))vm.runInThisContext(fs.readFileSync(file,'utf8'),{filename:file});
+const L=ZebjusCircuitLibrary,S=ZebjusCircuitSimulator,R=ZebjusWireRouter;
+const missing=L.COMPONENTS.filter(c=>!S.TYPE_KIND[c.type]).map(c=>c.type),states=L.COMPONENTS.map((c,i)=>({type:c.type,...S.valueFor(c,1.25,i)}));
+const gas={type:'GasSensor',simulation:{source:true,gasType:'Smoke',concentration:1000,freshAir:0,humidity:50,alarm:true}},gasDirty=S.valueFor(gas,0,0);gas.simulation.freshAir=90;const gasVentilated=S.valueFor(gas,0,0);
+const led={type:'SingleLED',simulation:{enabled:true,mode:'Blink',level:100,rate:1}},ledOn=S.valueFor(led,.1,0),ledOff=S.valueFor(led,.6,0);
+const motor={type:'DCMotor',simulation:{enabled:true,throttle:80,direction:'CCW',load:20,sound:true}},motorState=S.valueFor(motor,1,0);
+const pins=[{x:100,y:100,key:'start',radius:18},{x:300,y:100,key:'end',radius:18},{x:200,y:100,key:'blocked',radius:18},{x:200,y:140,key:'blocked2',radius:18}];
+const route=R.route({start:pins[0],end:pins[1],startLead:{x:100,y:130},endLead:{x:300,y:130},pins,exclude:['start','end'],bounds:{minX:0,minY:0,maxX:400,maxY:300}}),label=R.labelPlacement({points:route.points,text:'SIG→GPIO32',pins,exclude:['start','end'],bounds:{minX:0,minY:0,maxX:400,maxY:300}});
+const occupied=[],multi=[];for(let i=0;i<24;i++){const y=35+(i%8)*28,a={x:25,y},b={x:375,y:45+(i%12)*18},r=R.route({start:a,startLead:{x:47,y},end:b,endLead:{x:353,y:b.y},pins,exclude:[],occupied,index:i,bounds:{minX:0,minY:0,maxX:400,maxY:300}});occupied.push(r.points);multi.push(r)}
+const congestion=multi.reduce((total,r,i)=>{const c=R.congestionScore(r.points,multi.slice(0,i));total.overlaps+=c.overlaps;total.crossings+=c.crossings;return total},{overlaps:0,crossings:0});
+process.stdout.write(JSON.stringify({count:L.COMPONENTS.length,profiles:Object.keys(S.TYPE_KIND).length,missing,validStates:states.every(x=>typeof x.value==='string'&&Number.isFinite(x.level)&&x.level>=0&&x.level<=100),gasDirty,gasVentilated,ledOn,ledOff,motorState,route,label,multiConflicts:multi.reduce((n,r)=>n+r.conflicts.length,0),congestion}));
+'''
+sim_data=json.loads(subprocess.check_output(['node','-e',SIM_NODE,str(ROOT/'component-library.js'),str(ROOT/'circuit-simulator.js'),str(ROOT/'wire-router.js')],text=True))
+assert sim_data['count']==80 and sim_data['profiles']==80 and not sim_data['missing'] and sim_data['validStates']
+assert sim_data['gasDirty']['ppm']>sim_data['gasVentilated']['ppm'] and sim_data['gasDirty']['raw']>sim_data['gasVentilated']['raw']
+assert sim_data['ledOn']['active'] is True and sim_data['ledOff']['active'] is False
+assert sim_data['motorState']['direction']=='CCW' and sim_data['motorState']['rpm']>0 and sim_data['motorState']['sound']['type']=='motor'
+assert not sim_data['route']['conflicts'] and len(sim_data['route']['points'])>=4 and sim_data['label']['width']>=72
+assert sim_data['multiConflicts']==0 and sim_data['congestion']['overlaps']>=0
+print(f'Circuit Designer v6.8.1 regression PASS: 80/80 devices + simulation profiles; pin-safe shared router; gas/air mixing; motor/LED effects; 38-pin board; UART/SPI/I2C combinations; BroadcastChannel sync; generated Python; {len(svg)} realistic 2D assets')

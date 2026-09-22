@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.8.0 — Custom Board Simulation
+# ZEBJUS Python Lab v6.8.1 — Custom Board Simulation
 
 Student-focused browser lab with three linked pages:
 
@@ -15,14 +15,17 @@ The browser interface does not present the controller as a generic development b
 ## Circuit Design highlights
 
 - 80 realistic top-view 2D components; no 3D mode or 3D assets.
-- Wires render in a high front layer, with white underlay and readable labels, so they stay visible across part artwork.
+- Shared pin-safe routing keeps every wire away from unrelated component and board pin holes. Rounded orthogonal routes remain attached after page changes, browser back/forward, zoom changes, and layout reflow.
+- Wire text uses opaque label pills in a final top layer, so another wire can never cover the text. Labels and animated dash flow show controller-to-part, part-to-controller, return, and bidirectional direction correctly.
 - Component and board dragging, pin-hotspot wiring, mouse-wheel zoom, canvas pan, fit, resize, rotate, flip, undo, redo, validation, and auto-wiring.
-- Live Run/Stop simulation animates wire current and shows changing values for motors, LEDs, displays, environment sensors, IMUs, distance sensors, counters, buses, keypad, RTC, and more.
+- Live Run/Stop simulation animates directional wire current and shows component-specific effects: LED blink/pulse, colour patterns, displays, motor/servo/fan motion, bus traffic, sensor response, meters, and status values.
+- Selecting any component opens an **Interactive Simulation** panel. All 80 component types have suitable controls. Examples include temperature/humidity/pressure, distance, light, soil/water/rain, motion, load, voltage/current, motor direction/load, PWM, sound, RFID, GPS, radio, CAN, and display content.
+- The gas test combines gas type, concentration, fresh-air flow, and humidity to calculate effective ppm, ADC value, and CLEAN/MODERATE/DANGER output. Motor, buzzer, relay, servo, alarm, and UI click sounds use optional browser audio.
 - Circuit state and generated Python remain shared between Circuit Design, Schematic, and Python Lab.
 
 ## Component/runtime expansion
 
-v6.8.0 adds 35 components, including DC and TT motors, stepper motor, BLDC ESC, fan, pump, solenoid, vibration motor, PCA9685, LSM6DS3, BME280, BMP280, ADXL345, BH1750, VL53L0X, DS18B20, HX711, RC522, MicroSD, MAX7219, NeoPixel, keypad, DS3231, LoRa, CAN, and 7-segment output.
+The retained v6.8.0 expansion added 35 components, including DC and TT motors, stepper motor, BLDC ESC, fan, pump, solenoid, vibration motor, PCA9685, LSM6DS3, BME280, BMP280, ADXL345, BH1750, VL53L0X, DS18B20, HX711, RC522, MicroSD, MAX7219, NeoPixel, keypad, DS3231, LoRa, CAN, and 7-segment output. v6.8.1 adds pin-safe wiring and interactive behavior profiles for the full 80-part catalog.
 
 Matching `zebjus` Python classes are available to generated/student code. The browser simulation supplies changing values without a connected kit; generic bridge operations are retained for connected hardware.
 
@@ -43,4 +46,4 @@ Run the release verification with:
 python3 VERIFY_RELEASE.py
 ```
 
-Firmware stays at v2.5.0. The browser application version is v6.8.0.
+Firmware stays at v2.5.0. The browser application version is v6.8.1.

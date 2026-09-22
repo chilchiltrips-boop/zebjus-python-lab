@@ -2,7 +2,7 @@ from pathlib import Path
 from html.parser import HTMLParser
 import subprocess, sys, re, json, xml.etree.ElementTree as ET
 ROOT=Path(__file__).resolve().parent
-VERSION='6.8.0'; FW_VERSION='2.5.0'
+VERSION='6.8.1'; FW_VERSION='2.5.0'
 
 class P(HTMLParser):
     def __init__(self): super().__init__(); self.ids=[]; self.refs=[]
@@ -23,7 +23,7 @@ if extra: raise SystemExit('Unexpected folders in flat GitHub package: '+', '.jo
 js_files=sorted(ROOT.glob('*.js'))
 for js in js_files:
     subprocess.check_call(['node','--check',str(js)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-required_js={'app.js','kit-client.js','py-worker.js','settings.js','ai.js','camera-bridge.js','component-library.js','circuit-sync.js','circuit-simulator.js','circuit.js','schematic.js','firmware-updater.js'}
+required_js={'app.js','kit-client.js','py-worker.js','settings.js','ai.js','camera-bridge.js','component-library.js','circuit-sync.js','wire-router.js','circuit-simulator.js','circuit.js','schematic.js','firmware-updater.js'}
 missing=required_js-{x.name for x in js_files}
 if missing: raise SystemExit('Missing JS: '+', '.join(sorted(missing)))
 
@@ -66,8 +66,8 @@ for m in ('.tm1637-card','.lcd1602-screen','zebjusDisplayPulse'):
     if m not in styles: raise SystemExit('Display CSS missing: '+m)
 
 # Student workspace / 2D Circuit Designer.
-cl=(ROOT/'component-library.js').read_text(); cs=(ROOT/'circuit-sync.js').read_text(); cj=(ROOT/'circuit.js').read_text(); cc=(ROOT/'circuit.css').read_text(); sj=(ROOT/'schematic.js').read_text()
-for m in ('VERSION:"6.8.0"','FIRMWARE:"2.5.0"','COMPONENTS=','BOARD_PINS=','PHYSICAL_PIN_COUNT:38','BOARD_NAME:"ZEBJUS Custom Board 38-Pin Expansion"','c.asset2d=`./${c.slug}-2d.svg`'):
+cl=(ROOT/'component-library.js').read_text(); cs=(ROOT/'circuit-sync.js').read_text(); cj=(ROOT/'circuit.js').read_text(); cc=(ROOT/'circuit.css').read_text(); sj=(ROOT/'schematic.js').read_text(); router=(ROOT/'wire-router.js').read_text()
+for m in ('VERSION:"6.8.1"','FIRMWARE:"2.5.0"','COMPONENTS=','BOARD_PINS=','PHYSICAL_PIN_COUNT:38','BOARD_NAME:"ZEBJUS Custom Board 38-Pin Expansion"','c.asset2d=`./${c.slug}-2d.svg`'):
     if m not in cl: raise SystemExit('Component library marker missing: '+m)
 if 'asset3d' in cl: raise SystemExit('3D component metadata remains in component-library.js')
 for m in ('flipX','flipY','rotation:0','applyGeneratedBlock','allocateUARTPorts','allocateSPIBuses'):
@@ -75,12 +75,14 @@ for m in ('flipX','flipY','rotation:0','applyGeneratedBlock','allocateUARTPorts'
 for m in ('BroadcastChannel','zebjus-circuit-design-v2','onDesignChange','publishDesign'):
     if m not in cs: raise SystemExit('Cross-page circuit sync marker missing: '+m)
 if 'Number.isFinite(bx)?bx:940' not in cs or 'Number.isFinite(by)?by:420' not in cs: raise SystemExit('Circuit board zero-position fix missing')
-for m in ('stagePoint(el)','componentTransform(c)','data-orient','Flip H','Flip V','wirePath(a,b,i)','pin-hotspot','startCanvasPan','addEventListener(\'wheel\'','canvasWorld','m.asset2d'):
+for m in ('stagePoint(el)','stage.offsetWidth','componentTransform(c)','data-orient','Flip H','Flip V','pinKeepouts()','R.route','wire-label-layer','wire-label-bg','queueWireReflow','addEventListener(\'pageshow\'','visibilitychange','wireFlow(kind)','pin-hotspot','startCanvasPan','addEventListener(\'wheel\'','canvasWorld','m.asset2d'):
     if m not in cj: raise SystemExit('Circuit interaction marker missing: '+m)
-for m in ('startPan','addEventListener("wheel"','schWorld','syncIfValid','startBoardDrag'):
+for m in ('startPan','addEventListener("wheel"','schWorld','syncIfValid','startBoardDrag','renderSchematicWires','sch-label-layer','schematicWireFlow'):
     if m not in sj: raise SystemExit('Schematic interaction marker missing: '+m)
-for m in ('component-visual-shell','component-visual','pin-hotspot','orientation-tools','wire-under'):
+for m in ('component-visual-shell','component-visual','pin-hotspot','orientation-tools','wire-under','wire-label-bg','simulation-lab','wire-group.flowing'):
     if m not in cc: raise SystemExit('Circuit visual marker missing: '+m)
+for m in ('routePinConflicts','scorePrepared','congestionScore','roundedPath','labelPlacement','distancePointToSegment'):
+    if m not in router: raise SystemExit('Pin-safe wire router marker missing: '+m)
 if './zebjus-custom-board-38pin-2d.svg' not in (ROOT/'circuit.html').read_text(): raise SystemExit('ZEBJUS custom board asset is not flat/root-level')
 if (ROOT/'esp32-devkit-2d.svg').exists(): raise SystemExit('Obsolete board artwork remains')
 for page in ('index.html','circuit.html','schematic.html','settings.html'):
@@ -92,7 +94,7 @@ for page in ('index.html','circuit.html','schematic.html'):
     text=(ROOT/page).read_text()
     if ('workspaceRunBtn' if page=='index.html' else 'runSimulationBtn') not in text: raise SystemExit(f'{page} missing top Run button')
 sim=(ROOT/'circuit-simulator.js').read_text()
-for m in ('ZebjusCircuitSimulator','StepperMotor','BME280','valueFor','setInterval'):
+for m in ('ZebjusCircuitSimulator','StepperMotor','BME280','valueFor','setInterval','TYPE_KIND','profileFor','controlsFor','setControl','Air / gas mix','Fresh-air flow','Motor sound'):
     if m not in sim: raise SystemExit('Working circuit simulation marker missing: '+m)
 for m in ('.wire-layer{z-index:40;', 'simulation-running .wire-main'):
     if m not in cc: raise SystemExit('Front-wire/simulation CSS marker missing: '+m)
@@ -152,4 +154,6 @@ for feature in ('display_transport_resume_fix','stable_firmware_kit_identity','s
     if not bc.get('features',{}).get(feature): raise SystemExit('BUILD_CHECK missing bugfix feature: '+feature)
 for feature in ('student_workspace_tabs','two_dimensional_only','realistic_top_view_parts','mouse_wheel_zoom','canvas_drag_pan','live_wire_follow','broadcast_design_sync','simplified_student_settings'):
     if not bc.get('features',{}).get(feature): raise SystemExit('BUILD_CHECK missing student-workspace feature: '+feature)
+for feature in ('pin_safe_wire_routing','top_layer_wire_labels','page_return_wire_reflow','directional_current_flow','interactive_component_simulation','all_80_simulation_profiles','sensor_test_controls','gas_air_mixing','simulation_audio_effects','button_press_feedback'):
+    if not bc.get('features',{}).get(feature): raise SystemExit('BUILD_CHECK missing v6.8.1 feature: '+feature)
 print(f'ZEBJUS v{VERSION} release verification PASS ({len(js_files)} JS, {len(examples)} examples, 80 circuit components, 38-pin custom board, {len(svg)} 2D SVG assets, firmware v{FW_VERSION}; browser UI {browser_state})')

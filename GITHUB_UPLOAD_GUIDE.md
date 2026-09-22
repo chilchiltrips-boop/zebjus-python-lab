@@ -1,4 +1,4 @@
-# GitHub Upload — ZEBJUS Python Lab v6.8.0
+# GitHub Upload — ZEBJUS Python Lab v6.8.1
 
 GitHub’s browser uploader asks for fewer than 100 files at a time. The companion upload package is therefore split into safe batches:
 
@@ -10,4 +10,4 @@ Do not upload the numbered wrapper folders themselves. Select their contents so 
 
 After upload, `index.html`, `circuit.html`, `schematic.html`, all JS/CSS/SVG/docs/tests should be at root. The only project subfolder should be `esp32_firmware/`.
 
-The full release contains 164 root-level files plus one firmware file. The first batch uses 99, safely below the uploader limit.
+The full release contains 165 root-level files plus one firmware file. The first batch uses 99 and the second uses 66, both safely below the uploader limit.

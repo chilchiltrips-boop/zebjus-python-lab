@@ -1,6 +1,6 @@
 {
-  "release": "ZEBJUS Python Lab v6.8.0 Custom Board Simulation FINAL",
-  "ui_version": "6.8.0",
+  "release": "ZEBJUS Python Lab v6.8.1 Pin-Safe Interactive Simulation FINAL",
+  "ui_version": "6.8.1",
   "firmware": "2.5.0",
   "examples_count": 46,
   "circuit_components": 80,
@@ -42,6 +42,16 @@
     "run_button_all_main_pages": true,
     "motor_component_pack": true,
     "extended_python_component_drivers": true,
-    "python_lab_aurora_grid_theme": true
+    "python_lab_aurora_grid_theme": true,
+    "pin_safe_wire_routing": true,
+    "top_layer_wire_labels": true,
+    "page_return_wire_reflow": true,
+    "directional_current_flow": true,
+    "interactive_component_simulation": true,
+    "all_80_simulation_profiles": true,
+    "sensor_test_controls": true,
+    "gas_air_mixing": true,
+    "simulation_audio_effects": true,
+    "button_press_feedback": true
   }
 }

@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <title>ZEBJUS Circuit Design v6.8.0</title>
-  <link rel="stylesheet" href="./circuit.css?v=6.8.0">
-  <link rel="stylesheet" href="./workspace-nav.css?v=6.8.0">
+  <title>ZEBJUS Circuit Design v6.8.1</title>
+  <link rel="stylesheet" href="./circuit.css?v=6.8.1">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.8.1">
 </head>
 <body>
 <header class="c-topbar student-topbar">
-  <div class="brand"><div class="brand-mark">Z</div><div class="brand-copy"><h1>Circuit Design <span>v6.8.0</span></h1><p>Realistic 2D parts · 38-pin custom expansion board</p></div></div>
+  <div class="brand"><div class="brand-mark">Z</div><div class="brand-copy"><h1>Circuit Design <span>v6.8.1</span></h1><p>Realistic 2D parts · 38-pin custom expansion board</p></div></div>
   <nav class="workspace-nav" aria-label="Student workspace">
     <div class="workspace-tabs">
       <a class="workspace-tab" href="./index.html">Python Lab</a>
@@ -41,7 +41,7 @@
     </section>
     <section class="side-section inspector-section">
       <div class="section-title"><strong>Inspector</strong><span id="selectionKind">Nothing selected</span></div>
-      <div id="inspectorEmpty" class="empty-card">Select a component, wire, or board pin. Component settings such as I²C address, bus, UART port, baud and SPI mode appear here.</div>
+      <div id="inspectorEmpty" class="empty-card">Select a component to open its wiring, settings, and Interactive Simulation controls. Sensor inputs, motor load/direction, LED patterns, display values, and sound can be tested here.</div>
       <div id="inspector" hidden></div>
     </section>
     <details class="side-section compact-rules">
@@ -82,21 +82,22 @@
     </div>
     <footer class="canvas-footer">
       <div class="legend"><span><i data-sig="adc"></i>Analog</span><span><i data-sig="digitalIn"></i>Input</span><span><i data-sig="digitalOut"></i>Output</span><span><i data-sig="pwmOut"></i>PWM</span><span><i data-sig="i2cSda"></i>Bus</span><span><i data-sig="gnd"></i>GND</span><span><i data-sig="3v3"></i>3.3V/5V</span><span><i data-sig="12v"></i>12V</span></div>
-      <div id="canvasMessage">Drag a part to move it. Drag empty space to pan. Mouse wheel zooms. Click a part pin, then a green board pin.</div>
+      <div id="canvasMessage">Drag parts freely. Wires stay attached, route around other pins, and keep labels above every wire. Mouse wheel zooms; drag empty space to pan.</div>
     </footer>
   </main>
   <aside id="shelfPanel" class="shelf-panel">
     <div class="shelf-head"><div><strong>2D Components</strong><span id="componentCount">0 devices</span></div><span class="shelf-mode">2D ONLY</span></div>
     <div class="shelf-search"><input id="componentSearch" type="search" placeholder="Search component…"><select id="groupFilter"><option value="">All groups</option></select></div>
     <div id="componentShelf" class="component-shelf"></div>
-    <div class="shelf-note"><b>How to use:</b> drag a part onto the canvas, move it where you want, then click its pin and a green custom-board pin. Wires stay in front and follow while parts move.</div>
+    <div class="shelf-note"><b>How to use:</b> add a part, click its pin and a green board pin, then select the part to test it. Pin-safe wires stay attached after moving, zooming, or switching pages.</div>
   </aside>
 </div>
 <div id="toast" class="toast" hidden></div>
-<script src="./kit-client.js?v=6.8.0"></script>
-<script src="./component-library.js?v=6.8.0"></script>
-<script src="./circuit-sync.js?v=6.8.0"></script>
-<script src="./circuit-simulator.js?v=6.8.0"></script>
-<script src="./circuit.js?v=6.8.0"></script>
+<script src="./kit-client.js?v=6.8.1"></script>
+<script src="./component-library.js?v=6.8.1"></script>
+<script src="./circuit-sync.js?v=6.8.1"></script>
+<script src="./wire-router.js?v=6.8.1"></script>
+<script src="./circuit-simulator.js?v=6.8.1"></script>
+<script src="./circuit.js?v=6.8.1"></script>
 </body>
 </html>

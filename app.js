@@ -32,7 +32,7 @@
   function displayQueueSnapshot(){return [...displayHardwareQueues.entries()].map(([key,q])=>({key,busy:!!q.busy,paused:!!q.paused,pauseReason:String(q.pauseReason||""),pending:Number(q.pending?.length||0),hasLatest:!!q.latest,deviceError:String(q.deviceError||""),retryInMs:q.retryAfter?Math.max(0,Math.round(q.retryAfter-Date.now())):0}));}
   function buildDebugReport(){
     const now=Date.now(),code=getCode?.()||"";
-    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.8.0",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
+    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.8.1",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
       page:{url:location.href,protocol:location.protocol,embedded:isEmbedded,visibility:document.visibilityState,userAgent:navigator.userAgent,online:navigator.onLine},
       run:{running,liveMode,currentRunUsesKit,currentRunNeedsKit,liveSessionId},
       kit:{name:prefs.kitName||prefs.kitId||"",chipId:String(prefs.kitChipId||""),cachedIp:prefs.kitIp||"",base:kitClient?.base||"",connected:!!kitClient?.connected,lastGoodAgeMs:Number.isFinite(kitClient?.lastGoodAgeMs)?Math.round(kitClient.lastGoodAgeMs):null,failureCount:kitFailureCount,failureLimit:KIT_FAILURE_LIMIT,everConnected:kitEverConnected,reconnectBusy:kitReconnectBusy,heartbeatBusy:kitHeartbeatPingBusy,status:sanitizedKitStatus()},
@@ -1407,7 +1407,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.8.0",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.8.1",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};

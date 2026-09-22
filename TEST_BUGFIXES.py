@@ -5,6 +5,8 @@ app=(ROOT/'app.js').read_text()
 circuit=(ROOT/'circuit-sync.js').read_text()
 updater=(ROOT/'firmware-updater.js').read_text()
 verifier=(ROOT/'VERIFY_RELEASE.py').read_text()
+circuit_ui=(ROOT/'circuit.js').read_text()
+router=(ROOT/'wire-router.js').read_text()
 
 # Display queues paused by a lost transport must be tagged so reconnect resumes them.
 assert 'if(q.pauseReason!=="device"){q.paused=true;q.pauseReason="transport";}' in app
@@ -19,6 +21,12 @@ assert app.count('applyPendingCircuitCode')>=7
 assert 'Number.isFinite(bx)?bx:940' in circuit
 assert 'Number.isFinite(by)?by:420' in circuit
 
+# Wire endpoints use the rendered transform scale and are recomputed after page restoration.
+for marker in ('stage.offsetWidth','stage.offsetHeight','queueWireReflow','addEventListener(\'pageshow\'','visibilitychange'):
+    assert marker in circuit_ui
+for marker in ('routePinConflicts','scorePrepared','labelPlacement','roundedPath'):
+    assert marker in router
+
 # Firmware Center targets a stable identity, loads the matched Settings token, and gives esptool Uint8Array data.
 assert 'function kitKey(' in updater and 'function selectedKit(' in updater
 assert 'known().find(x=>kitKey(x)===key)' in updater
@@ -29,4 +37,4 @@ assert 'fileArray:[{data:fw.bytes,address:0x10000}]' in updater
 
 # Full release verification now includes the browser/UI regression.
 assert "'TEST_CIRCUIT_UI_BROWSER.py'" in verifier
-print('v6.8.0 retained bugfix regression PASS: reconnect queues, stable kit identity, secure token, USB bytes, board edge, queued circuit sync, browser QA')
+print('v6.8.1 retained bugfix regression PASS: reconnect queues, stable kit identity, secure token, USB bytes, board edge, queued circuit sync, transformed-scale/page-return wiring, browser QA')

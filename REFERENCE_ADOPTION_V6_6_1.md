@@ -1,4 +1,4 @@
-# Reference Adoption — retained in v6.8.0
+# Reference Adoption — retained in v6.8.1
 
 Source reference: `ZEBJUS_F450_Drone_Lab_V18_3_16_BOARD_AUTO_FW_UI.zip`.
 
