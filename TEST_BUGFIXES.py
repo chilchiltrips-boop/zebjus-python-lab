@@ -29,4 +29,4 @@ assert 'fileArray:[{data:fw.bytes,address:0x10000}]' in updater
 
 # Full release verification now includes the browser/UI regression.
 assert "'TEST_CIRCUIT_UI_BROWSER.py'" in verifier
-print('v6.7.0 bugfix regression PASS: reconnect queues, stable kit identity, secure token, USB bytes, board edge, queued circuit sync, browser QA')
+print('v6.8.0 retained bugfix regression PASS: reconnect queues, stable kit identity, secure token, USB bytes, board edge, queued circuit sync, browser QA')

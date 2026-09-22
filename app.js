@@ -32,7 +32,7 @@
   function displayQueueSnapshot(){return [...displayHardwareQueues.entries()].map(([key,q])=>({key,busy:!!q.busy,paused:!!q.paused,pauseReason:String(q.pauseReason||""),pending:Number(q.pending?.length||0),hasLatest:!!q.latest,deviceError:String(q.deviceError||""),retryInMs:q.retryAfter?Math.max(0,Math.round(q.retryAfter-Date.now())):0}));}
   function buildDebugReport(){
     const now=Date.now(),code=getCode?.()||"";
-    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.7.0",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
+    return {report:"ZEBJUS Python Lab Debug Report",uiVersion:"6.8.0",createdAt:new Date().toISOString(),traceUptimeMs:now-debugStartedAt,
       page:{url:location.href,protocol:location.protocol,embedded:isEmbedded,visibility:document.visibilityState,userAgent:navigator.userAgent,online:navigator.onLine},
       run:{running,liveMode,currentRunUsesKit,currentRunNeedsKit,liveSessionId},
       kit:{name:prefs.kitName||prefs.kitId||"",chipId:String(prefs.kitChipId||""),cachedIp:prefs.kitIp||"",base:kitClient?.base||"",connected:!!kitClient?.connected,lastGoodAgeMs:Number.isFinite(kitClient?.lastGoodAgeMs)?Math.round(kitClient.lastGoodAgeMs):null,failureCount:kitFailureCount,failureLimit:KIT_FAILURE_LIMIT,everConnected:kitEverConnected,reconnectBusy:kitReconnectBusy,heartbeatBusy:kitHeartbeatPingBusy,status:sanitizedKitStatus()},
@@ -268,7 +268,7 @@ while True:
 from zebjus import Ultrasonic, sleep
 
 # TRIG=GPIO18, ECHO=GPIO19
-# IMPORTANT: HC-SR04 ECHO is 5V. Use a voltage divider / level shifter to ESP32 ECHO GPIO.
+# IMPORTANT: HC-SR04 ECHO is 5V. Use a voltage divider / level shifter before the 3.3V controller input.
 ultra = Ultrasonic(18, 19)
 
 while True:
@@ -529,7 +529,7 @@ while True:
     gpsUniversal:`# GPS / GNSS over UART (NEO-6M / NEO-7M / M8N NMEA)
 from zebjus import GPS, plot, sleep
 
-# GPS TX -> ESP32 RX34, GPS RX -> ESP32 TX16
+# GPS TX -> controller RX34, GPS RX -> controller TX16
 gps = GPS(rx=34, tx=16, baud=9600, port=1)
 
 while True:
@@ -640,20 +640,83 @@ while True:
     print(f"CLOCK {h:02d}:{m:02d}:{sec:02d}")
     sleep(0.5)`,
 
-    customTransaction:`# Custom Timing Sensor - Local ESP32 Transaction VM
+    customTransaction:`# Custom Timing Sensor - Local Controller Transaction VM
 from zebjus import HardwareTransaction, sleep
 
 txn = HardwareTransaction("my_sensor")
 
 while True:
-    # Operations run locally on ESP32, so microsecond timing is not affected by Wi-Fi.
+    # Operations run locally on the ZEBJUS controller, so microsecond timing is not affected by Wi-Fi.
     result = txn.run([
         ("MODE", 34, "IN"),
         ("PULSEIN", 34, 1, 100000),
     ])
     if result:
         print("Captured pulse:", result[0], "us")
-    sleep(0.15)`
+    sleep(0.15)`,
+
+    dcMotorLab:`# ZEBJUS Custom Board - DC Motor
+from zebjus import DCMotor, sleep
+
+# H-bridge: IN1=16, IN2=17, PWM=18
+motor = DCMotor(16, 17, 18)
+
+while True:
+    motor.ramp(80, duration=1.0)
+    sleep(1)
+    motor.stop()
+    sleep(0.5)
+    motor.backward(55)
+    sleep(1)
+    motor.brake()
+    sleep(0.5)`,
+
+    stepperLab:`# 4-Wire Stepper Motor
+from zebjus import StepperMotor, sleep
+
+stepper = StepperMotor(16, 17, 18, 19, steps_per_revolution=2048)
+
+while True:
+    stepper.rotate(90, rpm=12)
+    sleep(0.4)
+    stepper.rotate(-90, rpm=12)
+    sleep(0.4)`,
+
+    lsm6ds3Lab:`# LSM6DS3 Motion Sensor
+from zebjus import LSM6DS3, plot, sleep
+
+imu = LSM6DS3(sda=21, scl=22, address=0x6B)
+
+while True:
+    data = imu.read()
+    print(data)
+    if "accel_x" in data:
+        plot(X=data["accel_x"], Y=data["accel_y"], Z=data["accel_z"])
+    sleep(0.1)`,
+
+    bme280Lab:`# BME280 Environment Monitor
+from zebjus import BME280, plot, sleep
+
+sensor = BME280(sda=21, scl=22, address=0x76)
+
+while True:
+    data = sensor.read()
+    print("Temperature:", data.get("temperature"), "Humidity:", data.get("humidity"), "Pressure:", data.get("pressure"))
+    if "temperature" in data:
+        plot(Temperature=data["temperature"], Humidity=data["humidity"], Pressure=data["pressure"])
+    sleep(0.5)`,
+
+    neoPixelLab:`# NeoPixel Color Animation
+from zebjus import NeoPixel, sleep
+
+pixels = NeoPixel(pin=4, count=8, brightness=0.7)
+colors = [(255, 30, 0), (0, 180, 255), (80, 255, 40), (180, 40, 255)]
+
+while True:
+    for color in colors:
+        pixels.fill(color)
+        print("NeoPixel:", color)
+        sleep(0.4)`
   };
 
   const libraries=[
@@ -676,6 +739,7 @@ while True:
       ["DigitalOutput","class","DigitalOutput","Universal digital output"],["Relay","class","Relay","Relay / digital output"],["GPIOInput","class","GPIOInput","Universal GPIO input"],["ADC","class","ADC","Raw ADC1 interface"],["PWM","class","PWM","Generic LEDC PWM output"],["PWMServo","class","PWMServo","Physical servo using generic PWM"],["MotorDriver","class","MotorDriver","2 direction pins + PWM"],
       ["I2C","class","I2C","Generic I²C bus; custom sensor drivers"],["I2CDevice","class","I2CDevice","Generic addressed I²C device"],["UART","class","UART","Generic UART for GPS/RFID/serial modules"],["SPI","class","SPI","Generic SPI bus"],["PulseInput","class","PulseInput","Pulse width / frequency sensor"],["PulseOutput","class","PulseOutput","Precise pulse output"],["CounterInput","class","CounterInput","Interrupt-backed pulse counter / flow / RPM"],["HardwareTransaction","class","HardwareTransaction","Local GPIO/pulse transaction VM"],
       ["GPS","class","GPS","NMEA GPS over UART"],["MPU6050","class","MPU6050","I²C IMU driver"],["LDR","class","LDR","ADC light sensor"],["SoilMoisture","class","SoilMoisture","ADC soil sensor"],["GasSensor","class","GasSensor","ADC gas sensor"],["VoltageSensor","class","VoltageSensor","ADC voltage sensor"],["SoundSensor","class","SoundSensor","ADC sound level sensor"],["RainSensor","class","RainSensor","ADC rain sensor"],["WaterLevelSensor","class","WaterLevelSensor","ADC water level sensor"],["Thermistor","class","Thermistor","ADC thermistor input"],["PIRSensor","class","PIRSensor","Digital motion sensor"],["ReedSwitch","class","ReedSwitch","Magnetic reed switch"],["TouchSensor","class","TouchSensor","Digital touch module"],["FlameSensor","class","FlameSensor","Digital flame module"],["FlowSensor","class","FlowSensor","Pulse flow sensor"],["RPMSensor","class","RPMSensor","Pulse RPM sensor"],["Buzzer","class","Buzzer","PWM buzzer output"],["Joystick","class","Joystick","Dual ADC joystick + switch"],["dashboard","function","dashboard","Show custom live sensor card"],
+      ["DCMotor","class","DCMotor","H-bridge DC motor"],["TTGearMotor","class","TTGearMotor","TT geared motor"],["StepperMotor","class","StepperMotor","4-wire stepper motor"],["BLDCESC","class","BLDCESC","Brushless ESC"],["FanMotor","class","FanMotor","PWM fan"],["WaterPump","class","WaterPump","Switched pump"],["Solenoid","class","Solenoid","Switched solenoid"],["VibrationMotor","class","VibrationMotor","PWM vibration motor"],["PCA9685","class","PCA9685","16-channel PWM expander"],["LSM6DS3","class","LSM6DS3","6-axis IMU"],["BME280","class","BME280","Temperature humidity pressure"],["BMP280","class","BMP280","Temperature pressure"],["ADXL345","class","ADXL345","3-axis accelerometer"],["BH1750","class","BH1750","Digital light sensor"],["VL53L0X","class","VL53L0X","Time-of-flight distance"],["DS18B20","class","DS18B20","One-wire temperature"],["IRObstacle","class","IRObstacle","IR obstacle sensor"],["IRReceiver","class","IRReceiver","IR remote receiver"],["LineSensor","class","LineSensor","Robot line sensor"],["HallSensor","class","HallSensor","Hall pulse sensor"],["FlexSensor","class","FlexSensor","Analog flex sensor"],["CurrentSensor","class","CurrentSensor","Analog current sensor"],["HX711","class","HX711","Load-cell amplifier"],["RC522","class","RC522","RFID reader"],["MicroSD","class","MicroSD","MicroSD module"],["MAX7219","class","MAX7219","LED matrix driver"],["NeoPixel","class","NeoPixel","Addressable RGB pixels"],["Keypad4x4","class","Keypad4x4","Matrix keypad"],["DS3231","class","DS3231","Real-time clock"],["LoRaSX1278","class","LoRaSX1278","LoRa radio"],["MCP2515","class","MCP2515","CAN controller"],["PhotoInterrupt","class","PhotoInterrupt","Photointerrupter counter"],["TiltSensor","class","TiltSensor","Digital tilt switch"],["LaserModule","class","LaserModule","Laser output"],["SevenSegment","class","SevenSegment","Single 7-segment display"],
       ["Motor","class","Motor","Legacy bridge API"],["Servo","class","Servo","Legacy bridge API"],["sleep","function","sleep","Delay"]
     ],
     zebjus_ai:[["HandDetector","class","HandDetector","Hand detector"],["HandResult","class","HandResult","Hand result"],["FaceDetector","class","FaceDetector","Face detector"],["FaceResult","class","FaceResult","Face result"]],
@@ -761,7 +825,7 @@ while True:
 
   function inferType(code,name){
     const esc=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    for(const type of ["RGBLED","LED","TM1637","LCD1602","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
+    for(const type of ["RGBLED","LED","TM1637","LCD1602","DHT11","SerialPlotter","OLED","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","DCMotor","TTGearMotor","StepperMotor","BLDCESC","FanMotor","WaterPump","Solenoid","VibrationMotor","PCA9685","LSM6DS3","BME280","BMP280","ADXL345","BH1750","VL53L0X","DS18B20","IRObstacle","IRReceiver","LineSensor","HallSensor","FlexSensor","CurrentSensor","HX711","RC522","MicroSD","MAX7219","NeoPixel","Keypad4x4","DS3231","LoRaSX1278","MCP2515","PhotoInterrupt","TiltSensor","LaserModule","SevenSegment","Motor","Servo","Camera","HandDetector","FaceDetector","SerialObject","handDetector","WifiBridge"]){
       if(new RegExp("\\b"+esc+"\\s*=\\s*"+type+"\\s*\\(").test(code))return type;
     }
     if(new RegExp("\\b"+esc+"\\s*=\\s*LED\\d+\\s*\\(").test(code))return "SingleLED";
@@ -778,7 +842,7 @@ while True:
 
   // ---------- GPIO pin assistance / validation ----------
   // v6.2 uses one live resource model for autocomplete, shared buses, Add Component, linting and dashboard order.
-  // Classic ESP32 DevKit: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
+  // ZEBJUS 38-pin controller core: 15 safe output/PWM pins; 19 general digital inputs; 6 Wi-Fi-safe ADC1 pins.
   const RGB_OUTPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33];
   const ANALOG_INPUT_PINS=[32,33,34,35,36,39];
   const DIGITAL_INPUT_PINS=[4,13,14,16,17,18,19,21,22,23,25,26,27,32,33,34,35,36,39];
@@ -1271,13 +1335,14 @@ while True:
   function badge(el,t,m=""){el.textContent=t;el.className="badge"+(m?" "+m:"");}
 
   function updateRunControls(){
-    const run=$("runBtn"),end=$("stopBtn");
+    const run=$("runBtn"),end=$("stopBtn"),workspaceRun=$("workspaceRunBtn");
     if(!run||!end)return;
     run.disabled=!!running;
     end.disabled=!running;
     run.classList.toggle("run-faded",!!running);
     end.classList.toggle("end-active",!!running);
     run.setAttribute("aria-pressed",running?"true":"false");
+    if(workspaceRun){workspaceRun.textContent=running?"■ Stop":"▶ Run";workspaceRun.classList.toggle("running",running);workspaceRun.setAttribute("aria-pressed",running?"true":"false")}
   }
 
   function showCameraProcessedImage(url,title="OpenCV Output"){
@@ -1342,7 +1407,7 @@ while True:
 
   function createWorker(){
     if(worker)worker.terminate();
-    worker=new Worker("./py-worker.js?v=6.7.0",{type:"module"});
+    worker=new Worker("./py-worker.js?v=6.8.0",{type:"module"});
     badge($("pythonStatus"),"Python loading…","warn");
     worker.onmessage=e=>{
       const m=e.data||{};
@@ -2723,7 +2788,7 @@ while True:
 
   $("loadExampleBtn").onclick=()=>setCode(examples[$("exampleSelect").value]||examples.ledBasic);
   $("newProjectBtn").onclick=newProject;
-  $("resetBtn").onclick=()=>setCode(examples.ledBasic);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;$("clearBtn").onclick=()=>terminal.textContent="";
+  $("resetBtn").onclick=()=>setCode(examples.ledBasic);$("runBtn").onclick=runCode;$("stopBtn").onclick=stopProgram;if($("workspaceRunBtn"))$("workspaceRunBtn").onclick=()=>running?stopProgram():runCode();$("clearBtn").onclick=()=>terminal.textContent="";
   updateRunControls();
   $("cameraToggleBtn").onclick=()=>cameraRunning?stopCamera():startCamera();
   $("autocompleteBtn").onclick=()=>editor?.showHint({hint:CodeMirror.hint.zebjusPython,completeSingle:false});

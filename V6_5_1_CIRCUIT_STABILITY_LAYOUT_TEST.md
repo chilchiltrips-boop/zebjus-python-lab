@@ -10,7 +10,7 @@ python3 TEST_CONNECTION_STABILITY.py
 python3 VERIFY_RELEASE.py
 ```
 
-Expected v6.7.0 circuit regression: 45/45 supported devices, UART/SPI/I²C combination rules, duplicate I²C address rejection, firmware slot limits, LIVE `while True` insertion, v1→v2 migration, generated Python compile/stub-execute and 46 valid 2D SVG/XML assets.
+Current v6.8.0 circuit regression: 80/80 supported devices, 38-pin ZEBJUS Custom Board, UART/SPI/I²C combination rules, duplicate I²C address rejection, firmware slot limits, LIVE `while True` insertion, v1→v2 migration, generated Python compile/stub-execute and 81 valid 2D SVG/XML assets.
 
 Manual UI smoke test:
 - desktop: Inspector / canvas / component shelf must not overlap; fields align and remain inside panels;

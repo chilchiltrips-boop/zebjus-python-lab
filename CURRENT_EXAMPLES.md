@@ -1,4 +1,4 @@
-# ZEBJUS Python Lab v6.4.5 — 40 Current Examples
+# ZEBJUS Python Lab v6.8.0 — 46 Current Examples
 
 1. **RGB LED Basic Colors** — `ledBasic`
 2. **RGB LED Blink** — `ledBlink`
@@ -39,4 +39,10 @@
 37. **Interrupt Counter - Flow / Hall / RPM Sensor** — `counterInput`
 38. **HW-069 / TM1637 4-Digit Display** — `tm1637Display`
 39. **LCD1602 16x2 with I2C backpack** — `lcd1602Display`
-40. **Custom Timing Sensor - Local ESP32 Transaction VM** — `customTransaction`
+40. **Clock + Connection Stability Test** — `diagnosticClock`
+41. **Custom Timing Sensor - Local Controller Transaction VM** — `customTransaction`
+42. **ZEBJUS Custom Board DC Motor** — `dcMotorLab`
+43. **4-Wire Stepper Motor** — `stepperLab`
+44. **LSM6DS3 Motion Sensor** — `lsm6ds3Lab`
+45. **BME280 Environment Monitor** — `bme280Lab`
+46. **NeoPixel Color Animation** — `neoPixelLab`

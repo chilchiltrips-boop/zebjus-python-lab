@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <title>ZEBJUS Circuit Design v6.7.0</title>
-  <link rel="stylesheet" href="./circuit.css?v=6.7.0">
-  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+  <title>ZEBJUS Circuit Design v6.8.0</title>
+  <link rel="stylesheet" href="./circuit.css?v=6.8.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.8.0">
 </head>
 <body>
 <header class="c-topbar student-topbar">
-  <div class="brand"><div class="brand-mark">Z</div><div class="brand-copy"><h1>Circuit Design <span>v6.7.0</span></h1><p>Drag 2D parts, connect pins, and build safely</p></div></div>
+  <div class="brand"><div class="brand-mark">Z</div><div class="brand-copy"><h1>Circuit Design <span>v6.8.0</span></h1><p>Realistic 2D parts · 38-pin custom expansion board</p></div></div>
   <nav class="workspace-nav" aria-label="Student workspace">
     <div class="workspace-tabs">
       <a class="workspace-tab" href="./index.html">Python Lab</a>
@@ -21,6 +21,7 @@
   <div class="top-actions">
     <span id="capabilityBadge" class="status-pill subtle optional-link">Firmware profile</span>
     <span id="designStatus" class="status-pill">READY</span>
+    <button id="runSimulationBtn" class="tool-btn run-simulation">▶ Run Simulation</button>
     <button id="validateBtn" class="tool-btn good optional-link">Check</button>
     <button id="autoWireBtn" class="tool-btn">Auto Wire</button>
     <button id="syncBtn" class="tool-btn primary">Update Python</button>
@@ -69,18 +70,18 @@
       <div id="canvasStage" class="canvas-stage" style="width:2400px;height:1600px">
         <svg id="wireLayer" class="wire-layer" width="2400" height="1600" viewBox="0 0 2400 1600" aria-label="Circuit wiring"></svg>
         <div id="boardNode" class="board-node" data-node-id="board">
-          <div class="node-drag-handle board-drag"><span>MAIN CONTROLLER</span><b>ZEBJUS ESP32</b></div>
-          <img src="./esp32-devkit-2d.svg" alt="ESP32 DevKit pin layout">
+          <div class="node-drag-handle board-drag"><span>38-PIN EXPANSION</span><b>ZEBJUS CUSTOM BOARD</b></div>
+          <img src="./zebjus-custom-board-38pin-2d.svg" alt="ZEBJUS Custom Board 38-pin expansion layout">
           <div id="boardPorts" class="board-ports"></div>
         </div>
         <div id="componentLayer" class="component-layer"></div>
-        <div id="wireHint" class="wire-hint" hidden>Choose a highlighted compatible ESP32 pin.</div>
+        <div id="wireHint" class="wire-hint" hidden>Choose a highlighted compatible custom-board pin.</div>
         <div id="canvasResizeHandle" class="canvas-resize-handle" title="Drag to resize drawing area">↘</div>
       </div>
       </div>
     </div>
     <footer class="canvas-footer">
-      <div class="legend"><span><i data-sig="adc"></i>Analog</span><span><i data-sig="digitalIn"></i>Input</span><span><i data-sig="digitalOut"></i>Output</span><span><i data-sig="pwmOut"></i>PWM</span><span><i data-sig="i2cSda"></i>Bus</span><span><i data-sig="gnd"></i>GND</span><span><i data-sig="3v3"></i>Power</span></div>
+      <div class="legend"><span><i data-sig="adc"></i>Analog</span><span><i data-sig="digitalIn"></i>Input</span><span><i data-sig="digitalOut"></i>Output</span><span><i data-sig="pwmOut"></i>PWM</span><span><i data-sig="i2cSda"></i>Bus</span><span><i data-sig="gnd"></i>GND</span><span><i data-sig="3v3"></i>3.3V/5V</span><span><i data-sig="12v"></i>12V</span></div>
       <div id="canvasMessage">Drag a part to move it. Drag empty space to pan. Mouse wheel zooms. Click a part pin, then a green board pin.</div>
     </footer>
   </main>
@@ -88,13 +89,14 @@
     <div class="shelf-head"><div><strong>2D Components</strong><span id="componentCount">0 devices</span></div><span class="shelf-mode">2D ONLY</span></div>
     <div class="shelf-search"><input id="componentSearch" type="search" placeholder="Search component…"><select id="groupFilter"><option value="">All groups</option></select></div>
     <div id="componentShelf" class="component-shelf"></div>
-    <div class="shelf-note"><b>How to use:</b> drag a part onto the canvas, move it where you want, then click its pin and a green ESP32 pin. Wires follow while parts move.</div>
+    <div class="shelf-note"><b>How to use:</b> drag a part onto the canvas, move it where you want, then click its pin and a green custom-board pin. Wires stay in front and follow while parts move.</div>
   </aside>
 </div>
 <div id="toast" class="toast" hidden></div>
-<script src="./kit-client.js?v=6.7.0"></script>
-<script src="./component-library.js?v=6.7.0"></script>
-<script src="./circuit-sync.js?v=6.7.0"></script>
-<script src="./circuit.js?v=6.7.0"></script>
+<script src="./kit-client.js?v=6.8.0"></script>
+<script src="./component-library.js?v=6.8.0"></script>
+<script src="./circuit-sync.js?v=6.8.0"></script>
+<script src="./circuit-simulator.js?v=6.8.0"></script>
+<script src="./circuit.js?v=6.8.0"></script>
 </body>
 </html>

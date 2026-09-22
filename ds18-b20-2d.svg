@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="DS18B20 Temperature Probe top view" data-realistic="top-view">
+<metadata>2D top-view, real-part-inspired educational illustration. Pin order matches the ZEBJUS wiring model.</metadata>
+<defs>
+ <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4f7f8"/><stop offset=".42" stop-color="#aeb8bf"/><stop offset=".72" stop-color="#e4eaed"/><stop offset="1" stop-color="#7d8991"/></linearGradient>
+ <linearGradient id="chip" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#39434a"/><stop offset="1" stop-color="#14191d"/></linearGradient>
+ <radialGradient id="led" cx="35%" cy="28%"><stop stop-color="#fff"/><stop offset=".18" stop-color="#ffef8a"/><stop offset=".55" stop-color="#ffd234"/><stop offset="1" stop-color="#cc7b00"/></radialGradient>
+ <radialGradient id="rgb" cx="35%" cy="28%"><stop stop-color="#fff"/><stop offset=".22" stop-color="#ff6580"/><stop offset=".52" stop-color="#6f82ff"/><stop offset=".8" stop-color="#40dca0"/><stop offset="1" stop-color="#2853a3"/></radialGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#334a5a" flood-opacity=".28"/></filter>
+ <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".35"/></filter>
+</defs>
+<rect width="320" height="180" rx="14" fill="#f6f8fa"/>
+<rect x="8" y="5" width="304" height="21" rx="7" fill="#e8eef3" stroke="#d3dde5"/>
+<text x="16" y="19" text-anchor="start" fill="#18364c" font-size="10" font-family="Inter,Arial,sans-serif" font-weight="800">DS18B20 Temperature Probe</text>
+<g><path d="M160 45v70" stroke="#c7d0d5" stroke-width="18" stroke-linecap="round"/><rect x="148" y="35" width="24" height="52" rx="12" fill="url(#metal)" stroke="#68747c" stroke-width="3"/><path d="M151 114l-42 25M160 114v31M169 114l42 25" stroke-width="4" stroke-linecap="round" stroke="#cf4747"/></g><text x="160" y="24" text-anchor="middle" fill="#314452" font-size="8" font-family="Inter,Arial,sans-serif" font-weight="700">WATERPROOF TEMPERATURE PROBE</text>
+<rect x="72.0" y="140" width="16" height="21" rx="3" fill="#202a31"/><circle cx="80.0" cy="150" r="5.5" fill="#e34b4b" stroke="#f5d878" stroke-width="2"/><text x="80.0" y="172" text-anchor="middle" fill="#283d4f" font-size="7" font-family="Inter,Arial,sans-serif" font-weight="700">3V3</text><rect x="152.0" y="140" width="16" height="21" rx="3" fill="#202a31"/><circle cx="160.0" cy="150" r="5.5" fill="#4b5563" stroke="#f5d878" stroke-width="2"/><text x="160.0" y="172" text-anchor="middle" fill="#283d4f" font-size="7" font-family="Inter,Arial,sans-serif" font-weight="700">GND</text><rect x="232.0" y="140" width="16" height="21" rx="3" fill="#202a31"/><circle cx="240.0" cy="150" r="5.5" fill="#e6a728" stroke="#f5d878" stroke-width="2"/><text x="240.0" y="172" text-anchor="middle" fill="#283d4f" font-size="7" font-family="Inter,Arial,sans-serif" font-weight="700">DATA</text>
+</svg>

@@ -40,7 +40,7 @@ process.stdout.write(JSON.stringify({out,sharedIssues:si,pairs:{sda:[...(pairs.i
 '''
 raw=subprocess.check_output(['node','-e',NODE,str(ROOT/'component-library.js'),str(ROOT/'circuit-sync.js')],text=True)
 data=json.loads(raw)
-assert data['count']==45
+assert data['count']==80
 fail=[]
 for item in data['out']:
     errs=[x for x in item['issues'] if x.get('level')=='error']
@@ -68,7 +68,8 @@ assert data['orient']['rotation']==90 and data['orient']['flipX'] is True and da
 # Generated code compilation plus keyword-signature validation.
 allowed={
 'RGBLED':set(),'TM1637':{'clk','dio','brightness'},'LCD1602':{'sda','scl','address','bus'},'OLED':{'sda','scl','address'},'DHT11':{'pin'},'Ultrasonic':{'trig','echo'},
-'Potentiometer':{'pin'},'AnalogInput':{'pin'},'Switch':{'pin'},'DigitalInput':{'pin'},'RotaryEncoder':{'clk','dt','switch'},'DigitalOutput':{'pin'},'GPIOInput':{'pin'},'PulseInput':{'pin'},'PulseOutput':{'pin'},'CounterInput':{'pin','edge','pullup'},'Relay':{'pin'},'ADC':{'pin'},'LDR':{'pin'},'SoilMoisture':{'pin'},'GasSensor':{'pin'},'VoltageSensor':{'pin'},'SoundSensor':{'pin'},'RainSensor':{'pin'},'WaterLevelSensor':{'pin'},'Thermistor':{'pin'},'PWM':{'pin','frequency','resolution'},'PWMServo':{'pin','min_us','max_us','frequency'},'MotorDriver':{'in1','in2','pwm_pin','frequency'},'I2C':{'sda','scl','frequency','bus'},'I2CDevice':{'address','sda','scl','frequency','bus'},'UART':{'rx','tx','baud','port'},'GPS':{'rx','tx','baud','port'},'SPI':{'sck','miso','mosi','cs','frequency','mode','bus','lsb_first','active_low'},'HardwareTransaction':set(),'MPU6050':{'sda','scl','address','bus'},'PIRSensor':{'pin'},'ReedSwitch':{'pin'},'TouchSensor':{'pin'},'FlameSensor':{'pin'},'FlowSensor':{'pin','pulses_per_liter','edge','pullup'},'RPMSensor':{'pin','pulses_per_revolution','edge','pullup'},'Buzzer':{'pin','frequency'},'Joystick':{'x_pin','y_pin','switch_pin'}
+'Potentiometer':{'pin'},'AnalogInput':{'pin'},'Switch':{'pin'},'DigitalInput':{'pin'},'RotaryEncoder':{'clk','dt','switch'},'DigitalOutput':{'pin'},'GPIOInput':{'pin'},'PulseInput':{'pin'},'PulseOutput':{'pin'},'CounterInput':{'pin','edge','pullup'},'Relay':{'pin'},'ADC':{'pin'},'LDR':{'pin'},'SoilMoisture':{'pin'},'GasSensor':{'pin'},'VoltageSensor':{'pin'},'SoundSensor':{'pin'},'RainSensor':{'pin'},'WaterLevelSensor':{'pin'},'Thermistor':{'pin'},'PWM':{'pin','frequency','resolution'},'PWMServo':{'pin','min_us','max_us','frequency'},'MotorDriver':{'in1','in2','pwm_pin','frequency'},'I2C':{'sda','scl','frequency','bus'},'I2CDevice':{'address','sda','scl','frequency','bus'},'UART':{'rx','tx','baud','port'},'GPS':{'rx','tx','baud','port'},'SPI':{'sck','miso','mosi','cs','frequency','mode','bus','lsb_first','active_low'},'HardwareTransaction':set(),'MPU6050':{'sda','scl','address','bus'},'PIRSensor':{'pin'},'ReedSwitch':{'pin'},'TouchSensor':{'pin'},'FlameSensor':{'pin'},'FlowSensor':{'pin','pulses_per_liter','edge','pullup'},'RPMSensor':{'pin','pulses_per_revolution','edge','pullup'},'Buzzer':{'pin','frequency'},'Joystick':{'x_pin','y_pin','switch_pin'},
+'DCMotor':{'in1','in2','pwm_pin','frequency'},'TTGearMotor':{'in1','in2','pwm_pin','frequency'},'StepperMotor':{'in1','in2','in3','in4','steps_per_revolution'},'BLDCESC':{'pin','frequency'},'FanMotor':{'pin'},'WaterPump':{'pin'},'Solenoid':{'pin'},'VibrationMotor':{'pin'},'PCA9685':{'sda','scl','address','bus','frequency'},'LSM6DS3':{'sda','scl','address','bus'},'BME280':{'sda','scl','address','bus'},'BMP280':{'sda','scl','address','bus'},'ADXL345':{'sda','scl','address','bus'},'BH1750':{'sda','scl','address','bus'},'VL53L0X':{'sda','scl','address','bus'},'DS18B20':{'pin'},'IRObstacle':{'pin'},'IRReceiver':{'pin'},'LineSensor':{'pin'},'HallSensor':{'pin'},'FlexSensor':{'pin'},'CurrentSensor':{'pin'},'HX711':{'data_pin','clock_pin','scale'},'RC522':{'sck','miso','mosi','cs','bus'},'MicroSD':{'sck','miso','mosi','cs','bus'},'MAX7219':{'sck','miso','mosi','cs','bus','brightness'},'NeoPixel':{'pin','count'},'Keypad4x4':{'rows','cols'},'DS3231':{'sda','scl','address','bus'},'LoRaSX1278':{'sck','miso','mosi','cs','bus','frequency'},'MCP2515':{'sck','miso','mosi','cs','interrupt_pin','bus','bitrate'},'PhotoInterrupt':{'pin'},'TiltSensor':{'pin'},'LaserModule':{'pin'},'SevenSegment':{'pins'}
 }
 class Stub:
     def __init__(self,*args,**kwargs): self.args=args;self.kwargs=kwargs
@@ -90,11 +91,11 @@ for code in all_codes:
 sys.modules['zebjus']=z
 for code in all_codes: exec(compile(code,'<circuit-exec>','exec'),{}, {})
 # 2D-only SVG validation + pin-label evidence.
-svg=list(ROOT.glob('*.svg'));assert len(svg)==46
+svg=list(ROOT.glob('*.svg'));assert len(svg)==81
 assert not list(ROOT.glob('*-3d.svg'))
 assert all(f.name.endswith('-2d.svg') for f in svg)
 for f in svg:
     r=ET.parse(f).getroot();assert r.tag.endswith('svg') and r.attrib.get('data-realistic')=='top-view'
-for name in ('tm1637-2d.svg','lcd1602-2d.svg','ultrasonic-2d.svg','esp32-devkit-2d.svg'):
-    txt=(ROOT/name).read_text();assert '<text' in txt and ('GPIO' in txt or 'VCC' in txt or name=='esp32-devkit-2d.svg')
-print(f'Circuit Designer v6.7.0 regression PASS: 45/45 devices; UART/SPI/I2C combinations; BroadcastChannel sync; LIVE insertion; limits; migration; generated Python compile/signature execution; {len(svg)} realistic 2D SVG/XML assets valid')
+for name in ('tm1637-2d.svg','lcd1602-2d.svg','ultrasonic-2d.svg','zebjus-custom-board-38pin-2d.svg'):
+    txt=(ROOT/name).read_text();assert '<text' in txt and ('GPIO' in txt or 'VCC' in txt or name=='zebjus-custom-board-38pin-2d.svg')
+print(f'Circuit Designer v6.8.0 regression PASS: 80/80 devices; 38-pin custom board; UART/SPI/I2C combinations; BroadcastChannel sync; LIVE insertion; limits; migration; generated Python compile/signature execution; {len(svg)} realistic 2D SVG/XML assets valid')

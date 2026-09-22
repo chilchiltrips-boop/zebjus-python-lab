@@ -1,14 +1,13 @@
-# GitHub Upload — v6.7.0
+# GitHub Upload — ZEBJUS Python Lab v6.8.0
 
-Upload the contents of the final folder directly to the GitHub Pages repository root.
+GitHub’s browser uploader asks for fewer than 100 files at a time. The companion upload package is therefore split into safe batches:
 
-If GitHub reports **“Try uploading fewer than 100 at a time”**, use the supplied upload-batch ZIP. Upload every file from `01_UPLOAD_FIRST` first, then every file from `02_UPLOAD_NEXT`, always targeting the same repository root. The two folders are upload batches only; do not upload the batch-folder names themselves.
+1. Open `01_UPLOAD_FIRST_99_FILES` and upload its **99 contents** to the repository root.
+2. Open `02_UPLOAD_REMAINING_ROOT_FILES` and upload all of its contents to the same repository root.
+3. Create/open the repository folder `esp32_firmware`, then upload the one file from `03_UPLOAD_FIRMWARE/esp32_firmware` there.
 
-## Folder rule
-- Website HTML/JS/CSS/SVG/docs/tests: **root level**
-- Only subfolder: `esp32_firmware/`
-- `esp32_firmware/` contains only `ZEBJUS_Kit_Universal_Hardware_Bridge_WiFi_v2_5_0.ino`
+Do not upload the numbered wrapper folders themselves. Select their contents so the website files remain at repository root.
 
-Do not create `assets/`, `tools/`, or nested website folders. Component preview SVGs are root-level so GitHub Pages path resolution is simple and reliable.
+After upload, `index.html`, `circuit.html`, `schematic.html`, all JS/CSS/SVG/docs/tests should be at root. The only project subfolder should be `esp32_firmware/`.
 
-After upload, open `index.html`; use the top **Circuit Design** tab for 2D wiring and **Firmware** for update/recovery.
+The full release contains 164 root-level files plus one firmware file. The first batch uses 99, safely below the uploader limit.

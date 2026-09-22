@@ -1,10 +1,10 @@
 {
-  "release": "ZEBJUS Python Lab v6.7.0 Student Circuit Studio FINAL",
-  "ui_version": "6.7.0",
+  "release": "ZEBJUS Python Lab v6.8.0 Custom Board Simulation FINAL",
+  "ui_version": "6.8.0",
   "firmware": "2.5.0",
-  "examples_count": 41,
-  "circuit_components": 45,
-  "circuit_svg_assets": 46,
+  "examples_count": 46,
+  "circuit_components": 80,
+  "circuit_svg_assets": 81,
   "features": {
     "reference_ui_adoption": true,
     "pin_hotspot_wiring": true,
@@ -34,6 +34,14 @@
     "simplified_student_settings": true,
     "stable_local_link_retained": true,
     "device_fault_isolation_retained": true,
-    "protected_runtime_retained": true
+    "protected_runtime_retained": true,
+    "zebjus_custom_board_38_pin": true,
+    "expansion_power_12v_5v_3v3": true,
+    "front_layer_wiring": true,
+    "working_circuit_simulation": true,
+    "run_button_all_main_pages": true,
+    "motor_component_pack": true,
+    "extended_python_component_drivers": true,
+    "python_lab_aurora_grid_theme": true
   }
 }
