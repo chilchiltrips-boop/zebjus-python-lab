@@ -8,8 +8,8 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/lib/codemirror.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/hint/show-hint.css">
-  <link rel="stylesheet" href="./styles.css?v=6.7.0">
-  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+  <link rel="stylesheet" href="./styles.css?v=6.8.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.8.0">
 </head>
 <body>
   <div id="editorLoadError" class="fatal-banner" hidden>
@@ -18,7 +18,7 @@
 
   <header class="topbar student-topbar">
     <div>
-      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.7.0</span>
+      <h1>ZEBJUS Python Lab</h1> <span class="build-version">v6.8.0</span>
       <p>Write and run student Python projects</p>
     </div>
     <nav class="workspace-nav" aria-label="Student workspace">
@@ -29,6 +29,7 @@
       </div>
     </nav>
     <div class="top-actions">
+      <button id="workspaceRunBtn" class="btn workspace-run" type="button">▶ Run</button>
       <span id="pythonStatus" class="badge warn">Python loading…</span>
       <span id="kitStatus" class="badge">Demo mode</span>
       <span id="aiStatus" class="badge">Camera off</span>
@@ -97,6 +98,13 @@
               <option value="pulseFrequency">Pulse / Frequency Sensor</option>
               <option value="counterInput">Interrupt Counter / Flow / RPM</option>
               <option value="customTransaction">Custom Timing Transaction</option>
+            </optgroup>
+            <optgroup label="Custom Board & Motors">
+              <option value="dcMotorLab">DC Motor Speed & Direction</option>
+              <option value="stepperLab">Stepper Motor Rotation</option>
+              <option value="lsm6ds3Lab">LSM6DS3 Motion Sensor</option>
+              <option value="bme280Lab">BME280 Environment Monitor</option>
+              <option value="neoPixelLab">NeoPixel Color Animation</option>
             </optgroup>
           </select>
         </label>
@@ -226,9 +234,9 @@
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/edit/matchbrackets.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.21/addon/selection/active-line.js"></script>
 
-  <script src="./config.js?v=6.7.0"></script>
-  <script src="./kit-client.js?v=6.7.0"></script>
-  <script src="./ai.js?v=6.7.0"></script>
-  <script src="./app.js?v=6.7.0"></script>
+  <script src="./config.js?v=6.8.0"></script>
+  <script src="./kit-client.js?v=6.8.0"></script>
+  <script src="./ai.js?v=6.8.0"></script>
+  <script src="./app.js?v=6.8.0"></script>
 </body>
 </html>

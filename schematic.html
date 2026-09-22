@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07101d">
-  <title>ZEBJUS Schematic v6.7.0</title>
-  <link rel="stylesheet" href="./schematic.css?v=6.7.0">
-  <link rel="stylesheet" href="./workspace-nav.css?v=6.7.0">
+  <title>ZEBJUS Schematic v6.8.0</title>
+  <link rel="stylesheet" href="./schematic.css?v=6.8.0">
+  <link rel="stylesheet" href="./workspace-nav.css?v=6.8.0">
 </head>
 <body>
 <header class="sch-top student-topbar">
-  <div class="sch-brand"><div class="sch-mark">Z</div><div><h1>Schematic <span>v6.7.0</span></h1><p>Logical view of the same student circuit</p></div></div>
+  <div class="sch-brand"><div class="sch-mark">Z</div><div><h1>Schematic <span>v6.8.0</span></h1><p>Logical view of the same student circuit</p></div></div>
   <nav class="workspace-nav" aria-label="Student workspace">
     <div class="workspace-tabs">
       <a class="workspace-tab" href="./index.html">Python Lab</a>
@@ -20,6 +20,7 @@
   </nav>
   <nav class="schematic-actions" aria-label="Schematic actions">
     <span id="status" class="status-pill">READY</span>
+    <button id="runSimulationBtn" class="run-simulation">▶ Run Simulation</button>
     <button id="syncBtn" class="primary">Update Python</button>
     <a class="optional-link" href="./settings.html">Settings</a>
   </nav>
@@ -44,12 +45,13 @@
     <div class="side-title">Design Check <span id="issueCount">0</span></div><div id="issues"></div>
     <div class="side-title top-gap">Shared Project</div><p>Move or add a part here and it appears on Circuit Design too. A valid circuit also updates the generated block in main.py.</p>
     <div class="aside-actions"><button id="saveBtn">Save</button><button id="reloadBtn">Reload</button><button id="tidyBtn">Tidy</button></div>
-    <div class="side-title top-gap">ESP32 Pin Map</div><div id="pinSummary" class="pin-summary"></div>
+    <div class="side-title top-gap">Custom Board Pin Map</div><div id="pinSummary" class="pin-summary"></div>
   </aside>
 </main>
 <div id="toast" hidden></div>
-<script src="./component-library.js?v=6.7.0"></script>
-<script src="./circuit-sync.js?v=6.7.0"></script>
-<script src="./schematic.js?v=6.7.0"></script>
+<script src="./component-library.js?v=6.8.0"></script>
+<script src="./circuit-sync.js?v=6.8.0"></script>
+<script src="./circuit-simulator.js?v=6.8.0"></script>
+<script src="./schematic.js?v=6.8.0"></script>
 </body>
 </html>

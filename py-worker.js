@@ -789,7 +789,7 @@ class CounterInput:
     def reset(self): _bridge_cmd("BRIDGE_COUNTER",self.key,op="reset",pin=self.pin,edge=self.edge,pullup=self.pullup);self._last_request=0.0;return True
 
 class HardwareTransaction:
-    """Run compact GPIO/pulse timing operations locally on ESP32. WRITE accepts optional safeValue as the fourth field."""
+    """Run compact GPIO/pulse timing operations locally on the ZEBJUS controller. WRITE accepts optional safeValue as the fourth field."""
     def __init__(self,key="custom"): self.key=str(key)
     def run(self,ops):
         if isinstance(ops,(list,tuple)): ops=";".join(",".join(str(x) for x in row) if isinstance(row,(list,tuple)) else str(row) for row in ops)
@@ -895,6 +895,266 @@ class Joystick:
     def __init__(self,x_pin=34,y_pin=35,switch_pin=None,active_low=True): self.x=ADC(x_pin);self.y=ADC(y_pin);self.switch=None if switch_pin is None else GPIOInput(switch_pin,"pullup" if active_low else "input",active_low);self.x_pin=int(x_pin);self.y_pin=int(y_pin);self.switch_pin=None if switch_pin is None else int(switch_pin)
     def read(self):
         out={"x":self.x.raw(),"y":self.y.raw(),"pressed":False if self.switch is None else self.switch.read()};dashboard("Joystick",X=out["x"],Y=out["y"],Pressed=out["pressed"]);return out
+
+# ---------------- ZEBJUS CUSTOM BOARD COMPONENT PACK v6.8 ----------------
+class DCMotor(MotorDriver):
+    """DC motor through a two-input H-bridge and one PWM enable pin."""
+    pass
+
+class TTGearMotor(MotorDriver):
+    """TT geared DC motor through an H-bridge."""
+    pass
+
+class StepperMotor:
+    __zebjus_ui__={"type":"stepper"}
+    _sequence=((1,0,0,0),(1,1,0,0),(0,1,0,0),(0,1,1,0),(0,0,1,0),(0,0,1,1),(0,0,0,1),(1,0,0,1))
+    def __init__(self,in1,in2,in3,in4,steps_per_revolution=2048):
+        self.pins=[DigitalOutput(x) for x in (in1,in2,in3,in4)];self.steps_per_revolution=max(1,int(steps_per_revolution));self.position=0
+    def step(self,steps=1,rpm=10):
+        steps=int(steps);direction=1 if steps>=0 else -1;delay=60.0/(max(.1,float(rpm))*self.steps_per_revolution*len(self._sequence))
+        for _ in range(abs(steps)):
+            self.position+=direction;pattern=self._sequence[self.position%len(self._sequence)]
+            for pin,value in zip(self.pins,pattern): pin.write(value)
+            time.sleep(min(.03,max(.0005,delay)))
+        _send("UI_MOTOR_SET",id=self.pins[0].pin,mode="stepper",steps=steps,position=self.position);return self.position
+    def rotate(self,degrees=90,rpm=10): return self.step(round(float(degrees)*self.steps_per_revolution/360.0),rpm)
+    def stop(self):
+        for pin in self.pins: pin.off()
+
+class BLDCESC(PWMServo):
+    __zebjus_ui__={"type":"motor"}
+    def __init__(self,pin,frequency=50,min_us=1000,max_us=2000): super().__init__(pin,min_us,max_us,frequency)
+    def arm(self,seconds=1.0): self.write_us(self.min_us);time.sleep(max(0,float(seconds)));return self
+    def throttle(self,percent=0):
+        p=max(0.0,min(100.0,float(percent)));self.write_us(self.min_us+(self.max_us-self.min_us)*p/100.0);_send("UI_MOTOR_SET",id=self.pin,pwmPin=self.pin,speed=p,mode="esc");return p
+    def stop(self): return self.throttle(0)
+
+class FanMotor(PWM):
+    __zebjus_ui__={"type":"motor"}
+    def __init__(self,pin,frequency=25000): super().__init__(pin,frequency,8,0)
+    def speed(self,percent=100): v=self.percent(percent);_send("UI_MOTOR_SET",id=self.pin,pwmPin=self.pin,speed=float(percent),mode="fan");return v
+    def stop(self): return self.off()
+
+class WaterPump(DigitalOutput): __zebjus_ui__={"type":"pump"}
+class Solenoid(DigitalOutput): __zebjus_ui__={"type":"solenoid"}
+class LaserModule(DigitalOutput): __zebjus_ui__={"type":"laser"}
+
+class VibrationMotor(PWM):
+    __zebjus_ui__={"type":"motor"}
+    def __init__(self,pin,frequency=1200): super().__init__(pin,frequency,8,0)
+    def intensity(self,percent=100): return self.percent(percent)
+    def stop(self): return self.off()
+
+class PCA9685:
+    __zebjus_ui__={"type":"pwm_expander"}
+    def __init__(self,sda=None,scl=None,address=0x40,bus=0,frequency=50):
+        self.dev=I2CDevice(address,sda,scl,400000,bus);self.address=int(address);self.frequency=max(1,int(frequency));self.dev.write_register(0x00,0x00);self.set_frequency(self.frequency)
+    def set_frequency(self,frequency=50):
+        self.frequency=max(1,min(1600,int(frequency)));prescale=max(3,min(255,round(25000000/(4096*self.frequency)-1)));self.dev.write_register(0xFE,prescale);return self.frequency
+    def set_pwm(self,channel,on=0,off=0):
+        ch=max(0,min(15,int(channel)));on=max(0,min(4095,int(on)));off=max(0,min(4095,int(off)));self.dev.write_register(0x06+4*ch,[on&255,on>>8,off&255,off>>8]);dashboard("PCA9685",Channel=ch,PWM=off,Frequency=self.frequency);return off
+    def percent(self,channel,value): return self.set_pwm(channel,0,round(4095*max(0,min(100,float(value)))/100.0))
+    def servo(self,channel,angle=90,min_us=500,max_us=2500):
+        a=max(0,min(180,float(angle)));us=float(min_us)+(float(max_us)-float(min_us))*a/180.0;return self.set_pwm(channel,0,round(4096*us*self.frequency/1000000.0))
+    def off(self,channel): return self.set_pwm(channel,0,0)
+
+class _I2CSensor:
+    sensor_name="I2C Sensor"
+    def __init__(self,sda=None,scl=None,address=0x00,bus=0): self.dev=I2CDevice(address,sda,scl,400000,bus);self.address=int(address)
+    def _phase(self,speed=.35): return _sim_phase(self.address*.07,speed)
+    def _raw(self,register,length): return list(self.dev.read_registers(register,length))
+
+class LSM6DS3(_I2CSensor):
+    sensor_name="LSM6DS3"
+    def __init__(self,sda=None,scl=None,address=0x6B,bus=0): super().__init__(sda,scl,address,bus);self.dev.write_register(0x10,0x40);self.dev.write_register(0x11,0x40)
+    def read(self):
+        if _simulating():
+            p=self._phase(.7);out={"accel_x":round(math.sin(p)*.35,4),"accel_y":round(math.cos(p*.8)*.25,4),"accel_z":round(.96+math.sin(p*.3)*.04,4),"gyro_x":round(math.cos(p)*18,2),"gyro_y":round(math.sin(p*.7)*14,2),"gyro_z":round(math.sin(p*.4)*8,2),"temperature":round(27+math.sin(p*.2),2),"valid":True,"simulated":True}
+        else: out={"raw":self._raw(0x20,14),"valid":True,"simulated":False}
+        dashboard(self.sensor_name,**out);return out
+
+class BME280(_I2CSensor):
+    sensor_name="BME280"
+    def __init__(self,sda=None,scl=None,address=0x76,bus=0): super().__init__(sda,scl,address,bus);self.dev.write_register(0xF2,1);self.dev.write_register(0xF4,0x27)
+    def read(self):
+        if _simulating():
+            p=self._phase(.18);out={"temperature":round(27+2.2*math.sin(p),2),"humidity":round(58+9*math.cos(p*.8),2),"pressure":round(1008+4*math.sin(p*.45),2),"valid":True,"simulated":True}
+        else: out={"raw":self._raw(0xF7,8),"valid":True,"simulated":False}
+        dashboard(self.sensor_name,**out);return out
+    def temperature(self): return self.read().get("temperature",float("nan"))
+    def humidity(self): return self.read().get("humidity",float("nan"))
+    def pressure(self): return self.read().get("pressure",float("nan"))
+
+class BMP280(BME280):
+    sensor_name="BMP280"
+    def __init__(self,sda=None,scl=None,address=0x77,bus=0): _I2CSensor.__init__(self,sda,scl,address,bus);self.dev.write_register(0xF4,0x27)
+    def read(self):
+        out=super().read();out.pop("humidity",None);return out
+
+class ADXL345(_I2CSensor):
+    sensor_name="ADXL345"
+    def __init__(self,sda=None,scl=None,address=0x53,bus=0): super().__init__(sda,scl,address,bus);self.dev.write_register(0x2D,0x08)
+    def read(self):
+        if _simulating():
+            p=self._phase(.6);out={"x":round(math.sin(p)*.5,3),"y":round(math.cos(p*.7)*.35,3),"z":round(.95+math.sin(p*.3)*.05,3),"valid":True,"simulated":True}
+        else: out={"raw":self._raw(0x32,6),"valid":True,"simulated":False}
+        dashboard(self.sensor_name,**out);return out
+
+class BH1750(_I2CSensor):
+    sensor_name="BH1750"
+    def __init__(self,sda=None,scl=None,address=0x23,bus=0): super().__init__(sda,scl,address,bus);self.dev.write(bytes([0x10]))
+    def lux(self):
+        if _simulating(): v=max(0,round(420+360*math.sin(self._phase(.22)),1))
+        else:
+            d=self.dev.read(2);v=((d[0]<<8)|d[1])/1.2 if len(d)>=2 else float("nan")
+        dashboard(self.sensor_name,Lux=v);return v
+    def read(self): return self.lux()
+
+class VL53L0X(_I2CSensor):
+    sensor_name="VL53L0X"
+    def __init__(self,sda=None,scl=None,address=0x29,bus=0): super().__init__(sda,scl,address,bus)
+    def distance_mm(self):
+        if _simulating(): v=round(80+720*(.5+.5*math.sin(self._phase(.34))))
+        else:
+            d=self._raw(0x1E,2);v=(d[0]<<8|d[1]) if len(d)>=2 else 0
+        dashboard(self.sensor_name,Distance_mm=v);return v
+    def read(self): return self.distance_mm()
+
+class DS3231(_I2CSensor):
+    sensor_name="DS3231 RTC"
+    def __init__(self,sda=None,scl=None,address=0x68,bus=0): super().__init__(sda,scl,address,bus)
+    @staticmethod
+    def _bcd(v): return (v>>4)*10+(v&15)
+    def datetime(self):
+        if _simulating():
+            t=time.localtime();out={"year":t.tm_year,"month":t.tm_mon,"day":t.tm_mday,"hour":t.tm_hour,"minute":t.tm_min,"second":t.tm_sec,"simulated":True}
+        else:
+            d=self._raw(0,7);out={"year":2000+self._bcd(d[6]),"month":self._bcd(d[5]&31),"day":self._bcd(d[4]),"hour":self._bcd(d[2]&63),"minute":self._bcd(d[1]),"second":self._bcd(d[0]),"simulated":False} if len(d)>=7 else {}
+        dashboard(self.sensor_name,**out);return out
+    def read(self): return self.datetime()
+
+class DS18B20:
+    __zebjus_ui__={"type":"temperature"}
+    def __init__(self,pin): self.pin=int(pin);self.key=f"ds18b20:{self.pin}"
+    def temperature(self):
+        if _simulating(): value=round(26.5+2.5*math.sin(_sim_phase(self.pin*.11,.22)),2)
+        else:
+            _bridge_cmd("BRIDGE_TRANSACTION",self.key,ops=f"ONEWIRE,{self.pin},DS18B20");value=float((_bridge_get("transaction",self.key,{}) or {}).get("temperature",float("nan")))
+        dashboard("DS18B20",Temperature_C=value,Pin=self.pin);return value
+    def read(self): return self.temperature()
+
+class IRObstacle(GPIOInput):
+    __zebjus_ui__={"type":"digital_input"}
+    def __init__(self,pin,active_low=True): super().__init__(pin,"input",active_low)
+class IRReceiver(GPIOInput):
+    __zebjus_ui__={"type":"ir"}
+    def __init__(self,pin,active_low=True): super().__init__(pin,"input",active_low)
+    def code(self): return int(_sim_phase(self.pin,.15))%8 if _simulating() else self.state()
+class LineSensor(GPIOInput):
+    __zebjus_ui__={"type":"line"}
+    def __init__(self,pin,active_low=False): super().__init__(pin,"input",active_low)
+class TiltSensor(GPIOInput):
+    __zebjus_ui__={"type":"tilt"}
+    def __init__(self,pin,active_low=False): super().__init__(pin,"pullup",active_low)
+
+class HallSensor(CounterInput):
+    __zebjus_ui__={"type":"hall"}
+    def __init__(self,pin,edge="rising",pullup=False): super().__init__(pin,edge,pullup)
+class PhotoInterrupt(CounterInput):
+    __zebjus_ui__={"type":"counter_input"}
+    def __init__(self,pin,edge="rising",pullup=False): super().__init__(pin,edge,pullup)
+class FlexSensor(ADC): __zebjus_ui__={"type":"flex"}
+class CurrentSensor(ADC):
+    __zebjus_ui__={"type":"current"}
+    def amps(self,sensitivity_mv_per_amp=185,zero_mv=1650):
+        value=(self.millivolts()-float(zero_mv))/max(.001,float(sensitivity_mv_per_amp));dashboard("Current Sensor",Current_A=round(value,3));return value
+
+class HX711:
+    __zebjus_ui__={"type":"weight"}
+    def __init__(self,data_pin,clock_pin,scale=1,offset=0): self.data_pin=int(data_pin);self.clock=DigitalOutput(clock_pin);self.scale=float(scale) if float(scale)!=0 else 1.0;self.offset=float(offset);self.key=f"hx711:{self.data_pin}:{self.clock.pin}"
+    def read_raw(self):
+        if _simulating(): value=int(825000+65000*math.sin(_sim_phase(self.data_pin*.04,.18)))
+        else:
+            _bridge_cmd("BRIDGE_TRANSACTION",self.key,ops=f"HX711,{self.data_pin},{self.clock.pin}");r=(_bridge_get("transaction",self.key,{}) or {}).get("results",[]);value=int(r[0]) if r else 0
+        return value
+    def read(self):
+        value=(self.read_raw()-self.offset)/self.scale;dashboard("HX711 Load Cell",Weight=round(value,2),Raw=self.read_raw());return value
+    def tare(self,samples=5): self.offset=sum(self.read_raw() for _ in range(max(1,int(samples))))/max(1,int(samples));return self.offset
+
+class _SPIDevice:
+    def __init__(self,sck=18,miso=19,mosi=23,cs=4,bus=1,frequency=1000000,mode=0): self.spi=SPI(sck,miso,mosi,cs,frequency,mode,bus);self._memory={}
+
+class RC522(_SPIDevice):
+    __zebjus_ui__={"type":"rfid"}
+    def read_uid(self):
+        if _simulating(): uid="04:A1:B2:C3"
+        else:
+            d=self.spi.transfer([0x00,0,0,0,0]);uid=":".join(f"{x:02X}" for x in d[:4]) if d else ""
+        dashboard("RC522 RFID",UID=uid or "NO CARD");return uid
+    def read(self): return self.read_uid()
+
+class MicroSD(_SPIDevice):
+    __zebjus_ui__={"type":"storage"}
+    def write_text(self,path,text): self._memory[str(path)]=str(text);dashboard("MicroSD",File=str(path),Bytes=len(str(text)));return True
+    def read_text(self,path,default=""): return self._memory.get(str(path),default)
+    def listdir(self): return sorted(self._memory)
+
+class MAX7219(_SPIDevice):
+    __zebjus_ui__={"type":"display"}
+    def __init__(self,sck=18,miso=19,mosi=23,cs=4,bus=1,brightness=8): super().__init__(sck,miso,mosi,cs,bus,1000000,0);self.brightness=max(0,min(15,int(brightness)));self.spi.write([0x0A,self.brightness,0x0C,1])
+    def show(self,value): self.spi.write(_bytes(str(value)));dashboard("MAX7219",Value=str(value),Brightness=self.brightness);return value
+    def clear(self): return self.show("")
+
+class LoRaSX1278(_SPIDevice):
+    __zebjus_ui__={"type":"radio"}
+    def __init__(self,sck=18,miso=19,mosi=23,cs=4,bus=1,frequency=433000000): super().__init__(sck,miso,mosi,cs,bus,4000000,0);self.frequency=int(frequency);self._last=""
+    def send(self,message): self._last=str(message);self.spi.write(_bytes(self._last));dashboard("LoRa SX1278",TX=self._last,Frequency=self.frequency);return True
+    def receive(self):
+        value=("SIM:"+self._last) if _simulating() and self._last else "";dashboard("LoRa SX1278",RX=value or "WAITING",Frequency=self.frequency);return value
+
+class MCP2515(_SPIDevice):
+    __zebjus_ui__={"type":"can"}
+    def __init__(self,sck=18,miso=19,mosi=23,cs=4,interrupt_pin=34,bus=1,bitrate=500000): super().__init__(sck,miso,mosi,cs,bus,8000000,0);self.interrupt=GPIOInput(interrupt_pin);self.bitrate=int(bitrate);self._frames=[]
+    def send(self,can_id,data): frame={"id":int(can_id),"data":_bytes(data)};self._frames.append(frame);dashboard("MCP2515 CAN",TX_ID=hex(int(can_id)),Bytes=len(frame["data"]));return True
+    def receive(self): return self._frames.pop(0) if self._frames else None
+
+class NeoPixel:
+    __zebjus_ui__={"type":"neopixel"}
+    def __init__(self,pin,count=8,brightness=1.0): self.pin=int(pin);self.count=max(1,int(count));self.brightness=max(0,min(1,float(brightness)));self.pixels=[(0,0,0)]*self.count
+    def set(self,index,color): self.pixels[int(index)%self.count]=tuple(max(0,min(255,int(x))) for x in color[:3]);return self
+    def fill(self,color): self.pixels=[tuple(max(0,min(255,int(x))) for x in color[:3])]*self.count;return self.show()
+    def show(self): _send("UI_NEOPIXEL_SET",pin=self.pin,count=self.count,pixels=self.pixels,brightness=self.brightness);dashboard("NeoPixel",Pixels=self.count,Color=str(self.pixels[0]));return self.pixels
+    def clear(self): return self.fill((0,0,0))
+
+class Keypad4x4:
+    __zebjus_ui__={"type":"keypad"}
+    _keys=("1","2","3","A","4","5","6","B","7","8","9","C","*","0","#","D")
+    def __init__(self,rows,cols): self.rows=[DigitalOutput(x) for x in rows];self.cols=[GPIOInput(x,"pullup",True) for x in cols];self._last=""
+    def read(self):
+        if _simulating():
+            i=int(_sim_phase(.3,.08))%24;key=self._keys[i] if i<16 else ""
+        else:
+            key=""
+            for r,out in enumerate(self.rows):
+                for x in self.rows:x.off()
+                out.on()
+                for c,inp in enumerate(self.cols):
+                    if inp.read(): key=self._keys[r*4+c];break
+                if key:break
+        if key!=self._last: dashboard("4x4 Keypad",Key=key or "—")
+        self._last=key;return key
+
+class SevenSegment:
+    __zebjus_ui__={"type":"display"}
+    _digits={"0":0x3F,"1":0x06,"2":0x5B,"3":0x4F,"4":0x66,"5":0x6D,"6":0x7D,"7":0x07,"8":0x7F,"9":0x6F,"-":0x40," ":0}
+    def __init__(self,pins,common_anode=False):
+        if len(pins)!=8: raise ValueError("SevenSegment needs 8 pins: A B C D E F G DP")
+        self.pins=[DigitalOutput(x) for x in pins];self.common_anode=bool(common_anode)
+    def show(self,value,dot=False):
+        char=str(value)[-1:] or " ";mask=self._digits.get(char.upper(),0)|(0x80 if dot else 0)
+        for i,p in enumerate(self.pins): p.write(not bool(mask&(1<<i)) if self.common_anode else bool(mask&(1<<i)))
+        dashboard("7-Segment",Value=char,Dot=bool(dot));return char
+    def clear(self): return self.show(" ")
 
 def sleep(seconds): time.sleep(float(seconds))
 
@@ -1094,11 +1354,12 @@ z=types.ModuleType("zebjus")
 for k,v in {
     "RGBLED":RGBLED,"LED":LED,"Motor":Motor,"Servo":Servo,"OLED":OLED,"TM1637":TM1637,"LCD1602":LCD1602,"DHT11":DHT11,"SerialPlotter":SerialPlotter,
     "plot":plot,"clear_plot":clear_plot,"dashboard":dashboard,"Ultrasonic":Ultrasonic,"AnalogInput":AnalogInput,"Potentiometer":Potentiometer,"DigitalInput":DigitalInput,"Switch":Switch,"RotaryEncoder":RotaryEncoder,
-    "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"SoundSensor":SoundSensor,"RainSensor":RainSensor,"WaterLevelSensor":WaterLevelSensor,"Thermistor":Thermistor,"PIRSensor":PIRSensor,"ReedSwitch":ReedSwitch,"TouchSensor":TouchSensor,"FlameSensor":FlameSensor,"FlowSensor":FlowSensor,"RPMSensor":RPMSensor,"Buzzer":Buzzer,"Joystick":Joystick,"sleep":sleep
+    "DigitalOutput":DigitalOutput,"Relay":Relay,"GPIOInput":GPIOInput,"ADC":ADC,"PWM":PWM,"PWMServo":PWMServo,"MotorDriver":MotorDriver,"I2C":I2C,"I2CDevice":I2CDevice,"UART":UART,"SPI":SPI,"PulseInput":PulseInput,"PulseOutput":PulseOutput,"CounterInput":CounterInput,"HardwareTransaction":HardwareTransaction,"GPS":GPS,"MPU6050":MPU6050,"LDR":LDR,"SoilMoisture":SoilMoisture,"GasSensor":GasSensor,"VoltageSensor":VoltageSensor,"SoundSensor":SoundSensor,"RainSensor":RainSensor,"WaterLevelSensor":WaterLevelSensor,"Thermistor":Thermistor,"PIRSensor":PIRSensor,"ReedSwitch":ReedSwitch,"TouchSensor":TouchSensor,"FlameSensor":FlameSensor,"FlowSensor":FlowSensor,"RPMSensor":RPMSensor,"Buzzer":Buzzer,"Joystick":Joystick,
+    "DCMotor":DCMotor,"TTGearMotor":TTGearMotor,"StepperMotor":StepperMotor,"BLDCESC":BLDCESC,"FanMotor":FanMotor,"WaterPump":WaterPump,"Solenoid":Solenoid,"VibrationMotor":VibrationMotor,"PCA9685":PCA9685,"LSM6DS3":LSM6DS3,"BME280":BME280,"BMP280":BMP280,"ADXL345":ADXL345,"BH1750":BH1750,"VL53L0X":VL53L0X,"DS18B20":DS18B20,"IRObstacle":IRObstacle,"IRReceiver":IRReceiver,"LineSensor":LineSensor,"HallSensor":HallSensor,"FlexSensor":FlexSensor,"CurrentSensor":CurrentSensor,"HX711":HX711,"RC522":RC522,"MicroSD":MicroSD,"MAX7219":MAX7219,"NeoPixel":NeoPixel,"Keypad4x4":Keypad4x4,"DS3231":DS3231,"LoRaSX1278":LoRaSX1278,"MCP2515":MCP2515,"PhotoInterrupt":PhotoInterrupt,"TiltSensor":TiltSensor,"LaserModule":LaserModule,"SevenSegment":SevenSegment,"sleep":sleep
 }.items(): setattr(z,k,v)
 for i,c in LED_CLASSES.items(): setattr(z,f"LED{i}",c)
 for i,c in RGBLED_CLASSES.items(): setattr(z,f"RGBLED{i}",c)
-z.__all__=["RGBLED","LED","Motor","Servo","OLED","TM1637","LCD1602","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
+z.__all__=["RGBLED","LED","Motor","Servo","OLED","TM1637","LCD1602","DHT11","SerialPlotter","plot","clear_plot","dashboard","Ultrasonic","AnalogInput","Potentiometer","DigitalInput","Switch","RotaryEncoder","DigitalOutput","Relay","GPIOInput","ADC","PWM","PWMServo","MotorDriver","I2C","I2CDevice","UART","SPI","PulseInput","PulseOutput","CounterInput","HardwareTransaction","GPS","MPU6050","LDR","SoilMoisture","GasSensor","VoltageSensor","SoundSensor","RainSensor","WaterLevelSensor","Thermistor","PIRSensor","ReedSwitch","TouchSensor","FlameSensor","FlowSensor","RPMSensor","Buzzer","Joystick","DCMotor","TTGearMotor","StepperMotor","BLDCESC","FanMotor","WaterPump","Solenoid","VibrationMotor","PCA9685","LSM6DS3","BME280","BMP280","ADXL345","BH1750","VL53L0X","DS18B20","IRObstacle","IRReceiver","LineSensor","HallSensor","FlexSensor","CurrentSensor","HX711","RC522","MicroSD","MAX7219","NeoPixel","Keypad4x4","DS3231","LoRaSX1278","MCP2515","PhotoInterrupt","TiltSensor","LaserModule","SevenSegment","sleep"]+[f"LED{i}" for i in range(1,16)]+[f"RGBLED{i}" for i in range(1,6)]
 sys.modules["zebjus"]=z
 
 za=types.ModuleType("zebjus_ai")
